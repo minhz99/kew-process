@@ -2863,16 +2863,13 @@
         gallery.appendChild(card);
         card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
-        try {
-          const fd = new FormData();
-          fd.append('image', file);
-          fd.append('idx', i); // screen index
-          for (const [k, v] of Object.entries(parameters)) fd.append(k, v);
+            try {
+      // Local processing
+      if (Object.keys(DIGIT_TEMPLATES).length === 0) await loadDigitTemplates();
+      
+      const blob = await processImageClientSide(file, i, parameters);
+      const url = URL.createObjectURL(blob);
 
-          const res = await fetch('/api/edit-meter-image', { method: 'POST', body: fd });
-          if (!res.ok) throw new Error(await res.text());
-          const blob = await res.blob();
-          const url = URL.createObjectURL(blob);
 
           card.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
@@ -2914,7 +2911,172 @@
     }
 
 
-    // Development fallback (only runs if accessed as local file)
+    
+const SCREENS = [
+  {
+    id: "SD140",
+    overlays: [
+      ...makeGrid(["V1","V2","V3"], [94,158,222], 54, "w"),
+      ...makeGrid(["A1","A2","A3"], [94,158,222], 70, "g"),
+      ...makeGrid(["P1","P2","P3"], [94,158,222], 86, "w"),
+      ...makeGrid(["Q1","Q2","Q3"], [94,158,222], 102, "g"),
+      ...makeGrid(["S1","S2","S3"], [94,158,222], 118, "w"),
+      ...makeGrid(["PF1","PF2","PF3"], [94,158,222], 134, "g"),
+      {id:"P", x:94, y:153, bg:"w", scale: 0.96},
+      {id:"freq", alias:"f", x:222, y:153, bg:"w", scale: 0.96},
+      {id:"Q", x:94, y:169, bg:"g", scale: 0.96},
+      {id:"S", x:94, y:185, bg:"w", scale: 0.96},
+      {id:"PF", x:94, y:201, bg:"g", scale: 0.96, w_clear: 55},
+      {id:"An", x:222, y:201, bg:"g", scale: 0.96}
+    ].map(o => (["PF1","PF2","PF3"].includes(o.id) ? {...o, w_clear:55} : o))
+  },
+  {
+    id: "SD141",
+    overlays: [
+      {id:"V1", x:63, y:36, bg:"w", scale: 0.85, w_clear: 45},
+      {id:"Vdeg1", x:121, y:36, bg:"w", scale: 0.85, w_clear: 45},
+      {id:"V2", x:63, y:52, bg:"g", scale: 0.85, w_clear: 45},
+      {id:"Vdeg2", x:121, y:52, bg:"g", scale: 0.85, w_clear: 45},
+      {id:"V3", x:63, y:68, bg:"w", scale: 0.85, w_clear: 45},
+      {id:"Vdeg3", x:121, y:68, bg:"w", scale: 0.85, w_clear: 45},
+      {id:"A1", x:63, y:87, bg:"w", scale: 0.85, w_clear: 45},
+      {id:"Adeg1", x:121, y:87, bg:"w", scale: 0.85, w_clear: 45},
+      {id:"A2", x:63, y:103, bg:"g", scale: 0.85, w_clear: 45},
+      {id:"Adeg2", x:121, y:103, bg:"g", scale: 0.85, w_clear: 45},
+      {id:"A3", x:63, y:119, bg:"w", scale: 0.85, w_clear: 45},
+      {id:"Adeg3", x:121, y:119, bg:"w", scale: 0.85, w_clear: 45},
+      {id:"freq", alias:"f", x:83, y:154, bg:"w", scale: 0.85, w_clear: 45},
+      {id:"V_unb", alias:"V%", x:83, y:189, bg:"g", scale: 0.85, w_clear: 45},
+      {id:"A_unb", alias:"A%", x:83, y:205, bg:"w", scale: 0.85, w_clear: 45}
+    ]
+  },
+  { id: "SD142", overlays: makeGrid(["V1","V2","V3"], [76,136,196], 47, "w") },
+  { id: "SD143", overlays: [
+      ...makeGrid(["V1","V2","V3"], [76,136,196], 47, "w"),
+      ...makeGrid(["A1","A2","A3"], [76,136,196], 63, "g")
+    ]
+  },
+  { id: "SD144", overlays: [
+      ...makeGrid(["V1","V2","V3"], [76,136,196], 47, "w"),
+      ...makeGrid(["THDV1","THDV2","THDV3"], [76,136,196], 63, "g")
+    ]
+  },
+  { id: "SD145", overlays: [
+      ...makeGrid(["A1","A2","A3"], [76,136,196], 47, "w"),
+      ...makeGrid(["THDA1","THDA2","THDA3"], [76,136,196], 63, "g")
+    ]
+  }
+];
+
+function makeGrid(ids, x_rights, y_bot, bg, scale=0.96) {
+  return ids.map((id, i) => ({ id, x: x_rights[i], y: y_bot, bg, scale }));
+}
+
+const DIGIT_TEMPLATES = {};
+const CHAR_MAP = {'.': 'dot', '-': 'minus', ':': 'colon'};
+
+async function loadDigitTemplates() {
+    const symbols = ['0','1','2','3','4','5','6','7','8','9','dot','minus','colon'];
+    const colors = ['w', 'g'];
+    const promises = [];
+    
+    for (let s of symbols) {
+        for (let c of colors) {
+            const key = `${s}_${c}`;
+            promises.push((async () => {
+                const img = new Image();
+                img.src = `templates/digits/${s}${c}.bmp`;
+                await new Promise(r => { img.onload = r; img.onerror = r; });
+                if (img.complete && img.naturalWidth > 0) {
+                    DIGIT_TEMPLATES[key] = img;
+                }
+            })());
+        }
+    }
+    await Promise.all(promises);
+}
+
+function getDigitImg(char, color) {
+    const s = CHAR_MAP[char] || char;
+    let key = `${s}_${color}`;
+    if (DIGIT_TEMPLATES[key]) return DIGIT_TEMPLATES[key];
+    // Fallback
+    key = `${s}_${color === 'w' ? 'g' : 'w'}`;
+    return DIGIT_TEMPLATES[key] || null;
+}
+
+async function processImageClientSide(file, screenIdx, params) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const img = new Image();
+            img.onload = async () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                
+                const sc = SCREENS[screenIdx % 6];
+                for (const overlay of sc.overlays) {
+                    let val = params[overlay.id];
+                    if (val === undefined && overlay.alias) val = params[overlay.alias];
+                    if (val !== undefined && val !== null && val !== "") {
+                        await applyTextToCanvas(ctx, overlay, String(val));
+                    }
+                }
+                
+                canvas.toBlob(blob => resolve(blob), 'image/bmp');
+            };
+            img.onerror = reject;
+            img.src = e.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
+async function applyTextToCanvas(ctx, config, text) {
+    const x_right = config.x;
+    const y_bot = config.y;
+    const color = config.bg || 'w';
+    const w_clear = config.w_clear || 50;
+    const h_clear = 15;
+    const scale = config.scale || 1.0;
+    
+    const x_left = Math.max(0, x_right - w_clear + 1);
+    const y_top = Math.max(0, y_bot - h_clear + 1);
+    
+    // 1. Clear background (sample from bottom-left of clear area)
+    const pixel = ctx.getImageData(x_left, y_bot, 1, 1).data;
+    ctx.fillStyle = `rgb(${pixel[0]},${pixel[1]},${pixel[2]})`;
+    ctx.fillRect(x_left, y_top, w_clear, h_clear);
+    
+    // 2. Draw text
+    const chars = text.split('').reverse();
+    let curr_x = x_right + 1;
+    
+    for (const char of chars) {
+        let c = char === '/' ? '.' : char;
+        const digitImg = getDigitImg(c, color);
+        if (digitImg) {
+            const dw = Math.floor(digitImg.naturalWidth * scale);
+            const dh = Math.floor(digitImg.naturalHeight * scale);
+            const spacing = dw >= 8 ? 1 : 2;
+            
+            curr_x -= dw;
+            const pasteY = y_bot - dh + 1;
+            ctx.drawImage(digitImg, curr_x, pasteY, dw, dh);
+            curr_x -= spacing;
+        } else {
+            curr_x -= Math.floor(6 * scale);
+        }
+    }
+}
+
+
+
+// Development fallback (only runs if accessed as local file)
     if (window.location.protocol === 'file:') {
       document.getElementById('upload-container').style.display = 'none';
       document.getElementById('app-container').style.display = 'block';

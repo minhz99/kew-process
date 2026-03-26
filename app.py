@@ -7,9 +7,7 @@ import shutil
 import zipfile
 from analyse_kew import build_analysis, sanitize, generate_commentary
 import sys
-from PIL import Image
-sys.path.append(os.path.join(os.path.dirname(__file__), 'scripts'))
-import meter_editor
+from analyse_kew import build_analysis, sanitize, generate_commentary
 
 app = Flask(__name__, static_folder='.', static_url_path='')
 
@@ -373,77 +371,7 @@ def correct_files():
         shutil.rmtree(temp_in, ignore_errors=True)
         shutil.rmtree(temp_out, ignore_errors=True)
 
-@app.route('/api/edit-meter-images', methods=['POST'])
-def edit_meter_images():
-    # ... (existing code for ZIP)
-    try:
-        if 'zip' not in request.files:
-            return jsonify({'error': 'Không có file ZIP nào được upload'}), 400
-            
-        zip_file = request.files['zip']
-        params = request.form.to_dict()
-        if 'fluctuate' in params:
-            params['fluctuate'] = params['fluctuate'] == 'true'
-            
-        zip_bytes = io.BytesIO(zip_file.read())
-        out_zip_bytes = meter_editor.process_zip(zip_bytes, params)
-        
-        return send_file(out_zip_bytes, download_name='Edited_Meter_Images.zip', as_attachment=True, mimetype='application/zip')
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': f'Lỗi chỉnh sửa ảnh: {str(e)}'}), 500
 
-@app.route('/api/edit-meter-image', methods=['POST'])
-def edit_meter_image():
-    try:
-        if 'image' not in request.files:
-            return jsonify({'error': 'Không có file ảnh nào được upload'}), 400
-            
-        file = request.files['image']
-        idx = int(request.form.get('idx', 0))
-        params = request.form.to_dict()
-        if 'fluctuate' in params:
-            params['fluctuate'] = params['fluctuate'] == 'true'
-            
-        img = Image.open(file).convert('RGB')
-        img = meter_editor.process_image(img, idx, params)
-        
-        img_io = io.BytesIO()
-        img.save(img_io, 'BMP')
-        img_io.seek(0)
-        
-        return send_file(img_io, mimetype='image/bmp')
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/edit-meter-images-bulk', methods=['POST'])
-def edit_meter_images_bulk():
-    try:
-        files = request.files.getlist('files')
-        if not files:
-            return jsonify({'error': 'Không có file nào được upload'}), 400
-            
-        params = request.form.to_dict()
-        if 'fluctuate' in params:
-            params['fluctuate'] = params['fluctuate'] == 'true'
-            
-        # Create an in-memory ZIP from the uploaded files
-        in_zip_bytes = io.BytesIO()
-        with zipfile.ZipFile(in_zip_bytes, 'w') as zf:
-            for idx, f in enumerate(files):
-                # Use filename or just index if missing
-                fname = f.filename or f"image_{idx}.bmp"
-                zf.writestr(fname, f.read())
-        
-        in_zip_bytes.seek(0)
-        out_zip_bytes = meter_editor.process_zip(in_zip_bytes, params)
-        
-        return send_file(out_zip_bytes, download_name='Edited_Meter_Images.zip', as_attachment=True, mimetype='application/zip')
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
 
 
 
