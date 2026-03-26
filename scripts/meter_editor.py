@@ -43,11 +43,16 @@ sc0.extend(make_grid(['P1','P2','P3'], [94,158,222], 86, 'w'))
 sc0.extend(make_grid(['Q1','Q2','Q3'], [94,158,222], 102, 'g'))
 sc0.extend(make_grid(['S1','S2','S3'], [94,158,222], 118, 'w'))
 sc0.extend(make_grid(['PF1','PF2','PF3'], [94,158,222], 134, 'g'))
+# Override w_clear for PFs in sc0
+for overlay in sc0:
+    if overlay['id'] in ['PF1', 'PF2', 'PF3']:
+        overlay['w_clear'] = 55
+
 sc0.append({'id':'P', 'x':94, 'y':153, 'bg':'w', 'scale': 0.96})
 sc0.append({'id':'freq', 'alias':'f', 'x':222, 'y':153, 'bg':'w', 'scale': 0.96})
 sc0.append({'id':'Q', 'x':94, 'y':169, 'bg':'g', 'scale': 0.96})
 sc0.append({'id':'S', 'x':94, 'y':185, 'bg':'w', 'scale': 0.96})
-sc0.append({'id':'PF', 'x':94, 'y':201, 'bg':'g', 'scale': 0.96})
+sc0.append({'id':'PF', 'x':94, 'y':201, 'bg':'g', 'scale': 0.96, 'w_clear': 55})
 sc0.append({'id':'An', 'x':222, 'y':201, 'bg':'g', 'scale': 0.96})
 
 sc1 = []
