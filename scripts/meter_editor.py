@@ -51,21 +51,21 @@ sc0.append({'id':'PF', 'x':94, 'y':201, 'bg':'g'})
 sc0.append({'id':'An', 'x':222, 'y':201, 'bg':'g'})
 
 sc1 = []
-sc1.append({'id':'V1', 'x':63, 'y':37, 'bg':'w', 'scale': 0.8})
-sc1.append({'id':'Vdeg1', 'x':121, 'y':37, 'bg':'w', 'scale': 0.8})
-sc1.append({'id':'V2', 'x':63, 'y':53, 'bg':'g', 'scale': 0.8})
-sc1.append({'id':'Vdeg2', 'x':121, 'y':53, 'bg':'g', 'scale': 0.8})
-sc1.append({'id':'V3', 'x':63, 'y':69, 'bg':'w', 'scale': 0.8})
-sc1.append({'id':'Vdeg3', 'x':121, 'y':69, 'bg':'w', 'scale': 0.8})
-sc1.append({'id':'A1', 'x':63, 'y':88, 'bg':'w', 'scale': 0.8})
-sc1.append({'id':'Adeg1', 'x':121, 'y':88, 'bg':'w', 'scale': 0.8})
-sc1.append({'id':'A2', 'x':63, 'y':104, 'bg':'g', 'scale': 0.8})
-sc1.append({'id':'Adeg2', 'x':121, 'y':104, 'bg':'g', 'scale': 0.8})
-sc1.append({'id':'A3', 'x':63, 'y':120, 'bg':'w', 'scale': 0.8})
-sc1.append({'id':'Adeg3', 'x':121, 'y':120, 'bg':'w', 'scale': 0.8})
-sc1.append({'id':'freq', 'alias':'f', 'x':83, 'y':155, 'bg':'w', 'scale': 0.8})
-sc1.append({'id':'V_unb', 'alias':'V%', 'x':81, 'y':190, 'bg':'g', 'scale': 0.8})
-sc1.append({'id':'A_unb', 'alias':'A%', 'x':82, 'y':206, 'bg':'w', 'scale': 0.8})
+sc1.append({'id':'V1', 'x':63, 'y':37, 'bg':'w', 'scale': 0.8, 'w_clear': 45})
+sc1.append({'id':'Vdeg1', 'x':121, 'y':37, 'bg':'w', 'scale': 0.8, 'w_clear': 45})
+sc1.append({'id':'V2', 'x':63, 'y':53, 'bg':'g', 'scale': 0.8, 'w_clear': 45})
+sc1.append({'id':'Vdeg2', 'x':121, 'y':53, 'bg':'g', 'scale': 0.8, 'w_clear': 45})
+sc1.append({'id':'V3', 'x':63, 'y':69, 'bg':'w', 'scale': 0.8, 'w_clear': 45})
+sc1.append({'id':'Vdeg3', 'x':121, 'y':69, 'bg':'w', 'scale': 0.8, 'w_clear': 45})
+sc1.append({'id':'A1', 'x':63, 'y':88, 'bg':'w', 'scale': 0.8, 'w_clear': 45})
+sc1.append({'id':'Adeg1', 'x':121, 'y':88, 'bg':'w', 'scale': 0.8, 'w_clear': 45})
+sc1.append({'id':'A2', 'x':63, 'y':104, 'bg':'g', 'scale': 0.8, 'w_clear': 45})
+sc1.append({'id':'Adeg2', 'x':121, 'y':104, 'bg':'g', 'scale': 0.8, 'w_clear': 45})
+sc1.append({'id':'A3', 'x':63, 'y':120, 'bg':'w', 'scale': 0.8, 'w_clear': 45})
+sc1.append({'id':'Adeg3', 'x':121, 'y':120, 'bg':'w', 'scale': 0.8, 'w_clear': 45})
+sc1.append({'id':'freq', 'alias':'f', 'x':83, 'y':155, 'bg':'w', 'scale': 0.8, 'w_clear': 45})
+sc1.append({'id':'V_unb', 'alias':'V%', 'x':81, 'y':190, 'bg':'g', 'scale': 0.8, 'w_clear': 45})
+sc1.append({'id':'A_unb', 'alias':'A%', 'x':82, 'y':206, 'bg':'w', 'scale': 0.8, 'w_clear': 45})
 
 sc2 = []
 sc2.extend(make_grid(['V1','V2','V3'], [76,136,196], 47, 'w'))
@@ -97,8 +97,8 @@ def apply_text_to_image(img, overlay_config, text_str):
     y_bot = overlay_config['y']
     color = overlay_config.get('bg', 'w')
     
-    # 50x15 clear space right aligned
-    w_clear = 50
+    # Clear space right aligned
+    w_clear = overlay_config.get('w_clear', 50)
     h_clear = 15
     x_left = x_right - w_clear + 1
     y_top = y_bot - h_clear + 1
