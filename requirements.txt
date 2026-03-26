@@ -2,3 +2,5 @@ flask
 pandas
 numpy
 openpyxl
+pillow
+python-dotenv
