@@ -70,8 +70,11 @@ let currentMode = 'string_mode';
 
         // Xử lý chuyển tab
         function switchExcelTab(modeId) {
-            document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            const root = document.getElementById('workspace-excel');
+            if (!root) return;
+
+            root.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
+            root.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
             
             document.getElementById(modeId).classList.add('active');
             
@@ -143,8 +146,9 @@ let currentMode = 'string_mode';
             display: none;
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(46, 204, 113, 0.9);
-            color: white;
+            background: rgba(10, 18, 34, 0.94);
+            border: 2px dashed rgba(34, 197, 94, 0.7);
+            color: #dcfce7;
             z-index: 9999;
             align-items: center;
             justify-content: center;
@@ -152,22 +156,35 @@ let currentMode = 'string_mode';
         `;
         document.body.appendChild(dragOverlay);
 
+        function isExcelWorkspaceActive() {
+            const excelWorkspace = document.getElementById('workspace-excel');
+            return excelWorkspace && excelWorkspace.style.display !== 'none';
+        }
+
+        function hasFilesInDragEvent(e) {
+            return e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files');
+        }
+
         let dragCounter = 0;
         dropZone.addEventListener('dragenter', (e) => {
             e.preventDefault();
+            if (!isExcelWorkspaceActive() || !hasFilesInDragEvent(e)) return;
             dragCounter++;
             dragOverlay.style.display = 'flex';
         });
         dropZone.addEventListener('dragleave', (e) => {
             e.preventDefault();
+            if (!isExcelWorkspaceActive()) return;
             dragCounter--;
             if (dragCounter === 0) dragOverlay.style.display = 'none';
         });
         dropZone.addEventListener('dragover', (e) => {
             e.preventDefault();
+            if (!isExcelWorkspaceActive()) return;
         });
         dropZone.addEventListener('drop', (e) => {
             e.preventDefault();
+            if (!isExcelWorkspaceActive()) return;
             dragCounter = 0;
             dragOverlay.style.display = 'none';
             if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {

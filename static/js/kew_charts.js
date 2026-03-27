@@ -164,13 +164,6 @@
       }
     }
 
-    function skipUpload() {
-      document.getElementById('upload-container').style.display = 'none';
-      document.getElementById('app-container').style.display = 'block';
-      // Keep user in KEW workflow; no data will be rendered until upload succeeds.
-      switchKewTab('overview');
-    }
-
     // ─── Subsample timestamps for display ─────────────────
     function subsample(arr, maxPoints = 300) {
       if (arr.length <= maxPoints) return arr;
@@ -847,34 +840,74 @@
     const dropArea = document.getElementById('upload-area');
     const fileInput = document.getElementById('file-input');
     const loadingScreen = document.getElementById('loading-screen');
+    const loadingText = document.getElementById('loading-text');
     const errorMsg = document.getElementById('upload-error');
+    const successMsg = document.getElementById('upload-success');
 
     // Store last uploaded FormData for the gen action
     let lastFormData = null;
+    let uploadStateToken = 0;
 
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-      dropArea.addEventListener(eventName, preventDefaults, false);
-    });
-    function preventDefaults(e) {
-      e.preventDefault(); e.stopPropagation();
+    function setUploadState(state, msg = '') {
+      if (!dropArea || !loadingScreen || !errorMsg) return;
+
+      dropArea.style.display = 'block';
+      dropArea.classList.remove('is-busy');
+      loadingScreen.style.display = 'none';
+      errorMsg.style.display = 'none';
+      if (successMsg) successMsg.style.display = 'none';
+
+      if (state === 'loading') {
+        dropArea.classList.add('is-busy');
+        loadingScreen.style.display = 'block';
+        if (loadingText) loadingText.textContent = msg || 'Đang phân tích dữ liệu...';
+        return;
+      }
+
+      if (state === 'error') {
+        errorMsg.textContent = msg;
+        errorMsg.style.display = 'block';
+        return;
+      }
+
+      if (state === 'success' && successMsg) {
+        successMsg.textContent = msg;
+        successMsg.style.display = 'block';
+      }
     }
 
-    ['dragenter', 'dragover'].forEach(eventName => {
-      dropArea.addEventListener(eventName, () => dropArea.classList.add('dragover'), false);
-    });
-    ['dragleave', 'drop'].forEach(eventName => {
-      dropArea.addEventListener(eventName, () => dropArea.classList.remove('dragover'), false);
-    });
+    function preventDefaults(e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
 
-    dropArea.addEventListener('drop', handleDrop, false);
-    fileInput.addEventListener('change', (e) => handleFiles(e.target.files), false);
+    if (dropArea && fileInput && loadingScreen && errorMsg) {
+      setUploadState('idle');
+
+      ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, preventDefaults, false);
+      });
+
+      ['dragenter', 'dragover'].forEach(eventName => {
+        dropArea.addEventListener(eventName, () => dropArea.classList.add('dragover'), false);
+      });
+      ['dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, () => dropArea.classList.remove('dragover'), false);
+      });
+
+      dropArea.addEventListener('drop', handleDrop, false);
+      fileInput.addEventListener('change', (e) => {
+        handleFiles(e.target.files);
+        e.target.value = '';
+      }, false);
+    }
 
     function handleDrop(e) {
       handleFiles(e.dataTransfer.files);
     }
 
     function handleFiles(files) {
-      if (files.length === 0) return;
+      if (!files || files.length === 0) return;
 
       const formData = new FormData();
       let hasKew = false;
@@ -895,18 +928,22 @@
     }
 
     function showError(msg) {
-      errorMsg.textContent = msg;
-      errorMsg.style.display = 'block';
-      loadingScreen.style.display = 'none';
-      dropArea.style.display = 'block';
+      setUploadState('error', msg);
     }
 
     function uploadFiles(formData) {
-      errorMsg.style.display = 'none';
-      dropArea.style.display = 'none';
-      loadingScreen.style.display = 'block';
-      setTimeout(() => { document.getElementById('loading-text').textContent = 'Đang trích xuất sóng hài...'; }, 2000);
-      setTimeout(() => { document.getElementById('loading-text').textContent = 'Tính toán THD và sự kiện...'; }, 4000);
+      const stateToken = ++uploadStateToken;
+      setUploadState('loading', 'Đang phân tích dữ liệu...');
+      setTimeout(() => {
+        if (stateToken === uploadStateToken && loadingText) {
+          loadingText.textContent = 'Đang trích xuất sóng hài...';
+        }
+      }, 1800);
+      setTimeout(() => {
+        if (stateToken === uploadStateToken && loadingText) {
+          loadingText.textContent = 'Tính toán THD và sự kiện...';
+        }
+      }, 3600);
 
       fetch('/api/kew/upload', {
         method: 'POST',
@@ -917,16 +954,15 @@
           return res.json();
         })
         .then(data => {
-          // Show App, hide Upload
-          document.getElementById('upload-container').style.display = 'none';
-          document.getElementById('app-container').style.display = 'block';
+          uploadStateToken++;
+          setUploadState('success', 'Đã phân tích xong. Biểu đồ đã được cập nhật.');
           renderAll(data);
           // Run phase detection in background
           if (lastFormData) detectAndShowGenPanel(lastFormData);
         })
         .catch(err => {
+          uploadStateToken++;
           showError(err.message);
-          dropArea.style.display = 'block';
         });
     }
 

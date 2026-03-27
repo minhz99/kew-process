@@ -1,5 +1,29 @@
 <script>
 
+function applyTheme(theme) {
+    const normalized = theme === 'light' ? 'light' : 'dark';
+    const html = document.documentElement;
+    const body = document.body;
+    if (!html || !body) return;
+
+    html.setAttribute('data-bs-theme', normalized);
+    body.classList.toggle('theme-light', normalized === 'light');
+
+    const themeBtn = document.getElementById('btn-theme-toggle');
+    if (themeBtn) {
+        themeBtn.innerHTML = normalized === 'light'
+            ? '<i class="bi bi-sun"></i> Chế độ sáng'
+            : '<i class="bi bi-moon-stars"></i> Chế độ tối';
+    }
+}
+
+function toggleTheme() {
+    const current = localStorage.getItem('plt_theme') || 'dark';
+    const next = current === 'dark' ? 'light' : 'dark';
+    localStorage.setItem('plt_theme', next);
+    applyTheme(next);
+}
+
 /* ── GLOBAL TOOL SWITCHING ── */
 function switchTool(toolId) {
     document.querySelectorAll('.workspace').forEach(el => { el.style.display = 'none'; });
@@ -21,6 +45,8 @@ function switchTool(toolId) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    const savedTheme = localStorage.getItem('plt_theme') || 'dark';
+    applyTheme(savedTheme);
     const savedTool = localStorage.getItem('plt_active_tool') || 'kew';
     switchTool(savedTool);
 });

@@ -1,37 +1,5 @@
-  <!-- ══════════════════ UPLOAD SCREEN ══════════════════ -->
-  <div id="workspace-kew" class="workspace active">
-  <div id="upload-container">
-    <div class="logo-icon"
-      style="margin: 0 auto 1.5rem; width: 64px; height: 64px; font-size: 32px; border-radius: 16px;">⚡</div>
-    <h2>Phân tích dữ liệu Quality Analyser</h2>
-    <p style="color:var(--text-muted); margin-top: 0.5rem; font-size: 0.9rem;">Upload các file log từ máy đo (INHS,
-      EVTS, INIS...)</p>
-
-    <div id="upload-area" onclick="document.getElementById('file-input').click()">
-      <div class="upload-icon">📂</div>
-      <div class="upload-text">Kéo thả file .KEW / .ZIP vào đây</div>
-      <div class="upload-sub">hoặc click để chọn — sẽ tự động phân tích và hiển thị biểu đồ</div>
-      <input type="file" id="file-input" multiple accept=".KEW,.kew,.ZIP,.zip" style="display: none">
-    </div>
-
-    <div id="loading-screen">
-      <div class="spinner"></div>
-      <div style="margin-top:1rem;color:var(--accent);font-weight:500;" id="loading-text">Đang phân tích dữ liệu...
-      </div>
-    </div>
-
-    <div id="upload-error" style="color:var(--danger); margin-top: 1rem; font-size: 0.9rem; display: none;"></div>
-
-    <div style="margin-top: 2rem; border-top: 1px solid var(--border); padding-top: 1.5rem;">
-      <button onclick="skipUpload()"
-        style="background:none; border:1px solid var(--border); color:var(--text-muted); padding:8px 20px; border-radius:8px; cursor:pointer; font-size:0.85rem; transition:all 0.2s;"
-        onmouseover="this.style.color='var(--text)';this.style.borderColor='var(--accent)'"
-        onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border)'">
-        Bỏ qua & Xử lý sau ➔
-      </button>
-    </div>
-  </div>
-
+<!-- ══════════════════ KEW WORKSPACE ══════════════════ -->
+<div id="workspace-kew" class="workspace active">
   <!-- ══════════════════ FLOATING GEN PANEL ══════════════════ -->
   <div id="gen-panel">
     <div class="gen-panel-header">
@@ -52,6 +20,33 @@
 
   <!-- ══════════════════ DASHBOARD APP ══════════════════ -->
   <div id="app-container">
+    <div id="kew-upload-section" class="chart-card kew-upload-card">
+      <div class="kew-upload-header">
+        <div>
+          <div class="section-header m-0">Nạp file đo KEW</div>
+          <p class="kew-upload-note">Kéo thả hoặc chọn file `.KEW` / `.ZIP` để phân tích và cập nhật biểu đồ trực tiếp.</p>
+        </div>
+        <button type="button" class="btn" onclick="document.getElementById('file-input').click()">
+          <i class="bi bi-upload me-1"></i> Chọn file
+        </button>
+      </div>
+
+      <div id="upload-area" onclick="document.getElementById('file-input').click()">
+        <div class="upload-icon">📂</div>
+        <div class="upload-text">Kéo thả file dữ liệu vào đây</div>
+        <div class="upload-sub">Hệ thống tự phân tích tổng quan, sóng hài, sự kiện và tab đánh giá.</div>
+        <input type="file" id="file-input" multiple accept=".KEW,.kew,.ZIP,.zip" style="display: none">
+      </div>
+
+      <div id="loading-screen">
+        <div class="spinner"></div>
+        <div id="loading-text">Đang phân tích dữ liệu...</div>
+      </div>
+
+      <div id="upload-error" class="kew-upload-feedback is-error" style="display: none;"></div>
+      <div id="upload-success" class="kew-upload-feedback is-success" style="display: none;"></div>
+    </div>
+
     <div id="kew-nav-section" class="chart-card kew-nav-card">
       <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
         <div>
@@ -498,5 +493,5 @@
     </div>
   </div>
 
-  </div> <!-- end workspace-kew -->
+  </div>
 </div>

@@ -350,11 +350,15 @@ let EDITED_FILES = [];
 
     // Development fallback (only runs if accessed as local file)
     if (window.location.protocol === 'file:') {
-      document.getElementById('upload-container').style.display = 'none';
-      document.getElementById('app-container').style.display = 'block';
-      fetch('kew_analysis.json')
-        .then(r => r.json())
-        .then(data => renderAll(data));
+      const uploadContainer = document.getElementById('upload-container');
+      const appContainer = document.getElementById('app-container');
+      if (uploadContainer) uploadContainer.style.display = 'none';
+      if (appContainer) appContainer.style.display = 'block';
+      if (typeof renderAll === 'function') {
+        fetch('kew_analysis.json')
+          .then(r => r.json())
+          .then(data => renderAll(data));
+      }
     }
   
 

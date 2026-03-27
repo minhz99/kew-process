@@ -4,21 +4,21 @@
         
         <!-- 1. Quản lý File Excel -->
         <div class="card">
-            <h2>HỆ THỐNG QUẢN LÝ SỐ ĐIỆN</h2>
+            <h2 class="excel-heading">HỆ THỐNG QUẢN LÝ SỐ ĐIỆN</h2>
             <h3>1. Chọn Tệp Excel</h3>
             
             <div class="file-area">
-                <input type="file" id="excel_file" accept=".xlsx" style="flex: 1;" multiple>
+                <input type="file" id="excel_file" accept=".xlsx" multiple>
                 <button onclick="uploadFile()">Tải Lên File(s) Cần Nhập</button>
             </div>
             
             <div id="active_file_display">
-                <div style="flex: 1; margin-right: 15px;">
-                    <label style="display: block; margin-bottom: 5px; font-size: 12px; color: var(--text-light);">TỆP HIỆN TẠI ĐANG CHỌN (CÓ THỂ ĐỔI):</label>
-                    <select id="active_filename" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border); font-weight: bold; color: var(--text); background: white;">
+                <div class="excel-active-file-meta">
+                    <label class="excel-active-file-label">TỆP HIỆN TẠI ĐANG CHỌN (CÓ THỂ ĐỔI):</label>
+                    <select id="active_filename">
                     </select>
                 </div>
-                <button class="btn-outline btn-small" onclick="downloadFile()" id="btn_download" style="display: none; height: fit-content;">
+                <button class="btn-outline btn-small" onclick="downloadFile()" id="btn_download" style="display: none;">
                     Tải Tất Cả File Về (ZIP)
                 </button>
             </div>
@@ -29,7 +29,7 @@
             <h3>2. Nhập Dữ Liệu</h3>
             
             <div class="form-row">
-                <div class="form-col" style="flex: 1.5;">
+                <div class="form-col form-col-wide">
                     <label>Năm (Tên Sheet Excel)</label>
                     <input type="text" id="sheet_name" value="2023" placeholder="Ví dụ: 2023">
                 </div>
@@ -43,9 +43,9 @@
                 </div>
             </div>
 
-            <div style="margin-top: -10px; margin-bottom: 20px;">
-                <label style="display: inline-flex; align-items: center; gap: 8px; cursor: pointer; text-transform: none; letter-spacing: normal; color: var(--text);">
-                    <input type="checkbox" id="auto_increment" checked style="width: auto;"> 
+            <div class="excel-option-row">
+                <label class="excel-inline-label">
+                    <input type="checkbox" id="auto_increment" checked> 
                     Tự động nhảy Kỳ/Tháng sau khi Ghi thành công
                 </label>
             </div>
@@ -89,9 +89,9 @@
             </div>
 
             <!-- Nút Hành Động -->
-            <div class="form-row" style="margin-top: 25px; align-items: center;">
+            <div class="form-row excel-actions">
                 <button onclick="submitData()" class="btn-block" id="btn_submit">GHI DỮ LIỆU VÀO EXCEL</button>
-                <button onclick="cancelEdit()" class="btn-outline btn-block" id="btn_cancel_edit" style="display: none; margin-left: 15px;">HỦY CHỈNH SỬA</button>
+                <button onclick="cancelEdit()" class="btn-outline btn-block excel-cancel-btn" id="btn_cancel_edit" style="display: none;">HỦY CHỈNH SỬA</button>
             </div>
             
             <div id="message"></div>
@@ -100,7 +100,7 @@
         <!-- 3. Lịch Sử Nhập Liệu -->
         <div class="card">
             <h3>3. Lịch Sử Mới Nhập (Phiên Làm Việc Này)</h3>
-            <div style="overflow-x: auto;">
+            <div class="table-scroll">
                 <table class="history-table" id="history_table">
                     <thead>
                         <tr>
@@ -111,7 +111,7 @@
                             <th>BT (Giá-SL)</th>
                             <th>CĐ (Giá-SL)</th>
                             <th>TĐ (Giá-SL)</th>
-                            <th style="text-align: right;">Hành Động</th>
+                            <th class="text-end">Hành Động</th>
                         </tr>
                     </thead>
                     <tbody id="history_body">
@@ -121,7 +121,7 @@
                     </tbody>
                 </table>
             </div>
-            <p style="text-align: right; margin-top: 15px; font-size: 13px; color: var(--text-light);">* Nhấn 'Sửa' để tải dữ liệu lại lên form, đổi số và Ghi Đè dòng đó trong file Excel.</p>
+            <p class="excel-history-note">* Nhấn 'Sửa' để tải dữ liệu lại lên form, đổi số và Ghi Đè dòng đó trong file Excel.</p>
         </div>
 
     </div>
