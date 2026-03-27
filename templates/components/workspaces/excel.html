@@ -1,128 +1,127 @@
-  <!-- ══════════════════ EXCEL WORKSPACE ══════════════════ -->
-  <div id="workspace-excel" class="workspace" style="display:none;">
-     <div class="main-wrapper">
-        
-        <!-- 1. Quản lý File Excel -->
-        <div class="card">
-            <h2 class="excel-heading">HỆ THỐNG QUẢN LÝ SỐ ĐIỆN</h2>
-            <h3>1. Chọn Tệp Excel</h3>
-            
-            <div class="file-area">
-                <input type="file" id="excel_file" accept=".xlsx" multiple>
-                <button onclick="uploadFile()">Tải Lên File(s) Cần Nhập</button>
-            </div>
-            
-            <div id="active_file_display">
-                <div class="excel-active-file-meta">
-                    <label class="excel-active-file-label">TỆP HIỆN TẠI ĐANG CHỌN (CÓ THỂ ĐỔI):</label>
-                    <select id="active_filename">
-                    </select>
-                </div>
-                <button class="btn-outline btn-small" onclick="downloadFile()" id="btn_download" style="display: none;">
-                    Tải Tất Cả File Về (ZIP)
-                </button>
-            </div>
-        </div>
+<!-- ══════════════════ EXCEL WORKSPACE ══════════════════ -->
+<div id="workspace-excel" class="workspace" style="display:none;">
+  <div class="main-wrapper">
 
-        <!-- 2. Vùng Nhập Liệu -->
-        <div class="card" id="data_entry_section" style="opacity: 0.5; pointer-events: none;">
-            <h3>2. Nhập Dữ Liệu</h3>
-            
-            <div class="form-row">
-                <div class="form-col form-col-wide">
-                    <label>Năm (Tên Sheet Excel)</label>
-                    <input type="text" id="sheet_name" value="2023" placeholder="Ví dụ: 2023">
-                </div>
-                <div class="form-col">
-                    <label>Tháng (1-12)</label>
-                    <input type="number" id="month" min="1" max="12" value="1">
-                </div>
-                <div class="form-col">
-                    <label>Kỳ (1-3)</label>
-                    <input type="number" id="period" min="1" max="3" value="1">
-                </div>
-            </div>
-
-            <div class="excel-option-row">
-                <label class="excel-inline-label">
-                    <input type="checkbox" id="auto_increment" checked> 
-                    Tự động nhảy Kỳ/Tháng sau khi Ghi thành công
-                </label>
-            </div>
-
-            <!-- Tabs Selection -->
-            <div class="tabs">
-                <button class="tab-btn active" onclick="switchExcelTab('string_mode')" id="tab_string">Nhập Bằng Chuỗi</button>
-                <button class="tab-btn" onclick="switchExcelTab('manual_mode')" id="tab_manual">Nhập Từng Ô</button>
-            </div>
-
-            <!-- Tab: Chuỗi -->
-            <div id="string_mode" class="tab-pane active">
-                <label>Dán dữ liệu số điện (3 Dòng : BT, CĐ, TĐ)</label>
-                <textarea id="raw_data" placeholder="Ví dụ:&#10;1.555 3.938&#10;2.871 1.298&#10;1.007 1.672"></textarea>
-            </div>
-
-            <!-- Tab: Từng ô -->
-            <div id="manual_mode" class="tab-pane">
-                <table class="table-input">
-                    <tr>
-                        <th></th>
-                        <th>Đơn Giá</th>
-                        <th>Tiêu Thụ</th>
-                    </tr>
-                    <tr>
-                        <td class="label-cell">Bình Thường:</td>
-                        <td><input type="text" id="bt_price" placeholder="Đơn giá BT"></td>
-                        <td><input type="text" id="bt_usage" placeholder="Sản lượng BT"></td>
-                    </tr>
-                    <tr>
-                        <td class="label-cell">Cao Điểm:</td>
-                        <td><input type="text" id="cd_price" placeholder="Đơn giá CĐ"></td>
-                        <td><input type="text" id="cd_usage" placeholder="Sản lượng CĐ"></td>
-                    </tr>
-                    <tr>
-                        <td class="label-cell">Thấp Điểm:</td>
-                        <td><input type="text" id="td_price" placeholder="Đơn giá TĐ"></td>
-                        <td><input type="text" id="td_usage" placeholder="Sản lượng TĐ"></td>
-                    </tr>
-                </table>
-            </div>
-
-            <!-- Nút Hành Động -->
-            <div class="form-row excel-actions">
-                <button onclick="submitData()" class="btn-block" id="btn_submit">GHI DỮ LIỆU VÀO EXCEL</button>
-                <button onclick="cancelEdit()" class="btn-outline btn-block excel-cancel-btn" id="btn_cancel_edit" style="display: none;">HỦY CHỈNH SỬA</button>
-            </div>
-            
-            <div id="message"></div>
-        </div>
-
-        <!-- 3. Lịch Sử Nhập Liệu -->
-        <div class="card">
-            <h3>3. Lịch Sử Mới Nhập (Phiên Làm Việc Này)</h3>
-            <div class="table-scroll">
-                <table class="history-table" id="history_table">
-                    <thead>
-                        <tr>
-                            <th>Thời Gian</th>
-                            <th>Tệp</th>
-                            <th>Tháng</th>
-                            <th>Kỳ</th>
-                            <th>BT (Giá-SL)</th>
-                            <th>CĐ (Giá-SL)</th>
-                            <th>TĐ (Giá-SL)</th>
-                            <th class="text-end">Hành Động</th>
-                        </tr>
-                    </thead>
-                    <tbody id="history_body">
-                        <tr>
-                            <td colspan="8" class="empty-state">Chưa có kết quả nào được ghi trong phiên này.</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-            <p class="excel-history-note">* Nhấn 'Sửa' để tải dữ liệu lại lên form, đổi số và Ghi Đè dòng đó trong file Excel.</p>
-        </div>
-
+    <div class="card excel-hero">
+      <h2 class="excel-heading">Excel số điện</h2>
+      <p class="excel-hero-sub">Nhập nhanh chỉ số điện theo tháng/kỳ, ghi trực tiếp vào file Excel và tải kết quả ngay trong một luồng thao tác.</p>
     </div>
+
+    <!-- 1. Quản lý File Excel -->
+    <div class="card">
+      <h3 class="excel-step-title">Bước 1: Chọn tệp Excel</h3>
+
+      <div class="file-area">
+        <input type="file" id="excel_file" accept=".xlsx" multiple>
+        <button onclick="uploadFile()">Tải lên file cần nhập</button>
+      </div>
+
+      <div id="active_file_display">
+        <div class="excel-active-file-meta">
+          <label class="excel-active-file-label">Tệp đang xử lý (có thể đổi):</label>
+          <select id="active_filename"></select>
+        </div>
+        <button class="btn-outline btn-small" onclick="downloadFile()" id="btn_download" style="display: none;">
+          Tải file kết quả
+        </button>
+      </div>
+    </div>
+
+    <!-- 2. Vùng Nhập Liệu -->
+    <div class="card" id="data_entry_section" style="opacity: 0.5; pointer-events: none;">
+      <h3 class="excel-step-title">Bước 2: Nhập dữ liệu</h3>
+
+      <div class="form-row">
+        <div class="form-col form-col-wide">
+          <label>Năm (tên sheet Excel)</label>
+          <input type="text" id="sheet_name" value="2023" placeholder="Ví dụ: 2023">
+        </div>
+        <div class="form-col">
+          <label>Tháng (1-12)</label>
+          <input type="number" id="month" min="1" max="12" value="1">
+        </div>
+        <div class="form-col">
+          <label>Kỳ (1-3)</label>
+          <input type="number" id="period" min="1" max="3" value="1">
+        </div>
+      </div>
+
+      <div class="excel-option-row">
+        <label class="excel-inline-label">
+          <input type="checkbox" id="auto_increment" checked>
+          Tự động nhảy kỳ/tháng sau khi ghi thành công
+        </label>
+      </div>
+
+      <div class="tabs">
+        <button class="tab-btn active" onclick="switchExcelTab('string_mode')" id="tab_string">Nhập bằng chuỗi</button>
+        <button class="tab-btn" onclick="switchExcelTab('manual_mode')" id="tab_manual">Nhập từng ô</button>
+      </div>
+
+      <div id="string_mode" class="tab-pane active">
+        <label>Dán dữ liệu số điện (3 dòng: BT, CĐ, TĐ)</label>
+        <textarea id="raw_data" placeholder="Ví dụ:\n1.555 3.938\n2.871 1.298\n1.007 1.672"></textarea>
+      </div>
+
+      <div id="manual_mode" class="tab-pane">
+        <table class="table-input">
+          <tr>
+            <th></th>
+            <th>Đơn giá</th>
+            <th>Tiêu thụ</th>
+          </tr>
+          <tr>
+            <td class="label-cell">Bình thường:</td>
+            <td><input type="text" id="bt_price" placeholder="Đơn giá BT"></td>
+            <td><input type="text" id="bt_usage" placeholder="Sản lượng BT"></td>
+          </tr>
+          <tr>
+            <td class="label-cell">Cao điểm:</td>
+            <td><input type="text" id="cd_price" placeholder="Đơn giá CĐ"></td>
+            <td><input type="text" id="cd_usage" placeholder="Sản lượng CĐ"></td>
+          </tr>
+          <tr>
+            <td class="label-cell">Thấp điểm:</td>
+            <td><input type="text" id="td_price" placeholder="Đơn giá TĐ"></td>
+            <td><input type="text" id="td_usage" placeholder="Sản lượng TĐ"></td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="form-row excel-actions">
+        <button onclick="submitData()" class="btn-block" id="btn_submit">Ghi dữ liệu vào Excel</button>
+        <button onclick="cancelEdit()" class="btn-outline btn-block excel-cancel-btn" id="btn_cancel_edit" style="display: none;">Hủy chỉnh sửa</button>
+      </div>
+
+      <div id="message"></div>
+    </div>
+
+    <!-- 3. Lịch Sử Nhập Liệu -->
+    <div class="card">
+      <h3 class="excel-step-title">Bước 3: Lịch sử trong phiên làm việc</h3>
+      <div class="table-scroll">
+        <table class="history-table" id="history_table">
+          <thead>
+            <tr>
+              <th>Thời gian</th>
+              <th>Tệp</th>
+              <th>Tháng</th>
+              <th>Kỳ</th>
+              <th>BT (Giá-SL)</th>
+              <th>CĐ (Giá-SL)</th>
+              <th>TĐ (Giá-SL)</th>
+              <th class="text-end">Hành động</th>
+            </tr>
+          </thead>
+          <tbody id="history_body">
+            <tr>
+              <td colspan="8" class="empty-state">Chưa có kết quả nào được ghi trong phiên này.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="excel-history-note">* Nhấn "Sửa" để nạp lại dữ liệu lên form và ghi đè dòng tương ứng trong file Excel.</p>
+    </div>
+
   </div>
+</div>

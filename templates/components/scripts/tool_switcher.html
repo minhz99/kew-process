@@ -1,26 +1,55 @@
 <script>
 
+function applyTheme(theme) {
+    const normalized = theme === 'light' ? 'light' : 'dark';
+    const html = document.documentElement;
+    const body = document.body;
+    if (!html || !body) return;
+
+    html.setAttribute('data-bs-theme', normalized);
+    body.classList.toggle('theme-light', normalized === 'light');
+
+    const themeBtn = document.getElementById('btn-theme-toggle');
+    if (themeBtn) {
+        themeBtn.innerHTML = normalized === 'light'
+            ? '<i class="bi bi-sun"></i> Chế độ sáng'
+            : '<i class="bi bi-moon-stars"></i> Chế độ tối';
+    }
+}
+
+function toggleTheme() {
+    const current = localStorage.getItem('plt_theme') || 'dark';
+    const next = current === 'dark' ? 'light' : 'dark';
+    localStorage.setItem('plt_theme', next);
+    applyTheme(next);
+}
+
 /* ── GLOBAL TOOL SWITCHING ── */
 function switchTool(toolId) {
+    const allowedTools = ['kew', 'img', 'excel'];
+    const activeTool = allowedTools.includes(toolId) ? toolId : 'kew';
+
     document.querySelectorAll('.workspace').forEach(el => { el.style.display = 'none'; });
     document.querySelectorAll('#tool-tabs .tool-tab').forEach(el => el.classList.remove('active'));
 
-    const workspace = document.getElementById('workspace-' + toolId);
+    const workspace = document.getElementById('workspace-' + activeTool);
     if (workspace) workspace.style.display = 'block';
 
-    const btn = document.getElementById('btn-tool-' + toolId);
+    const btn = document.getElementById('btn-tool-' + activeTool);
     if (btn) btn.classList.add('active');
 
-    const showKewMeta = toolId === 'kew';
+    const showKewMeta = activeTool === 'kew';
     const deviceInfo = document.getElementById('deviceInfo');
     const headerMeta = document.getElementById('headerMeta');
     if (deviceInfo) deviceInfo.style.display = showKewMeta ? 'block' : 'none';
     if (headerMeta) headerMeta.style.display = showKewMeta ? 'block' : 'none';
 
-    localStorage.setItem('plt_active_tool', toolId);
+    localStorage.setItem('plt_active_tool', activeTool);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    const savedTheme = localStorage.getItem('plt_theme') || 'dark';
+    applyTheme(savedTheme);
     const savedTool = localStorage.getItem('plt_active_tool') || 'kew';
     switchTool(savedTool);
 });
