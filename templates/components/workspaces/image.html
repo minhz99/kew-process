@@ -1,75 +1,76 @@
-  <!-- ══════════════════ IMAGE WORKSPACE ══════════════════ -->
-  <div id="workspace-img" class="workspace" style="display:none;">
-    <div class="content active" id="tab-edit-img">
-      <div class="section-header">Sửa Ảnh Đo (Pixel Replacement)</div>
-      <div class="chart-card" style="margin-bottom: 1.5rem;">
-        <h3>Tải lên dữ liệu ảnh (.BMP)</h3>
-        
-        <div class="mb-4 mt-3">
-          <label class="form-label text-muted fw-semibold" style="font-size:0.85rem">Chọn Mẫu Đồng Hồ (Template)</label>
-          <select class="form-select bg-dark text-white border-secondary" id="ei-template-select" style="max-width: 300px;">
-            <option value="kew6315">Kyoritsu KEW 6315 (Mặc định)</option>
-            <option value="kew6305">Kyoritsu KEW 6305</option>
-            <option value="hioki3198">Hioki PQ3198</option>
-            <option value="chauvin">Chauvin Arnoux C.A 8336</option>
-          </select>
-        </div>
+<!-- ══════════════════ IMAGE WORKSPACE ══════════════════ -->
+<div id="workspace-img" class="workspace" style="display:none;">
+  <div class="content active" id="tab-edit-img">
+    <div class="section-header">Sửa Ảnh Đo (Pixel Replacement)</div>
+    <div class="chart-card" style="margin-bottom: 1.5rem;">
+      <h3>Tải lên dữ liệu ảnh (.BMP)</h3>
 
-        <div id="ei-bulk-upload-area"
-          style="border: 2px dashed var(--border); border-radius: 12px; padding: 2rem; text-align: center; cursor: pointer; margin-bottom: 1.5rem; transition: all 0.2s;"
-          ondragover="event.preventDefault(); this.style.borderColor='var(--accent)';"
-          ondragleave="this.style.borderColor='var(--border)';" ondrop="handleBulkDrop(event)">
-          <div style="font-size: 2rem; margin-bottom: 0.5rem;">📸</div>
-          <div style="font-size: 0.9rem; font-weight: 600;">Kéo thả nhiều ảnh .BMP vào đây</div>
-          <div style="font-size: 0.75rem; color: var(--text-muted);">Hoặc click để chọn nhiều file</div>
-          <input type="file" id="ei-bulk-input" multiple accept=".bmp" style="display: none"
-            onchange="handleBulkFiles(this.files)">
-        </div>
+      <div class="mb-4 mt-3">
+        <label class="form-label text-muted fw-semibold" style="font-size:0.85rem">Chọn loại máy đo</label>
+        <select class="form-select bg-dark text-white border-secondary" id="ei-template-select"
+          style="max-width: 300px;">
+          <option value="kew6315" selected>Kyoritsu KEW 6315</option>
+          <option value="kew6305" disabled>Kyoritsu KEW 6305</option>
+          <option value="hioki3198" disabled>Hioki PQ3198</option>
+          <option value="chauvin" disabled>Chauvin Arnoux C.A 8336</option>
+        </select>
+      </div>
 
-        <div id="ei-preview-container"
-          style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px;">
-          <!-- Previews will appear here -->
-        </div>
+      <div id="ei-bulk-upload-area"
+        style="border: 2px dashed var(--border); border-radius: 12px; padding: 2rem; text-align: center; cursor: pointer; margin-bottom: 1.5rem; transition: all 0.2s;"
+        ondragover="event.preventDefault(); this.style.borderColor='var(--accent)';"
+        ondragleave="this.style.borderColor='var(--border)';" ondrop="handleBulkDrop(event)">
+        <div style="font-size: 2rem; margin-bottom: 0.5rem;">📸</div>
+        <div style="font-size: 0.9rem; font-weight: 600;">Kéo thả nhiều ảnh .BMP vào đây</div>
+        <div style="font-size: 0.75rem; color: var(--text-muted);">Hoặc click để chọn nhiều file</div>
+        <input type="file" id="ei-bulk-input" multiple accept=".bmp" style="display: none"
+          onchange="handleBulkFiles(this.files)">
+      </div>
 
-        <div id="ei-slots-info"
-          style="margin-top: 1rem; font-size: 0.75rem; color: var(--text-muted); border-top: 1px solid var(--border); padding-top: 10px;">
-          Kéo thả các ảnh vào đúng vị trí bên dưới để sắp xếp chức năng:
-        </div>
+      <div id="ei-preview-container"
+        style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px;">
+        <!-- Previews will appear here -->
+      </div>
 
-        <div
-          style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 10px;">
-          <div class="ei-slot" data-idx="0" ondragover="event.preventDefault()" ondrop="handleDropToSlot(event, 0)"
-            style="border: 1px solid var(--border); border-radius: 8px; padding: 10px; background: var(--surface2); text-align: center; min-height: 80px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-            <span style="font-size:0.7rem; color:var(--text-muted); margin-bottom:5px;">1. Tổng hợp</span>
-            <div class="ei-slot-content" style="width:100%; height:100%;"></div>
-          </div>
-          <div class="ei-slot" data-idx="1" ondragover="event.preventDefault()" ondrop="handleDropToSlot(event, 1)"
-            style="border: 1px solid var(--border); border-radius: 8px; padding: 10px; background: var(--surface2); text-align: center; min-height: 80px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-            <span style="font-size:0.7rem; color:var(--text-muted); margin-bottom:5px;">2. Góc pha</span>
-            <div class="ei-slot-content" style="width:100%; height:100%;"></div>
-          </div>
-          <div class="ei-slot" data-idx="2" ondragover="event.preventDefault()" ondrop="handleDropToSlot(event, 2)"
-            style="border: 1px solid var(--border); border-radius: 8px; padding: 10px; background: var(--surface2); text-align: center; min-height: 80px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-            <span style="font-size:0.7rem; color:var(--text-muted); margin-bottom:5px;">3. Sin áp</span>
-            <div class="ei-slot-content" style="width:100%; height:100%;"></div>
-          </div>
-          <div class="ei-slot" data-idx="3" ondragover="event.preventDefault()" ondrop="handleDropToSlot(event, 3)"
-            style="border: 1px solid var(--border); border-radius: 8px; padding: 10px; background: var(--surface2); text-align: center; min-height: 80px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-            <span style="font-size:0.7rem; color:var(--text-muted); margin-bottom:5px;">4. Sin dòng</span>
-            <div class="ei-slot-content" style="width:100%; height:100%;"></div>
-          </div>
-          <div class="ei-slot" data-idx="4" ondragover="event.preventDefault()" ondrop="handleDropToSlot(event, 4)"
-            style="border: 1px solid var(--border); border-radius: 8px; padding: 10px; background: var(--surface2); text-align: center; min-height: 80px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-            <span style="font-size:0.7rem; color:var(--text-muted); margin-bottom:5px;">5. Hài áp</span>
-            <div class="ei-slot-content" style="width:100%; height:100%;"></div>
-          </div>
-          <div class="ei-slot" data-idx="5" ondragover="event.preventDefault()" ondrop="handleDropToSlot(event, 5)"
-            style="border: 1px solid var(--border); border-radius: 8px; padding: 10px; background: var(--surface2); text-align: center; min-height: 80px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-            <span style="font-size:0.7rem; color:var(--text-muted); margin-bottom:5px;">6. Hài dòng</span>
-            <div class="ei-slot-content" style="width:100%; height:100%;"></div>
-          </div>
+      <div id="ei-slots-info"
+        style="margin-top: 1rem; font-size: 0.75rem; color: var(--text-muted); border-top: 1px solid var(--border); padding-top: 10px;">
+        Kéo thả các ảnh vào đúng vị trí bên dưới để sắp xếp chức năng:
+      </div>
+
+      <div
+        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 10px;">
+        <div class="ei-slot" data-idx="0" ondragover="event.preventDefault()" ondrop="handleDropToSlot(event, 0)"
+          style="border: 1px solid var(--border); border-radius: 8px; padding: 10px; background: var(--surface2); text-align: center; min-height: 80px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+          <span style="font-size:0.7rem; color:var(--text-muted); margin-bottom:5px;">1. Tổng hợp</span>
+          <div class="ei-slot-content" style="width:100%; height:100%;"></div>
+        </div>
+        <div class="ei-slot" data-idx="1" ondragover="event.preventDefault()" ondrop="handleDropToSlot(event, 1)"
+          style="border: 1px solid var(--border); border-radius: 8px; padding: 10px; background: var(--surface2); text-align: center; min-height: 80px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+          <span style="font-size:0.7rem; color:var(--text-muted); margin-bottom:5px;">2. Góc pha</span>
+          <div class="ei-slot-content" style="width:100%; height:100%;"></div>
+        </div>
+        <div class="ei-slot" data-idx="2" ondragover="event.preventDefault()" ondrop="handleDropToSlot(event, 2)"
+          style="border: 1px solid var(--border); border-radius: 8px; padding: 10px; background: var(--surface2); text-align: center; min-height: 80px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+          <span style="font-size:0.7rem; color:var(--text-muted); margin-bottom:5px;">3. Sin áp</span>
+          <div class="ei-slot-content" style="width:100%; height:100%;"></div>
+        </div>
+        <div class="ei-slot" data-idx="3" ondragover="event.preventDefault()" ondrop="handleDropToSlot(event, 3)"
+          style="border: 1px solid var(--border); border-radius: 8px; padding: 10px; background: var(--surface2); text-align: center; min-height: 80px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+          <span style="font-size:0.7rem; color:var(--text-muted); margin-bottom:5px;">4. Sin dòng</span>
+          <div class="ei-slot-content" style="width:100%; height:100%;"></div>
+        </div>
+        <div class="ei-slot" data-idx="4" ondragover="event.preventDefault()" ondrop="handleDropToSlot(event, 4)"
+          style="border: 1px solid var(--border); border-radius: 8px; padding: 10px; background: var(--surface2); text-align: center; min-height: 80px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+          <span style="font-size:0.7rem; color:var(--text-muted); margin-bottom:5px;">5. Hài áp</span>
+          <div class="ei-slot-content" style="width:100%; height:100%;"></div>
+        </div>
+        <div class="ei-slot" data-idx="5" ondragover="event.preventDefault()" ondrop="handleDropToSlot(event, 5)"
+          style="border: 1px solid var(--border); border-radius: 8px; padding: 10px; background: var(--surface2); text-align: center; min-height: 80px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+          <span style="font-size:0.7rem; color:var(--text-muted); margin-bottom:5px;">6. Hài dòng</span>
+          <div class="ei-slot-content" style="width:100%; height:100%;"></div>
         </div>
       </div>
+    </div>
 
     <div class="chart-card" style="margin-bottom: 1.5rem;">
       <h3>Thông số cấu hình</h3>
@@ -260,4 +261,4 @@
     <div id="ei-gallery"
       style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem;"></div>
   </div>
-  </div>
+</div>
