@@ -4,7 +4,17 @@ __pycache__/
 *$py.class
 venv/
 env/
+.venv/
 .env
+.python-version
+
+# Python tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
 
 # OS
 .DS_Store
@@ -14,6 +24,18 @@ env/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Editors / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
 
 # Project-specific
 *.KEW
