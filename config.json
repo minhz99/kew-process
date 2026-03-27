@@ -1,0 +1,18 @@
+{
+  "ou_process": {
+    "inhs": {
+      "phase2": { "theta": 0.25, "sigma": 0.012 },
+      "phase3": { "theta": 0.20, "sigma": 0.010 }
+    },
+    "inps": {
+      "phase2": { "theta": 0.30, "sigma": 0.008 },
+      "phase3": { "theta": 0.25, "sigma": 0.007 }
+    }
+  },
+  "analysis": {
+    "standard_voltages": [110, 127, 220, 230, 240, 380, 400, 415, 440, 480, 600, 690, 1000],
+    "voltage_deviation_limit_pct": 5.0,
+    "current_spread_stable_pct": 15.0,
+    "current_spread_moderate_pct": 50.0
+  }
+}

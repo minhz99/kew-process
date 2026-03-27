@@ -12,6 +12,15 @@ import os
 import sys
 import re
 
+CONFIG = {}
+config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'config.json')
+if os.path.exists(config_path):
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            CONFIG = json.load(f)
+    except Exception:
+        pass
+
 # ─────────────────────────────────────────────────────────
 # Bước 1: Đọc INHS file (binary mixed format) - hàm từ read-kew.py
 # ─────────────────────────────────────────────────────────
@@ -754,8 +763,14 @@ def generate_commentary(result, device_name='thiết bị'):
         v_line_max = max(phase_maxs) * factor if phase_maxs else v_mean_3ph * factor
         v_line_nom = nom_v
 
+    cfg_ana = CONFIG.get('analysis', {})
+    std_volts = cfg_ana.get('standard_voltages', [110, 127, 220, 230, 240, 380, 400, 415, 440, 480, 600, 690, 1000])
+    v_dev_limit = cfg_ana.get('voltage_deviation_limit_pct', 5.0)
+    i_stable = cfg_ana.get('current_spread_stable_pct', 15.0)
+    i_mod = cfg_ana.get('current_spread_moderate_pct', 50.0)
+
     # δU: auto-detect nominal thực tế từ bảng tiêu chuẩn gần nhất với V_line đo được
-    STANDARD_VOLTAGES = [110, 127, 220, 230, 240, 380, 400, 415, 440, 480, 600, 690, 1000]
+    STANDARD_VOLTAGES = std_volts
     v_measured_avg = (v_line_min + v_line_max) / 2 if (v_line_min and v_line_max) else v_mean_3ph
     v_ref = min(STANDARD_VOLTAGES, key=lambda sv: abs(sv - v_measured_avg))
     # Nếu NOMINAL trong INIS gần với giá trị đo (±20%), ưu tiên
@@ -764,7 +779,7 @@ def generate_commentary(result, device_name='thiết bị'):
 
     delta_u_min = (v_line_min - v_ref) / v_ref * 100
     delta_u_max = (v_line_max - v_ref) / v_ref * 100
-    delta_u_ok = abs(delta_u_min) <= 5.0 and abs(delta_u_max) <= 5.0
+    delta_u_ok = abs(delta_u_min) <= v_dev_limit and abs(delta_u_max) <= v_dev_limit
 
     # Mất cân bằng điện áp ΔU (3 pha từ INHS)
     delta_U_imbalance = max(abs(v - v_mean_3ph) for v in v_avgs) / v_mean_3ph * 100 if v_mean_3ph > 0 else 0
@@ -791,9 +806,9 @@ def generate_commentary(result, device_name='thiết bị'):
 
     if a_all_vals and a_mean_3ph > 0:
         spread = (max(a_all_vals) - min(a_all_vals)) / a_mean_3ph * 100
-        if spread < 15:
+        if spread < i_stable:
             current_behavior = "ổn định trong thời gian đo kiểm"
-        elif spread < 50:
+        elif spread < i_mod:
             current_behavior = "biến đổi liên tục với biên độ nhỏ"
         else:
             current_behavior = "biến đổi liên tục trong thời gian đo kiểm"

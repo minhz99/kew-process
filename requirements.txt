@@ -2,4 +2,4 @@ flask
 pandas
 numpy
 openpyxl
-python-dotenv
+werkzeug

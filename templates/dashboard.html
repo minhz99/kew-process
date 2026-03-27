@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="vi" data-bs-theme="dark">
+
+<head>
+  <meta charset="UTF-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Power Quality Analyser — Bảng Điều Khiển</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+
+<body>
+<div class="d-flex" style="height: 100vh; overflow: hidden;">
+  <!-- Sidebar -->
+  <div class="d-flex flex-column flex-shrink-0 p-3 text-bg-dark" style="width: 250px; background: var(--surface) !important; border-right: 1px solid var(--border);">
+    <a href="/" class="d-flex align-items-center mb-3 mb-md-0 me-md-auto text-white text-decoration-none gap-2">
+      <div class="logo-icon" style="width:32px; height:32px; background: linear-gradient(135deg, var(--accent), var(--accent2)); border-radius:8px; display:flex; align-items:center; justify-content:center; font-weight:bold;">⚡</div>
+      <span class="fs-5 fw-bold">PLT Process</span>
+    </a>
+    <hr>
+    
+    <div class="d-flex flex-column gap-2 mb-3">
+        <button class="btn btn-primary w-100 text-start" id="btn-tool-kew" onclick="switchTool('kew')"><i class="bi bi-bar-chart-line"></i> Phân Tích KEW</button>
+        <button class="btn btn-outline-secondary w-100 text-start" id="btn-tool-img" onclick="switchTool('img')"><i class="bi bi-camera"></i> Sửa Ảnh Đo</button>
+        <button class="btn btn-outline-secondary w-100 text-start" id="btn-tool-excel" onclick="switchTool('excel')"><i class="bi bi-file-earmark-spreadsheet"></i> Nhập Excel</button>
+    </div>
+    
+    <div id="kew-nav-section">
+        <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-muted text-uppercase">
+          <span>Báo cáo KEW</span>
+        </h6>
+        <ul class="nav flex-column mb-auto" id="kew-tabs">
+          <li class="nav-item"><a href="#" class="nav-link active tab text-white" onclick="switchTab('overview')"><i class="bi bi-speedometer2 me-2"></i> Tổng quan</a></li>
+          <li class="nav-item"><a href="#" class="nav-link tab text-white" onclick="switchTab('voltage')"><i class="bi bi-lightning-charge me-2"></i> Điện áp</a></li>
+          <li class="nav-item"><a href="#" class="nav-link tab text-white" onclick="switchTab('current')"><i class="bi bi-plug me-2"></i> Dòng điện</a></li>
+          <li class="nav-item"><a href="#" class="nav-link tab text-white" onclick="switchTab('power')"><i class="bi bi-lightbulb me-2"></i> Công suất</a></li>
+          <li class="nav-item"><a href="#" class="nav-link tab text-white" onclick="switchTab('harmonics')"><i class="bi bi-graph-up me-2"></i> Sóng hài</a></li>
+          <li class="nav-item"><a href="#" class="nav-link tab text-white" onclick="switchTab('events')"><i class="bi bi-exclamation-triangle me-2"></i> Sự kiện</a></li>
+          <li class="nav-item"><a href="#" class="nav-link tab text-white" onclick="switchTab('assessment')"><i class="bi bi-check-circle me-2"></i> Đánh giá</a></li>
+          <li class="nav-item"><a href="#" class="nav-link tab text-white" onclick="switchTab('correction')"><i class="bi bi-tools me-2"></i> Sửa số liệu</a></li>
+          <li class="nav-item mt-3"><a href="#" class="nav-link tab text-white" onclick="switchTab('settings')" data-bs-toggle="modal" data-bs-target="#settingsModal"><i class="bi bi-gear me-2"></i> Cài đặt</a></li>
+        </ul>
+    </div>
+    
+    <hr class="mt-auto">
+    <div id="headerMeta" class="small text-muted"></div>
+  </div>
+
+  <!-- Content Area -->
+  <div class="flex-grow-1 overflow-auto bg-body" style="position: relative;">
+
+  <!-- ══════════════════ UPLOAD SCREEN ══════════════════ -->
+  <div id="workspace-kew" class="workspace active">
+  <div id="upload-container">
+    <div class="logo-icon"
+      style="margin: 0 auto 1.5rem; width: 64px; height: 64px; font-size: 32px; border-radius: 16px;">⚡</div>
+    <h2>Phân tích dữ liệu Quality Analyser</h2>
+    <p style="color:var(--text-muted); margin-top: 0.5rem; font-size: 0.9rem;">Upload các file log từ máy đo (INHS,
+      EVTS, INIS...)</p>
+
+    <div id="upload-area" onclick="document.getElementById('file-input').click()">
+      <div class="upload-icon">📂</div>
+      <div class="upload-text">Kéo thả file .KEW / .ZIP vào đây</div>
+      <div class="upload-sub">hoặc click để chọn — sẽ tự động phân tích và hiển thị biểu đồ</div>
+      <input type="file" id="file-input" multiple accept=".KEW,.kew,.ZIP,.zip" style="display: none">
+    </div>
+
+    <div id="loading-screen">
+      <div class="spinner"></div>
+      <div style="margin-top:1rem;color:var(--accent);font-weight:500;" id="loading-text">Đang phân tích dữ liệu...
+      </div>
+    </div>
+
+    <div id="upload-error" style="color:var(--danger); margin-top: 1rem; font-size: 0.9rem; display: none;"></div>
+
+    <div style="margin-top: 2rem; border-top: 1px solid var(--border); padding-top: 1.5rem;">
+      <button onclick="skipUpload()"
+        style="background:none; border:1px solid var(--border); color:var(--text-muted); padding:8px 20px; border-radius:8px; cursor:pointer; font-size:0.85rem; transition:all 0.2s;"
+        onmouseover="this.style.color='var(--text)';this.style.borderColor='var(--accent)'"
+        onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border)'">
+        Bỏ qua & Xử lý sau ➔
+      </button>
+    </div>
+  </div>
+
+  <!-- ══════════════════ FLOATING GEN PANEL ══════════════════ -->
+  <div id="gen-panel">
+    <div class="gen-panel-header">
+      <span style="font-size:1.2rem">⚠️</span>
+      <h4>Phát hiện pha bị khuyết</h4>
+      <button class="close-btn" onclick="document.getElementById('gen-panel').style.display='none'">✕</button>
+    </div>
+    <div class="gen-panel-body">
+      <div class="phase-status-row" id="gen-phase-status"></div>
+      <p class="gen-desc" id="gen-desc">Hệ thống phát hiện dữ liệu dòng điện không đủ 3 pha. Bạn có thể tự động nội suy
+        và tải file đã sửa.</p>
+      <button class="btn-gen" id="btn-gen" onclick="runGenData()">
+        <div class="btn-spinner" id="gen-spinner"></div>
+        <span id="gen-btn-text">🛠 Gen dữ liệu & Tải ZIP</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ══════════════════ DASHBOARD APP ══════════════════ -->
+  <div id="app-container">
+    
+
+
+
+    <!-- ══════════════════ OVERVIEW TAB ══════════════════ -->
+    <div class="content active" id="tab-overview">
+      <div class="section-header">Thông số cơ bản</div>
+      <div class="kpi-grid" id="kpiGrid"></div>
+
+      <div class="charts-grid">
+        <div class="chart-card">
+          <h3>📊 Điện áp 3 pha — Giá trị cơ bản (V)</h3>
+          <canvas id="overviewVoltChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3>📊 Dòng điện 3 pha — Giá trị cơ bản (A)</h3>
+          <canvas id="overviewCurrChart"></canvas>
+        </div>
+      </div>
+      <div class="charts-grid">
+        <div class="chart-card">
+          <h3>💡 Công suất hoạt động (W)</h3>
+          <canvas id="overviewPowerChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3>🔁 THD (%) — Xu hướng theo thời gian</h3>
+          <canvas id="overviewTHDChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════ VOLTAGE TAB ══════════════════ -->
+    <div class="content" id="tab-voltage">
+      <div class="section-header">Điện áp theo thời gian</div>
+      <div class="controls-row">
+        <div class="btn-group" id="voltPhaseButtons">
+          <button class="btn active" onclick="setVoltPhase('all')">3 pha</button>
+          <button class="btn" onclick="setVoltPhase('V1[V]')">V1</button>
+          <button class="btn" onclick="setVoltPhase('V2[V]')">V2</button>
+          <button class="btn" onclick="setVoltPhase('V3[V]')">V3</button>
+        </div>
+      </div>
+      <div class="charts-grid wide">
+        <div class="chart-card tall">
+          <h3>⚡ Điện áp pha (V)</h3>
+          <canvas id="voltTimeChart"></canvas>
+        </div>
+      </div>
+      <div class="kpi-grid" id="voltKpiGrid"></div>
+      <div class="section-header">THD Điện áp</div>
+      <div class="charts-grid">
+        <div class="chart-card">
+          <h3>🔁 THD Điện áp (%) theo thời gian</h3>
+          <canvas id="voltTHDChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3>📊 THD trung bình theo pha</h3>
+          <canvas id="voltTHDBarChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════ CURRENT TAB ══════════════════ -->
+    <div class="content" id="tab-current">
+      <div class="section-header">Dòng điện theo thời gian</div>
+      <div class="controls-row">
+        <div class="btn-group">
+          <button class="btn active" onclick="setCurrPhase('all')">3 pha</button>
+          <button class="btn" onclick="setCurrPhase('A1[A]')">A1</button>
+          <button class="btn" onclick="setCurrPhase('A2[A]')">A2</button>
+          <button class="btn" onclick="setCurrPhase('A3[A]')">A3</button>
+        </div>
+      </div>
+      <div class="charts-grid wide">
+        <div class="chart-card tall">
+          <h3>🔌 Dòng điện pha (A)</h3>
+          <canvas id="currTimeChart"></canvas>
+        </div>
+      </div>
+      <div class="kpi-grid" id="currKpiGrid"></div>
+      <div class="section-header">THD Dòng điện</div>
+      <div class="charts-grid">
+        <div class="chart-card">
+          <h3>🔁 THD Dòng (%) theo thời gian</h3>
+          <canvas id="currTHDChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3>📊 THD trung bình theo pha</h3>
+          <canvas id="currTHDBarChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════ POWER TAB ══════════════════ -->
+    <div class="content" id="tab-power">
+      <div class="section-header">Công suất theo thời gian</div>
+      <div class="charts-grid wide">
+        <div class="chart-card tall">
+          <h3>💡 Công suất hoạt động P1, P2, P3, P (W)</h3>
+          <canvas id="powerTimeChart"></canvas>
+        </div>
+      </div>
+      <div class="kpi-grid" id="powerKpiGrid"></div>
+      <div class="section-header">Góc pha điện áp–dòng điện (Power Factor)</div>
+      <div class="charts-grid">
+        <div class="chart-card">
+          <h3>📐 Góc VA1, VA2, VA3 (deg)</h3>
+          <canvas id="pfChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3>💡 Hệ số công suất cos(φ) ước tính</h3>
+          <canvas id="pfBarChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════ HARMONICS TAB ══════════════════ -->
+    <div class="content" id="tab-harmonics">
+      <div class="section-header">Phổ sóng hài</div>
+      <div class="controls-row">
+        <label style="font-size:0.8rem;color:var(--text-muted)">Kênh:</label>
+        <select id="harmonicsChannel" onchange="renderHarmonics()"></select>
+      </div>
+      <div class="charts-grid">
+        <div class="chart-card">
+          <h3>📈 Phổ sóng hài trung bình <span class="badge" id="harmonicsChLabel">V1[V]</span></h3>
+          <canvas id="spectrumChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3>🔁 THD (%) theo thời gian</h3>
+          <canvas id="harmonicsTHDLine"></canvas>
+        </div>
+      </div>
+      <div class="section-header">Bảng THD tất cả kênh</div>
+      <div class="thd-grid" id="thdGrid"></div>
+    </div>
+
+    <!-- ══════════════════ EVENTS TAB ══════════════════ -->
+    <div class="content" id="tab-events">
+      <div class="section-header">Nhật ký sự kiện chất lượng điện</div>
+      <div class="kpi-grid" id="eventKpiGrid"></div>
+      <div class="chart-card">
+        <h3>🚨 Danh sách sự kiện</h3>
+        <div style="overflow-x:auto">
+          <table class="events-table" id="eventsTable">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Thời gian</th>
+                <th>Thời gian trôi</th>
+                <th>Loại sự kiện</th>
+                <th>Giá trị</th>
+                <th>Nhận xét</th>
+              </tr>
+            </thead>
+            <tbody id="eventsBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════ ASSESSMENT TAB ══════════════════ -->
+    <div class="content" id="tab-assessment">
+      <div class="section-header">Nhận xét tự động</div>
+      <div class="chart-card" style="margin-bottom: 1.5rem;">
+        <div style="margin-bottom: 1rem; display: flex; align-items: center; gap: 10px;">
+          <label for="mbaPower" style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">Công suất máy
+            biến áp định mức (kVA):</label>
+          <input type="number" id="mbaPower" class="btn" value="1250" style="width: 100px; padding: 5px 10px;"
+            oninput="updateCommentaryMBA()">
+        </div>
+        <p id="commentaryText" style="line-height: 1.6; color: var(--text);"></p>
+      </div>
+
+      <div class="section-header"
+        style="display: flex; justify-content: space-between; align-items: center; margin-top: 2rem;">
+        <span>Bảng tổng hợp thông số</span>
+        <button class="btn" onclick="copySummaryTable()">📋 Copy Bảng</button>
+      </div>
+      <div class="chart-card" style="margin-bottom: 2rem;">
+        <div style="overflow-x:auto">
+          <table class="events-table" id="summaryTable" style="white-space: nowrap;">
+            <thead>
+              <tr>
+                <th>TT</th>
+                <th>Thông số</th>
+                <th>Đại lượng</th>
+                <th>Cao nhất</th>
+                <th>Thấp nhất</th>
+                <th>Trung bình</th>
+                <th>Giới hạn</th>
+                <th>Đánh giá</th>
+              </tr>
+            </thead>
+            <tbody id="summaryTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="section-header">Đánh giá chi tiết</div>
+      <div class="assessment-grid" id="assessmentGrid"></div>
+      <div class="section-header" style="margin-top:2rem">Thông tin thiết bị đo</div>
+      <div class="chart-card">
+        <table class="events-table" id="deviceTable">
+          <thead>
+            <tr>
+              <th>Thông số</th>
+              <th>Giá trị</th>
+            </tr>
+          </thead>
+          <tbody id="deviceBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══════════════════ CORRECTION TAB ══════════════════ -->
+  <div class="content" id="tab-correction">
+    <div class="section-header">Tính toán nhanh & Hiệu chỉnh số liệu</div>
+
+    <!-- Quick Calculator -->
+    <div class="chart-card" style="margin-bottom:1.2rem; border-color: var(--accent)40;">
+      <h3>🧮 Máy tính nhanh (U-I-P)</h3>
+      <p style="font-size:0.76rem;color:var(--text-muted);margin-bottom:1rem">Chọn thông số cần tính, sau đó nhập 2
+        thông số còn lại.</p>
+      <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-end">
+        <div style="flex:1;min-width:140px">
+          <label style="font-size:0.72rem;color:var(--text-muted);display:block;margin-bottom:4px">Thông số cần
+            tính</label>
+          <select id="calc-target" onchange="updateCalcTarget()"
+            style="width:100%;padding:6px 10px;border-color:var(--accent);color:var(--accent);font-weight:600">
+            <option value="p">Tính Công suất (P)</option>
+            <option value="i">Tính Dòng điện (I)</option>
+            <option value="u">Tính Điện áp (U)</option>
+          </select>
+        </div>
+        <div style="flex:1;min-width:110px">
+          <label style="font-size:0.72rem;color:var(--text-muted);display:block;margin-bottom:4px">Điện áp U (V)</label>
+          <input type="number" id="calc-u" class="btn calc-inp" style="width:100%;padding:6px 10px" placeholder="U"
+            oninput="quickCalc()">
+        </div>
+        <div style="flex:1;min-width:110px">
+          <label style="font-size:0.72rem;color:var(--text-muted);display:block;margin-bottom:4px">Dòng điện I
+            (A)</label>
+          <input type="number" id="calc-i" class="btn calc-inp" style="width:100%;padding:6px 10px" placeholder="I"
+            oninput="quickCalc()">
+        </div>
+        <div style="flex:1;min-width:110px">
+          <label style="font-size:0.72rem;color:var(--text-muted);display:block;margin-bottom:4px">Công suất P
+            (kW)</label>
+          <input type="number" id="calc-p" class="btn calc-inp" style="width:100%;padding:6px 10px" placeholder="P"
+            oninput="quickCalc()" disabled>
+        </div>
+        <div style="flex:0.5;min-width:80px">
+          <label style="font-size:0.72rem;color:var(--text-muted);display:block;margin-bottom:4px">Hệ số PF</label>
+          <input type="number" id="calc-pf" class="btn" style="width:100%;padding:6px 10px" value="0.85" step="0.01"
+            oninput="quickCalc()">
+        </div>
+        <div style="flex:1;min-width:130px">
+          <label style="font-size:0.72rem;color:var(--text-muted);display:block;margin-bottom:4px">Loại lưới</label>
+          <select id="calc-type" onchange="quickCalc()" style="width:100%;padding:6px 10px">
+            <option value="3p">3 Pha (√3)</option>
+            <option value="1p">1 Pha</option>
+          </select>
+        </div>
+        <button class="btn" style="border-color:var(--danger);color:var(--danger)" onclick="resetCalc()">Xóa</button>
+      </div>
+      <div id="calc-hint" style="font-size:0.72rem;color:var(--accent);margin-top:8px;font-style:italic;height:12px">
+      </div>
+    </div>
+
+    <div class="section-header">Tự động nhận dạng</div>
+    <div class="chart-card" style="margin-bottom:1.2rem">
+      <h3>⚡ Phím tắt hiệu chỉnh nhanh</h3>
+      <div style="display:flex;gap:1.5rem;flex-wrap:wrap;margin-top:0.75rem">
+        <div>
+          <label style="font-size:0.78rem;color:var(--text-muted);display:block;margin-bottom:6px">Tỉ số CT thực / CT
+            cài đặt</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input type="number" id="ct-real" placeholder="CT thực (A)" class="btn"
+              style="width:110px;padding:6px 10px">
+            <span style="color:var(--text-muted)">÷</span>
+            <input type="number" id="ct-set" placeholder="CT cài (A)" class="btn" style="width:110px;padding:6px 10px">
+            <button class="btn" style="border-color:var(--accent);color:var(--accent)" onclick="applyCTPreset()">Áp
+              dụng</button>
+          </div>
+        </div>
+        <div>
+          <label style="font-size:0.78rem;color:var(--text-muted);display:block;margin-bottom:6px">Tỉ số VT thực / VT
+            cài đặt</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input type="number" id="vt-real" placeholder="VT thực (V)" class="btn"
+              style="width:110px;padding:6px 10px">
+            <span style="color:var(--text-muted)">÷</span>
+            <input type="number" id="vt-set" placeholder="VT cài (V)" class="btn" style="width:110px;padding:6px 10px">
+            <button class="btn" style="border-color:var(--accent);color:var(--accent)" onclick="applyVTPreset()">Áp
+              dụng</button>
+          </div>
+        </div>
+        <div style="display:flex;align-items:flex-end;gap:8px">
+          <button class="btn" onclick="autoDetectCorrection()"
+            style="border-color:var(--accent3);color:var(--accent3);font-weight:600">🧠 Tự nhận dạng</button>
+          <button class="btn" onclick="resetCorrections()" style="border-color:var(--danger);color:var(--danger)">↺
+            Reset tất cả</button>
+        </div>
+      </div>
+    </div>
+    <div id="auto-detect-result" style="display:none;margin-bottom:1.2rem"></div>
+    <div class="chart-card" style="margin-bottom:1.2rem">
+      <h3>🔢 Thông số hiệu chỉnh từng kênh</h3>
+      <p style="font-size:0.76rem;color:var(--text-muted);margin-bottom:1rem">Công thức: <code
+          style="background:var(--surface2);padding:2px 8px;border-radius:4px">Giá trị hiệu chỉnh = Giá trị gốc × Hệ số nhân + Offset</code>
+      </p>
+      <div style="overflow-x:auto">
+        <table class="events-table">
+          <thead>
+            <tr>
+              <th>Kênh</th>
+              <th>Mô tả</th>
+              <th>Hệ số nhân (×)</th>
+              <th>Offset (+)</th>
+              <th>TB gốc</th>
+              <th>TB sau sửa</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong style="color:var(--accent3)">A</strong></td>
+              <td style="color:var(--text-muted)">Dòng điện A1, A2, A3</td>
+              <td><input type="number" class="corr-input btn" data-g="A" data-t="multiply" value="1" step="0.001"
+                  style="width:100px" oninput="updateCorrPreview()"></td>
+              <td><input type="number" class="corr-input btn" data-g="A" data-t="offset" value="0" step="0.1"
+                  style="width:90px" oninput="updateCorrPreview()"></td>
+              <td id="orig-A" style="color:var(--text-muted)">—</td>
+              <td id="prev-A" style="color:var(--accent3);font-weight:600">—</td>
+            </tr>
+            <tr>
+              <td><strong style="color:var(--accent)">V</strong></td>
+              <td style="color:var(--text-muted)">Điện áp V1, V2, V3</td>
+              <td><input type="number" class="corr-input btn" data-g="V" data-t="multiply" value="1" step="0.001"
+                  style="width:100px" oninput="updateCorrPreview()"></td>
+              <td><input type="number" class="corr-input btn" data-g="V" data-t="offset" value="0" step="0.1"
+                  style="width:90px" oninput="updateCorrPreview()"></td>
+              <td id="orig-V" style="color:var(--text-muted)">—</td>
+              <td id="prev-V" style="color:var(--accent);font-weight:600">—</td>
+            </tr>
+            <tr>
+              <td><strong style="color:var(--accent4)">P</strong></td>
+              <td style="color:var(--text-muted)">Công suất tác dụng P</td>
+              <td><input type="number" class="corr-input btn" data-g="P" data-t="multiply" value="1" step="0.001"
+                  style="width:100px" oninput="updateCorrPreview()"></td>
+              <td><input type="number" class="corr-input btn" data-g="P" data-t="offset" value="0" step="1"
+                  style="width:90px" oninput="updateCorrPreview()"></td>
+              <td id="orig-P" style="color:var(--text-muted)">—</td>
+              <td id="prev-P" style="color:var(--accent4);font-weight:600">—</td>
+            </tr>
+            <tr>
+              <td><strong style="color:var(--accent2)">Q</strong></td>
+              <td style="color:var(--text-muted)">Công suất phản kháng Q</td>
+              <td><input type="number" class="corr-input btn" data-g="Q" data-t="multiply" value="1" step="0.001"
+                  style="width:100px" oninput="updateCorrPreview()"></td>
+              <td><input type="number" class="corr-input btn" data-g="Q" data-t="offset" value="0" step="1"
+                  style="width:90px" oninput="updateCorrPreview()"></td>
+              <td id="orig-Q" style="color:var(--text-muted)">—</td>
+              <td id="prev-Q" style="color:var(--accent2);font-weight:600">—</td>
+            </tr>
+            <tr>
+              <td><strong style="color:var(--danger)">S</strong></td>
+              <td style="color:var(--text-muted)">Công suất biểu kiến S</td>
+              <td><input type="number" class="corr-input btn" data-g="S" data-t="multiply" value="1" step="0.001"
+                  style="width:100px" oninput="updateCorrPreview()"></td>
+              <td><input type="number" class="corr-input btn" data-g="S" data-t="offset" value="0" step="1"
+                  style="width:90px" oninput="updateCorrPreview()"></td>
+              <td id="orig-S" style="color:var(--text-muted)">—</td>
+              <td id="prev-S" style="color:var(--danger);font-weight:600">—</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="section-header">Xem trước kết quả hiệu chỉnh (realtime)</div>
+    <div class="charts-grid">
+      <div class="chart-card">
+        <h3>⚡ Điện áp hiệu chỉnh (V)</h3>
+        <canvas id="corrVoltChart"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>🔌 Dòng điện hiệu chỉnh (A)</h3>
+        <canvas id="corrCurrChart"></canvas>
+      </div>
+    </div>
+    <div class="charts-grid">
+      <div class="chart-card">
+        <h3>💡 Công suất hiệu chỉnh (W)</h3>
+        <canvas id="corrPowerChart"></canvas>
+      </div>
+      <div class="chart-card"
+        style="display:flex;flex-direction:column;justify-content:center;align-items:center;gap:1.2rem;padding:2rem;text-align:center">
+        <div style="font-size:0.85rem;color:var(--text-muted);line-height:1.7">Kiểm tra biểu đồ preview, sau đó nhấn nút
+          để xuất file KEW đã hiệu chỉnh.</div>
+        <button id="btn-apply-corr" onclick="applyAndDownloadCorrection()"
+          style="background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:white;padding:12px 28px;border-radius:12px;font-size:0.88rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;transition:opacity 0.15s">
+          <div id="corr-spinner"
+            style="width:14px;height:14px;border:2px solid rgba(255,255,255,0.3);border-radius:50%;border-top-color:white;animation:spin 0.8s linear infinite;display:none">
+          </div>
+          <span id="corr-btn-text">📥 Áp dụng & Tải ZIP</span>
+        </button>
+        <div id="corr-error" style="color:var(--danger);font-size:0.78rem;display:none"></div>
+      </div>
+    </div>
+  </div>
+
+  </div> <!-- end workspace-kew -->
+
+  <!-- ══════════════════ IMAGE WORKSPACE ══════════════════ -->
+  <div id="workspace-img" class="workspace" style="display:none;">
+    <div class="content active" id="tab-edit-img">
+      <div class="section-header">Sửa Ảnh Đo (Pixel Replacement)</div>
+      <div class="chart-card" style="margin-bottom: 1.5rem;">
+        <h3>Tải lên dữ liệu ảnh (.BMP)</h3>
+        
+        <div class="mb-4 mt-3">
+          <label class="form-label text-muted fw-semibold" style="font-size:0.85rem">Chọn Mẫu Đồng Hồ (Template)</label>
+          <select class="form-select bg-dark text-white border-secondary" id="ei-template-select" style="max-width: 300px;">
+            <option value="kew6315">Kyoritsu KEW 6315 (Mặc định)</option>
+            <option value="kew6305">Kyoritsu KEW 6305</option>
+            <option value="hioki3198">Hioki PQ3198</option>
+            <option value="chauvin">Chauvin Arnoux C.A 8336</option>
+          </select>
+        </div>
+
+        <div id="ei-bulk-upload-area"
+          style="border: 2px dashed var(--border); border-radius: 12px; padding: 2rem; text-align: center; cursor: pointer; margin-bottom: 1.5rem; transition: all 0.2s;"
+          ondragover="event.preventDefault(); this.style.borderColor='var(--accent)';"
+          ondragleave="this.style.borderColor='var(--border)';" ondrop="handleBulkDrop(event)">
+          <div style="font-size: 2rem; margin-bottom: 0.5rem;">📸</div>
+          <div style="font-size: 0.9rem; font-weight: 600;">Kéo thả nhiều ảnh .BMP vào đây</div>
+          <div style="font-size: 0.75rem; color: var(--text-muted);">Hoặc click để chọn nhiều file</div>
+          <input type="file" id="ei-bulk-input" multiple accept=".bmp" style="display: none"
+            onchange="handleBulkFiles(this.files)">
+        </div>
+
+        <div id="ei-preview-container"
+          style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px;">
+          <!-- Previews will appear here -->
+        </div>
+
+        <div id="ei-slots-info"
+          style="margin-top: 1rem; font-size: 0.75rem; color: var(--text-muted); border-top: 1px solid var(--border); padding-top: 10px;">
+          Kéo thả các ảnh vào đúng vị trí bên dưới để sắp xếp chức năng:
+        </div>
+
+        <div
+          style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 10px;">
+          <div class="ei-slot" data-idx="0" ondragover="event.preventDefault()" ondrop="handleDropToSlot(event, 0)"
+            style="border: 1px solid var(--border); border-radius: 8px; padding: 10px; background: var(--surface2); text-align: center; min-height: 80px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+            <span style="font-size:0.7rem; color:var(--text-muted); margin-bottom:5px;">1. Tổng hợp</span>
+            <div class="ei-slot-content" style="width:100%; height:100%;"></div>
+          </div>
+          <div class="ei-slot" data-idx="1" ondragover="event.preventDefault()" ondrop="handleDropToSlot(event, 1)"
+            style="border: 1px solid var(--border); border-radius: 8px; padding: 10px; background: var(--surface2); text-align: center; min-height: 80px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+            <span style="font-size:0.7rem; color:var(--text-muted); margin-bottom:5px;">2. Góc pha</span>
+            <div class="ei-slot-content" style="width:100%; height:100%;"></div>
+          </div>
+          <div class="ei-slot" data-idx="2" ondragover="event.preventDefault()" ondrop="handleDropToSlot(event, 2)"
+            style="border: 1px solid var(--border); border-radius: 8px; padding: 10px; background: var(--surface2); text-align: center; min-height: 80px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+            <span style="font-size:0.7rem; color:var(--text-muted); margin-bottom:5px;">3. Sin áp</span>
+            <div class="ei-slot-content" style="width:100%; height:100%;"></div>
+          </div>
+          <div class="ei-slot" data-idx="3" ondragover="event.preventDefault()" ondrop="handleDropToSlot(event, 3)"
+            style="border: 1px solid var(--border); border-radius: 8px; padding: 10px; background: var(--surface2); text-align: center; min-height: 80px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+            <span style="font-size:0.7rem; color:var(--text-muted); margin-bottom:5px;">4. Sin dòng</span>
+            <div class="ei-slot-content" style="width:100%; height:100%;"></div>
+          </div>
+          <div class="ei-slot" data-idx="4" ondragover="event.preventDefault()" ondrop="handleDropToSlot(event, 4)"
+            style="border: 1px solid var(--border); border-radius: 8px; padding: 10px; background: var(--surface2); text-align: center; min-height: 80px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+            <span style="font-size:0.7rem; color:var(--text-muted); margin-bottom:5px;">5. Hài áp</span>
+            <div class="ei-slot-content" style="width:100%; height:100%;"></div>
+          </div>
+          <div class="ei-slot" data-idx="5" ondragover="event.preventDefault()" ondrop="handleDropToSlot(event, 5)"
+            style="border: 1px solid var(--border); border-radius: 8px; padding: 10px; background: var(--surface2); text-align: center; min-height: 80px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+            <span style="font-size:0.7rem; color:var(--text-muted); margin-bottom:5px;">6. Hài dòng</span>
+            <div class="ei-slot-content" style="width:100%; height:100%;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-card" style="margin-bottom: 1.5rem;">
+      <h3>Thông số cấu hình</h3>
+      <div
+        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 15px;">
+        <div><label style="font-size:0.8rem; color:var(--text-muted)">V1</label><input type="text" id="ei-V1"
+            placeholder="V1"
+            style="width:100%; padding:6px; background:var(--surface2); border:1px solid var(--border); color:white; border-radius:4px;" />
+        </div>
+        <div><label style="font-size:0.8rem; color:var(--text-muted)">V2</label><input type="text" id="ei-V2"
+            placeholder="V2"
+            style="width:100%; padding:6px; background:var(--surface2); border:1px solid var(--border); color:white; border-radius:4px;" />
+        </div>
+        <div><label style="font-size:0.8rem; color:var(--text-muted)">V3</label><input type="text" id="ei-V3"
+            placeholder="V3"
+            style="width:100%; padding:6px; background:var(--surface2); border:1px solid var(--border); color:white; border-radius:4px;" />
+        </div>
+        <div><label style="font-size:0.8rem; color:var(--text-muted)">A1</label><input type="text" id="ei-A1"
+            placeholder="A1"
+            style="width:100%; padding:6px; background:var(--surface2); border:1px solid var(--border); color:white; border-radius:4px;" />
+        </div>
+        <div><label style="font-size:0.8rem; color:var(--text-muted)">A2</label><input type="text" id="ei-A2"
+            placeholder="A2"
+            style="width:100%; padding:6px; background:var(--surface2); border:1px solid var(--border); color:white; border-radius:4px;" />
+        </div>
+        <div><label style="font-size:0.8rem; color:var(--text-muted)">A3</label><input type="text" id="ei-A3"
+            placeholder="A3"
+            style="width:100%; padding:6px; background:var(--surface2); border:1px solid var(--border); color:white; border-radius:4px;" />
+        </div>
+        <div><label style="font-size:0.8rem; color:var(--text-muted)">P1</label><input type="text" id="ei-P1"
+            placeholder="P1"
+            style="width:100%; padding:6px; background:var(--surface2); border:1px solid var(--border); color:white; border-radius:4px;" />
+        </div>
+        <div><label style="font-size:0.8rem; color:var(--text-muted)">P2</label><input type="text" id="ei-P2"
+            placeholder="P2"
+            style="width:100%; padding:6px; background:var(--surface2); border:1px solid var(--border); color:white; border-radius:4px;" />
+        </div>
+        <div><label style="font-size:0.8rem; color:var(--text-muted)">P3</label><input type="text" id="ei-P3"
+            placeholder="P3"
+            style="width:100%; padding:6px; background:var(--surface2); border:1px solid var(--border); color:white; border-radius:4px;" />
+        </div>
+        <div><label style="font-size:0.8rem; color:var(--text-muted)">Q1</label><input type="text" id="ei-Q1"
+            placeholder="Q1"
+            style="width:100%; padding:6px; background:var(--surface2); border:1px solid var(--border); color:white; border-radius:4px;" />
+        </div>
+        <div><label style="font-size:0.8rem; color:var(--text-muted)">Q2</label><input type="text" id="ei-Q2"
+            placeholder="Q2"
+            style="width:100%; padding:6px; background:var(--surface2); border:1px solid var(--border); color:white; border-radius:4px;" />
+        </div>
+        <div><label style="font-size:0.8rem; color:var(--text-muted)">Q3</label><input type="text" id="ei-Q3"
+            placeholder="Q3"
+            style="width:100%; padding:6px; background:var(--surface2); border:1px solid var(--border); color:white; border-radius:4px;" />
+        </div>
+        <div><label style="font-size:0.8rem; color:var(--text-muted)">S1</label><input type="text" id="ei-S1"
+            placeholder="S1"
+            style="width:100%; padding:6px; background:var(--surface2); border:1px solid var(--border); color:white; border-radius:4px;" />
+        </div>
+        <div><label style="font-size:0.8rem; color:var(--text-muted)">S2</label><input type="text" id="ei-S2"
+            placeholder="S2"
+            style="width:100%; padding:6px; background:var(--surface2); border:1px solid var(--border); color:white; border-radius:4px;" />
+        </div>
+        <div><label style="font-size:0.8rem; color:var(--text-muted)">S3</label><input type="text" id="ei-S3"
+            placeholder="S3"
+            style="width:100%; padding:6px; background:var(--surface2); border:1px solid var(--border); color:white; border-radius:4px;" />
+        </div>
+        <div><label style="font-size:0.8rem; color:var(--text-muted)">PF1</label><input type="text" id="ei-PF1"
+            placeholder="PF1"
+            style="width:100%; padding:6px; background:var(--surface2); border:1px solid var(--border); color:white; border-radius:4px;" />
+        </div>
+        <div><label style="font-size:0.8rem; color:var(--text-muted)">PF2</label><input type="text" id="ei-PF2"
+            placeholder="PF2"
+            style="width:100%; padding:6px; background:var(--surface2); border:1px solid var(--border); color:white; border-radius:4px;" />
+        </div>
+        <div><label style="font-size:0.8rem; color:var(--text-muted)">PF3</label><input type="text" id="ei-PF3"
+            placeholder="PF3"
+            style="width:100%; padding:6px; background:var(--surface2); border:1px solid var(--border); color:white; border-radius:4px;" />
+        </div>
+        <div><label style="font-size:0.8rem; color:var(--text-muted)">Vdeg1</label><input type="text" id="ei-Vdeg1"
+            placeholder="Vdeg1"
+            style="width:100%; padding:6px; background:var(--surface2); border:1px solid var(--border); color:white; border-radius:4px;" />
+        </div>
+        <div><label style="font-size:0.8rem; color:var(--text-muted)">Vdeg2</label><input type="text" id="ei-Vdeg2"
+            placeholder="Vdeg2"
+            style="width:100%; padding:6px; background:var(--surface2); border:1px solid var(--border); color:white; border-radius:4px;" />
+        </div>
+        <div><label style="font-size:0.8rem; color:var(--text-muted)">Vdeg3</label><input type="text" id="ei-Vdeg3"
+            placeholder="Vdeg3"
+            style="width:100%; padding:6px; background:var(--surface2); border:1px solid var(--border); color:white; border-radius:4px;" />
+        </div>
+        <div><label style="font-size:0.8rem; color:var(--text-muted)">Adeg1</label><input type="text" id="ei-Adeg1"
+            placeholder="Adeg1"
+            style="width:100%; padding:6px; background:var(--surface2); border:1px solid var(--border); color:white; border-radius:4px;" />
+        </div>
+        <div><label style="font-size:0.8rem; color:var(--text-muted)">Adeg2</label><input type="text" id="ei-Adeg2"
+            placeholder="Adeg2"
+            style="width:100%; padding:6px; background:var(--surface2); border:1px solid var(--border); color:white; border-radius:4px;" />
+        </div>
+        <div><label style="font-size:0.8rem; color:var(--text-muted)">Adeg3</label><input type="text" id="ei-Adeg3"
+            placeholder="Adeg3"
+            style="width:100%; padding:6px; background:var(--surface2); border:1px solid var(--border); color:white; border-radius:4px;" />
+        </div>
+        <div><label style="font-size:0.8rem; color:var(--text-muted)">THDV1</label><input type="text" id="ei-THDV1"
+            placeholder="THDV1"
+            style="width:100%; padding:6px; background:var(--surface2); border:1px solid var(--border); color:white; border-radius:4px;" />
+        </div>
+        <div><label style="font-size:0.8rem; color:var(--text-muted)">THDV2</label><input type="text" id="ei-THDV2"
+            placeholder="THDV2"
+            style="width:100%; padding:6px; background:var(--surface2); border:1px solid var(--border); color:white; border-radius:4px;" />
+        </div>
+        <div><label style="font-size:0.8rem; color:var(--text-muted)">THDV3</label><input type="text" id="ei-THDV3"
+            placeholder="THDV3"
+            style="width:100%; padding:6px; background:var(--surface2); border:1px solid var(--border); color:white; border-radius:4px;" />
+        </div>
+        <div><label style="font-size:0.8rem; color:var(--text-muted)">THDA1</label><input type="text" id="ei-THDA1"
+            placeholder="THDA1"
+            style="width:100%; padding:6px; background:var(--surface2); border:1px solid var(--border); color:white; border-radius:4px;" />
+        </div>
+        <div><label style="font-size:0.8rem; color:var(--text-muted)">THDA2</label><input type="text" id="ei-THDA2"
+            placeholder="THDA2"
+            style="width:100%; padding:6px; background:var(--surface2); border:1px solid var(--border); color:white; border-radius:4px;" />
+        </div>
+        <div><label style="font-size:0.8rem; color:var(--text-muted)">THDA3</label><input type="text" id="ei-THDA3"
+            placeholder="THDA3"
+            style="width:100%; padding:6px; background:var(--surface2); border:1px solid var(--border); color:white; border-radius:4px;" />
+        </div>
+        <div><label style="font-size:0.8rem; color:var(--text-muted)">P</label><input type="text" id="ei-P"
+            placeholder="P"
+            style="width:100%; padding:6px; background:var(--surface2); border:1px solid var(--border); color:white; border-radius:4px;" />
+        </div>
+        <div><label style="font-size:0.8rem; color:var(--text-muted)">Q</label><input type="text" id="ei-Q"
+            placeholder="Q"
+            style="width:100%; padding:6px; background:var(--surface2); border:1px solid var(--border); color:white; border-radius:4px;" />
+        </div>
+        <div><label style="font-size:0.8rem; color:var(--text-muted)">S</label><input type="text" id="ei-S"
+            placeholder="S"
+            style="width:100%; padding:6px; background:var(--surface2); border:1px solid var(--border); color:white; border-radius:4px;" />
+        </div>
+        <div><label style="font-size:0.8rem; color:var(--text-muted)">PF</label><input type="text" id="ei-PF"
+            placeholder="PF"
+            style="width:100%; padding:6px; background:var(--surface2); border:1px solid var(--border); color:white; border-radius:4px;" />
+        </div>
+        <div><label style="font-size:0.8rem; color:var(--text-muted)">freq</label><input type="text" id="ei-freq"
+            placeholder="freq"
+            style="width:100%; padding:6px; background:var(--surface2); border:1px solid var(--border); color:white; border-radius:4px;" />
+        </div>
+        <div><label style="font-size:0.8rem; color:var(--text-muted)">An</label><input type="text" id="ei-An"
+            placeholder="An"
+            style="width:100%; padding:6px; background:var(--surface2); border:1px solid var(--border); color:white; border-radius:4px;" />
+        </div>
+        <div><label style="font-size:0.8rem; color:var(--text-muted)">V_unb</label><input type="text" id="ei-V_unb"
+            placeholder="V_unb"
+            style="width:100%; padding:6px; background:var(--surface2); border:1px solid var(--border); color:white; border-radius:4px;" />
+        </div>
+        <div><label style="font-size:0.8rem; color:var(--text-muted)">A_unb</label><input type="text" id="ei-A_unb"
+            placeholder="A_unb"
+            style="width:100%; padding:6px; background:var(--surface2); border:1px solid var(--border); color:white; border-radius:4px;" />
+        </div>
+      </div>
+    </div>
+    <div class="charts-grid">
+
+    </div>
+
+    <div class="chart-card"
+      style="display:flex;flex-direction:column;justify-content:center;align-items:center;gap:1rem;text-align:center;">
+      <div style="display:none">
+        <input type="checkbox" id="ei-fluctuate">
+      </div>
+      <div style="display:flex; gap:10px;">
+        <button id="btn-edit-img-submit" onclick="submitEditImages()"
+          style="background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:white;padding:12px 28px;border-radius:12px;font-size:0.88rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;transition:opacity 0.15s">
+          <div id="ei-spinner"
+            style="width:14px;height:14px;border:2px solid rgba(255,255,255,0.3);border-radius:50%;border-top-color:white;animation:spin 0.8s linear infinite;display:none">
+          </div>
+          <span id="ei-btn-text">📸 Bắt đầu xử lý</span>
+        </button>
+        <button id="btn-edit-img-zip" onclick="downloadEditedZip()"
+          style="display:none; background:var(--surface2); border:1px solid var(--border); color:var(--text); padding:12px 20px; border-radius:12px; font-size:0.88rem; cursor:pointer;">
+          📦 Tải toàn bộ ZIP
+        </button>
+      </div>
+      <div id="ei-error" style="color:var(--danger);font-size:0.78rem;display:none"></div>
+    </div>
+  </div>
+
+  <div id="ei-results-container" style="display:none; margin-top: 2rem;">
+    <div class="section-header">Kết quả chỉnh sửa (Live Gallery)</div>
+    <div id="ei-gallery"
+      style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem;"></div>
+  </div>
+  </div>
+
+
+  </div>
+
+  <!-- ══════════════════ EXCEL WORKSPACE ══════════════════ -->
+  <div id="workspace-excel" class="workspace" style="display:none;">
+     <div class="main-wrapper">
+        
+        <!-- 1. Quản lý File Excel -->
+        <div class="card">
+            <h2>HỆ THỐNG QUẢN LÝ SỐ ĐIỆN</h2>
+            <h3>1. Chọn Tệp Excel</h3>
+            
+            <div class="file-area">
+                <input type="file" id="excel_file" accept=".xlsx" style="flex: 1;" multiple>
+                <button onclick="uploadFile()">Tải Lên File(s) Cần Nhập</button>
+            </div>
+            
+            <div id="active_file_display">
+                <div style="flex: 1; margin-right: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-size: 12px; color: var(--text-light);">TỆP HIỆN TẠI ĐANG CHỌN (CÓ THỂ ĐỔI):</label>
+                    <select id="active_filename" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border); font-weight: bold; color: var(--text); background: white;">
+                    </select>
+                </div>
+                <button class="btn-outline btn-small" onclick="downloadFile()" id="btn_download" style="display: none; height: fit-content;">
+                    Tải Tất Cả File Về (ZIP)
+                </button>
+            </div>
+        </div>
+
+        <!-- 2. Vùng Nhập Liệu -->
+        <div class="card" id="data_entry_section" style="opacity: 0.5; pointer-events: none;">
+            <h3>2. Nhập Dữ Liệu</h3>
+            
+            <div class="form-row">
+                <div class="form-col" style="flex: 1.5;">
+                    <label>Năm (Tên Sheet Excel)</label>
+                    <input type="text" id="sheet_name" value="2023" placeholder="Ví dụ: 2023">
+                </div>
+                <div class="form-col">
+                    <label>Tháng (1-12)</label>
+                    <input type="number" id="month" min="1" max="12" value="1">
+                </div>
+                <div class="form-col">
+                    <label>Kỳ (1-3)</label>
+                    <input type="number" id="period" min="1" max="3" value="1">
+                </div>
+            </div>
+
+            <div style="margin-top: -10px; margin-bottom: 20px;">
+                <label style="display: inline-flex; align-items: center; gap: 8px; cursor: pointer; text-transform: none; letter-spacing: normal; color: var(--text);">
+                    <input type="checkbox" id="auto_increment" checked style="width: auto;"> 
+                    Tự động nhảy Kỳ/Tháng sau khi Ghi thành công
+                </label>
+            </div>
+
+            <!-- Tabs Selection -->
+            <div class="tabs">
+                <button class="tab-btn active" onclick="switchTab('string_mode')" id="tab_string">Nhập Bằng Chuỗi</button>
+                <button class="tab-btn" onclick="switchTab('manual_mode')" id="tab_manual">Nhập Từng Ô</button>
+            </div>
+
+            <!-- Tab: Chuỗi -->
+            <div id="string_mode" class="tab-pane active">
+                <label>Dán dữ liệu số điện (3 Dòng : BT, CĐ, TĐ)</label>
+                <textarea id="raw_data" placeholder="Ví dụ:&#10;1.555 3.938&#10;2.871 1.298&#10;1.007 1.672"></textarea>
+            </div>
+
+            <!-- Tab: Từng ô -->
+            <div id="manual_mode" class="tab-pane">
+                <table class="table-input">
+                    <tr>
+                        <th></th>
+                        <th>Đơn Giá</th>
+                        <th>Tiêu Thụ</th>
+                    </tr>
+                    <tr>
+                        <td class="label-cell">Bình Thường:</td>
+                        <td><input type="text" id="bt_price" placeholder="Đơn giá BT"></td>
+                        <td><input type="text" id="bt_usage" placeholder="Sản lượng BT"></td>
+                    </tr>
+                    <tr>
+                        <td class="label-cell">Cao Điểm:</td>
+                        <td><input type="text" id="cd_price" placeholder="Đơn giá CĐ"></td>
+                        <td><input type="text" id="cd_usage" placeholder="Sản lượng CĐ"></td>
+                    </tr>
+                    <tr>
+                        <td class="label-cell">Thấp Điểm:</td>
+                        <td><input type="text" id="td_price" placeholder="Đơn giá TĐ"></td>
+                        <td><input type="text" id="td_usage" placeholder="Sản lượng TĐ"></td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- Nút Hành Động -->
+            <div class="form-row" style="margin-top: 25px; align-items: center;">
+                <button onclick="submitData()" class="btn-block" id="btn_submit">GHI DỮ LIỆU VÀO EXCEL</button>
+                <button onclick="cancelEdit()" class="btn-outline btn-block" id="btn_cancel_edit" style="display: none; margin-left: 15px;">HỦY CHỈNH SỬA</button>
+            </div>
+            
+            <div id="message"></div>
+        </div>
+
+        <!-- 3. Lịch Sử Nhập Liệu -->
+        <div class="card">
+            <h3>3. Lịch Sử Mới Nhập (Phiên Làm Việc Này)</h3>
+            <div style="overflow-x: auto;">
+                <table class="history-table" id="history_table">
+                    <thead>
+                        <tr>
+                            <th>Thời Gian</th>
+                            <th>Tệp</th>
+                            <th>Tháng</th>
+                            <th>Kỳ</th>
+                            <th>BT (Giá-SL)</th>
+                            <th>CĐ (Giá-SL)</th>
+                            <th>TĐ (Giá-SL)</th>
+                            <th style="text-align: right;">Hành Động</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history_body">
+                        <tr>
+                            <td colspan="8" class="empty-state">Chưa có kết quả nào được ghi trong phiên này.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p style="text-align: right; margin-top: 15px; font-size: 13px; color: var(--text-light);">* Nhấn 'Sửa' để tải dữ liệu lại lên form, đổi số và Ghi Đè dòng đó trong file Excel.</p>
+        </div>
+
+    </div>
+  </div>
+  
+
+<script>
+
+/* ── GLOBAL TOOL SWITCHING ── */
+function switchTool(toolId) {
+    document.querySelectorAll('.workspace').forEach(el => el.style.display = 'none');
+    document.querySelectorAll('.global-nav .btn').forEach(el => el.classList.remove('active'));
+    
+    document.getElementById('workspace-' + toolId).style.display = 'block';
+    
+    const btn = document.getElementById('btn-tool-' + toolId);
+    if(btn) btn.classList.add('active');
+}
+</script>
+
+
+  <script src="{{ url_for('static', filename='js/excel_handler.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/image_editor.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/kew_charts.js') }}"></script>
+<!-- Settings Modal -->
+<div class="modal fade" id="settingsModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content text-bg-dark">
+      <div class="modal-header border-secondary">
+        <h5 class="modal-title"><i class="bi bi-gear"></i> Cài đặt Ngưỡng Đánh Giá</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Ngưỡng THD Điện áp (%) Cảnh báo</label>
+          <input type="number" class="form-control bg-dark text-white border-secondary" id="set-thdv-warn" value="5">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Ngưỡng THD Dòng điện (%) Cảnh báo</label>
+          <input type="number" class="form-control bg-dark text-white border-secondary" id="set-thda-warn" value="15">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Ngưỡng Mất cân bằng Điện áp (%) Cảnh báo</label>
+          <input type="number" class="form-control bg-dark text-white border-secondary" id="set-vunb-warn" value="2">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Hệ số cos(φ) tối thiểu</label>
+          <input type="number" step="0.01" class="form-control bg-dark text-white border-secondary" id="set-pf-min" value="0.9">
+        </div>
+      </div>
+      <div class="modal-footer border-secondary">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+        <button type="button" class="btn btn-primary" onclick="saveSettings()" data-bs-dismiss="modal">Lưu cài đặt</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+  </div>
+</div>
+</body>
+
+</html>

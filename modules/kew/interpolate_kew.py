@@ -5,6 +5,16 @@ import re
 import struct
 import random
 import math
+import json
+
+CONFIG = {}
+config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'config.json')
+if os.path.exists(config_path):
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            CONFIG = json.load(f)
+    except Exception as e:
+        print(f"[WARN] Lỗi đọc config.json: {e}")
 
 # ─── Ornstein-Uhlenbeck Noise Generator ──────────────────────────────────────
 # Generates correlated random-walk noise that mimics real electrical measurement
@@ -76,11 +86,15 @@ def process_inhs(in_path, out_path):
     ref_A_ch = f'A{ref_phase}[A]'.encode('ascii')
     ref_P_ch = f'P{ref_phase}[W]'.encode('ascii')
     
+    cfg_inhs = CONFIG.get('ou_process', {}).get('inhs', {})
+    p2 = cfg_inhs.get('phase2', {'theta': 0.25, 'sigma': 0.012})
+    p3 = cfg_inhs.get('phase3', {'theta': 0.20, 'sigma': 0.010})
+    
     # Build per-phase OU processes so noise is correlated across time
-    ou_A2 = OUProcess(theta=0.25, sigma=0.012)
-    ou_A3 = OUProcess(theta=0.20, sigma=0.010)
-    ou_P2 = OUProcess(theta=0.25, sigma=0.012)
-    ou_P3 = OUProcess(theta=0.20, sigma=0.010)
+    ou_A2 = OUProcess(theta=p2['theta'], sigma=p2['sigma'])
+    ou_A3 = OUProcess(theta=p3['theta'], sigma=p3['sigma'])
+    ou_P2 = OUProcess(theta=p2['theta'], sigma=p2['sigma'])
+    ou_P3 = OUProcess(theta=p3['theta'], sigma=p3['sigma'])
     
     # Parse records
     records = []
@@ -204,9 +218,13 @@ def process_inps(in_path, out_path, ref_phase=None):
         else:
             print(f"[INFO] INPS using INHS Reference phase: {ref_phase}")
 
+        cfg_inps = CONFIG.get('ou_process', {}).get('inps', {})
+        p2 = cfg_inps.get('phase2', {'theta': 0.3, 'sigma': 0.008})
+        p3 = cfg_inps.get('phase3', {'theta': 0.25, 'sigma': 0.007})
+
         # Build separate OU processes per target phase, for each metric group
-        ou_ph2 = OUProcess(theta=0.3, sigma=0.008)
-        ou_ph3 = OUProcess(theta=0.25, sigma=0.007)
+        ou_ph2 = OUProcess(theta=p2['theta'], sigma=p2['sigma'])
+        ou_ph3 = OUProcess(theta=p3['theta'], sigma=p3['sigma'])
         
         out_lines = [lines[0], lines[1]]
         
