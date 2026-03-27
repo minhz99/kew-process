@@ -5,11 +5,20 @@ function switchTool(toolId) {
     const allowedTools = ['kew', 'img', 'excel'];
     const activeTool = allowedTools.includes(toolId) ? toolId : 'kew';
 
-    document.querySelectorAll('.workspace').forEach(el => { el.style.display = 'none'; });
+    document.querySelectorAll('.workspace').forEach(el => { 
+        el.style.display = 'none';
+        el.classList.remove('active');
+    });
     document.querySelectorAll('#tool-tabs .tool-tab').forEach(el => el.classList.remove('active'));
 
     const workspace = document.getElementById('workspace-' + activeTool);
-    if (workspace) workspace.style.display = 'block';
+    if (workspace) {
+        workspace.style.display = 'block';
+        workspace.classList.add('active');
+        console.log('Switched to workspace:', activeTool);
+    } else {
+        console.error('Workspace not found:', 'workspace-' + activeTool);
+    }
 
     const btn = document.getElementById('btn-tool-' + activeTool);
     if (btn) btn.classList.add('active');

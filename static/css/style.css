@@ -585,6 +585,11 @@
 
     .workspace {
       min-height: 100%;
+      display: none;
+    }
+
+    .workspace.active {
+      display: block !important;
     }
 
     /* ── Uploader ── */
@@ -928,20 +933,22 @@
         #workspace-excel {
             --excel-primary: var(--accent);
             --excel-primary-dark: #2563eb;
-            --excel-primary-soft: rgba(59, 130, 246, 0.18);
+            --excel-primary-soft: rgba(59, 130, 246, 0.12);
             --excel-surface: var(--surface);
             --excel-surface-alt: var(--surface2);
             --excel-border: var(--border);
             --excel-text: var(--text);
             --excel-text-muted: var(--text-muted);
-            --excel-danger: #f87171;
-            --excel-warning: #fbbf24;
+            --excel-danger: var(--danger);
+            --excel-warning: var(--accent4);
             --excel-info: var(--accent);
+            
             padding: 1.5rem 1.25rem 2.5rem;
             background: var(--bg);
             min-height: 100%;
             color: var(--excel-text);
             font-family: 'Inter', sans-serif;
+            position: relative;
         }
 
         #workspace-excel .main-wrapper {
@@ -954,16 +961,30 @@
         }
 
         #workspace-excel .card {
-            background-color: var(--excel-surface);
-            padding: 1.25rem 1.35rem;
-            border-radius: 14px;
+            background: linear-gradient(145deg, var(--excel-surface), rgba(17, 24, 39, 0.8));
+            padding: 1.5rem;
+            border-radius: 16px;
             border: 1px solid var(--excel-border);
-            box-shadow: 0 14px 28px rgba(3, 8, 20, 0.32);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
 
         #workspace-excel .excel-hero {
-            border-color: rgba(59, 130, 246, 0.28);
-            background: linear-gradient(140deg, rgba(59, 130, 246, 0.12), rgba(139, 92, 246, 0.08));
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(139, 92, 246, 0.1) 100%);
+            border-color: rgba(59, 130, 246, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        #workspace-excel .excel-hero::after {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(59, 130, 246, 0.05) 0%, transparent 70%);
+            pointer-events: none;
         }
 
         #workspace-excel .excel-hero-sub {
@@ -1035,14 +1056,15 @@
         #workspace-excel textarea,
         #workspace-excel input[type="file"] {
             width: 100%;
-            padding: 10px 12px;
+            padding: 10px 14px;
             border: 1px solid var(--excel-border);
             border-radius: 10px;
             transition: all 0.2s ease;
             font-family: inherit;
             font-size: 0.9rem;
-            background-color: var(--excel-surface-alt);
-            color: var(--excel-text);
+            background-color: var(--surface2);
+            color: var(--text);
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         #workspace-excel input[type="text"]:focus,
@@ -1062,29 +1084,32 @@
         }
 
         #workspace-excel button {
-            padding: 10px 20px;
-            background: linear-gradient(135deg, var(--excel-primary), var(--excel-primary-dark));
+            padding: 10px 22px;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
             color: white;
-            border: 1px solid transparent;
+            border: none;
             border-radius: 10px;
-            font-size: 0.84rem;
+            font-size: 0.9rem;
             font-weight: 600;
             cursor: pointer;
-            transition: transform 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            gap: 6px;
+            gap: 8px;
             white-space: nowrap;
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.2);
         }
 
         #workspace-excel button:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 10px 20px rgba(34, 197, 94, 0.22);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(59, 130, 246, 0.35);
+            filter: brightness(1.1);
         }
 
         #workspace-excel button:active {
             transform: translateY(0);
+            box-shadow: 0 4px 10px rgba(59, 130, 246, 0.2);
         }
 
         #workspace-excel .btn-block {
@@ -1190,28 +1215,27 @@
         }
 
         #workspace-excel .tab-btn {
-            background: transparent;
+            background: var(--surface2);
             border: 1px solid var(--excel-border);
-            color: var(--excel-text-muted);
+            color: var(--text-muted);
             font-weight: 600;
-            padding: 8px 14px;
+            padding: 8px 18px;
             cursor: pointer;
-            border-radius: 999px;
-            transition: all 0.2s;
-            box-shadow: none;
+            border-radius: 10px;
+            transition: all 0.2s ease;
         }
 
         #workspace-excel .tab-btn:hover {
-            background-color: rgba(59, 130, 246, 0.12);
-            border-color: rgba(96, 165, 250, 0.6);
-            color: var(--excel-text);
-            transform: none;
+            border-color: var(--accent);
+            color: var(--text);
+            background: rgba(59, 130, 246, 0.05);
         }
 
         #workspace-excel .tab-btn.active {
-            background: linear-gradient(135deg, #2563eb, #1d4ed8);
-            color: #dbeafe;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            color: white;
             border-color: transparent;
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.25);
         }
 
         #workspace-excel .tab-pane {
