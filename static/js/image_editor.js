@@ -247,7 +247,7 @@ let EDITED_FILES = [];
           const key = `${s}_${c}`;
           promises.push((async () => {
             const img = new Image();
-            img.src = `templates/digits/${s}${c}.bmp`;
+            img.src = `/static/digits/${s}${c}.bmp`;
             await new Promise(r => { img.onload = r; img.onerror = r; });
             if (img.complete && img.naturalWidth > 0) {
               DIGIT_TEMPLATES[key] = img;

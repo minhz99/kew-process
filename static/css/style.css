@@ -1,17 +1,17 @@
 :root {
-      --bg: #0a0e1a;
-      --surface: #111827;
-      --surface2: #1a2235;
-      --border: #1f2d45;
-      --accent: #3b82f6;
-      --accent2: #8b5cf6;
+      --bg: #0b0a10;
+      --surface: #14131d;
+      --surface2: #1d1b2a;
+      --border: #2d2845;
+      --accent: #6d28d9;
+      --accent2: #ec4899;
       --accent3: #10b981;
       --accent4: #f59e0b;
       --danger: #ef4444;
-      --text: #e2e8f0;
-      --text-muted: #64748b;
-      --grid: #1e2a3a;
-      --card-glow: rgba(59, 130, 246, 0.08);
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --grid: #1a1828;
+      --card-glow: rgba(109, 40, 217, 0.15);
     }
 
     *,
@@ -162,7 +162,7 @@
     }
 
     .kew-nav-card {
-      margin: 1.5rem 2rem 0;
+      margin: 0;
       padding: 1rem 1.1rem;
     }
 
@@ -201,11 +201,18 @@
     }
 
     /* ── Layout ── */
-    .content {
+    .content, .content-header {
       padding: 1.5rem 2rem;
-      display: none;
       max-width: 1600px;
       margin: 0 auto;
+    }
+
+    .content {
+      display: none;
+    }
+
+    .content-header {
+      display: block;
     }
 
     .content.active {
@@ -599,7 +606,7 @@
     }
 
     .kew-upload-card {
-      margin: 1.5rem 2rem 0;
+      margin-bottom: 1.5rem;
       background: linear-gradient(140deg, rgba(17, 24, 39, 0.94), rgba(26, 34, 53, 0.88));
       border-color: rgba(59, 130, 246, 0.35);
       box-shadow: 0 20px 35px rgba(4, 10, 23, 0.45);
@@ -874,16 +881,16 @@
         display: none;
       }
 
-      .content {
+      .content, .content-header {
         padding: 1rem;
       }
 
       .kew-nav-card {
-        margin: 1rem;
+        margin: 0;
       }
 
       .kew-upload-card {
-        margin: 1rem;
+        margin-bottom: 1rem;
       }
 
       #upload-area {
