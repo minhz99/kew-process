@@ -5,13 +5,15 @@ import io
 import tempfile
 import shutil
 import zipfile
-from analyse_kew import build_analysis, sanitize, generate_commentary
 import sys
 from analyse_kew import build_analysis, sanitize, generate_commentary
+from excel_api import excel_bp
 
 app = Flask(__name__, static_folder='.', static_url_path='')
+app.register_blueprint(excel_bp, url_prefix='/api/excel')
 
 @app.route('/')
+
 def index():
     return send_file('dashboard.html')
 

@@ -3,7 +3,131 @@
 
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <<div class="main-wrapper">
+        
+        <!-- 1. Quản lý File Excel -->
+        <div class="card">
+            <h2>HỆ THỐNG QUẢN LÝ SỐ ĐIỆN</h2>
+            <h3>1. Chọn Tệp Excel</h3>
+            
+            <div class="file-area">
+                <input type="file" id="excel_file" accept=".xlsx" style="flex: 1;" multiple>
+                <button onclick="uploadFile()">Tải Lên File(s) Cần Nhập</button>
+            </div>
+            
+            <div id="active_file_display">
+                <div style="flex: 1; margin-right: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-size: 12px; color: var(--text-light);">TỆP HIỆN TẠI ĐANG CHỌN (CÓ THỂ ĐỔI):</label>
+                    <select id="active_filename" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border); font-weight: bold; color: var(--text); background: white;">
+                    </select>
+                </div>
+                <button class="btn-outline btn-small" onclick="downloadFile()" id="btn_download" style="display: none; height: fit-content;">
+                    Tải Tất Cả File Về (ZIP)
+                </button>
+            </div>
+        </div>
+
+        <!-- 2. Vùng Nhập Liệu -->
+        <div class="card" id="data_entry_section" style="opacity: 0.5; pointer-events: none;">
+            <h3>2. Nhập Dữ Liệu</h3>
+            
+            <div class="form-row">
+                <div class="form-col" style="flex: 1.5;">
+                    <label>Năm (Tên Sheet Excel)</label>
+                    <input type="text" id="sheet_name" value="2023" placeholder="Ví dụ: 2023">
+                </div>
+                <div class="form-col">
+                    <label>Tháng (1-12)</label>
+                    <input type="number" id="month" min="1" max="12" value="1">
+                </div>
+                <div class="form-col">
+                    <label>Kỳ (1-3)</label>
+                    <input type="number" id="period" min="1" max="3" value="1">
+                </div>
+            </div>
+
+            <div style="margin-top: -10px; margin-bottom: 20px;">
+                <label style="display: inline-flex; align-items: center; gap: 8px; cursor: pointer; text-transform: none; letter-spacing: normal; color: var(--text);">
+                    <input type="checkbox" id="auto_increment" checked style="width: auto;"> 
+                    Tự động nhảy Kỳ/Tháng sau khi Ghi thành công
+                </label>
+            </div>
+
+            <!-- Tabs Selection -->
+            <div class="tabs">
+                <button class="tab-btn active" onclick="switchTab('string_mode')" id="tab_string">Nhập Bằng Chuỗi</button>
+                <button class="tab-btn" onclick="switchTab('manual_mode')" id="tab_manual">Nhập Từng Ô</button>
+            </div>
+
+            <!-- Tab: Chuỗi -->
+            <div id="string_mode" class="tab-pane active">
+                <label>Dán dữ liệu số điện (3 Dòng : BT, CĐ, TĐ)</label>
+                <textarea id="raw_data" placeholder="Ví dụ:&#10;1.555 3.938&#10;2.871 1.298&#10;1.007 1.672"></textarea>
+            </div>
+
+            <!-- Tab: Từng ô -->
+            <div id="manual_mode" class="tab-pane">
+                <table class="table-input">
+                    <tr>
+                        <th></th>
+                        <th>Đơn Giá</th>
+                        <th>Tiêu Thụ</th>
+                    </tr>
+                    <tr>
+                        <td class="label-cell">Bình Thường:</td>
+                        <td><input type="text" id="bt_price" placeholder="Đơn giá BT"></td>
+                        <td><input type="text" id="bt_usage" placeholder="Sản lượng BT"></td>
+                    </tr>
+                    <tr>
+                        <td class="label-cell">Cao Điểm:</td>
+                        <td><input type="text" id="cd_price" placeholder="Đơn giá CĐ"></td>
+                        <td><input type="text" id="cd_usage" placeholder="Sản lượng CĐ"></td>
+                    </tr>
+                    <tr>
+                        <td class="label-cell">Thấp Điểm:</td>
+                        <td><input type="text" id="td_price" placeholder="Đơn giá TĐ"></td>
+                        <td><input type="text" id="td_usage" placeholder="Sản lượng TĐ"></td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- Nút Hành Động -->
+            <div class="form-row" style="margin-top: 25px; align-items: center;">
+                <button onclick="submitData()" class="btn-block" id="btn_submit">GHI DỮ LIỆU VÀO EXCEL</button>
+                <button onclick="cancelEdit()" class="btn-outline btn-block" id="btn_cancel_edit" style="display: none; margin-left: 15px;">HỦY CHỈNH SỬA</button>
+            </div>
+            
+            <div id="message"></div>
+        </div>
+
+        <!-- 3. Lịch Sử Nhập Liệu -->
+        <div class="card">
+            <h3>3. Lịch Sử Mới Nhập (Phiên Làm Việc Này)</h3>
+            <div style="overflow-x: auto;">
+                <table class="history-table" id="history_table">
+                    <thead>
+                        <tr>
+                            <th>Thời Gian</th>
+                            <th>Tệp</th>
+                            <th>Tháng</th>
+                            <th>Kỳ</th>
+                            <th>BT (Giá-SL)</th>
+                            <th>CĐ (Giá-SL)</th>
+                            <th>TĐ (Giá-SL)</th>
+                            <th style="text-align: right;">Hành Động</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history_body">
+                        <tr>
+                            <td colspan="8" class="empty-state">Chưa có kết quả nào được ghi trong phiên này.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p style="text-align: right; margin-top: 15px; font-size: 13px; color: var(--text-light);">* Nhấn 'Sửa' để tải dữ liệu lại lên form, đổi số và Ghi Đè dòng đó trong file Excel.</p>
+        </div>
+
+    </div>\nmeta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Power Quality Analyser — KEW Dashboard</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -783,14 +907,337 @@
       max-width: 400px;
       line-height: 1.6;
     }
-  </style>
+  \n\n  /* ── EXCEL MODULE STYLES ── */\n
+        /* Global excel variables */:root {
+            --primary: #2ecc71;
+            --primary-dark: #27ae60;
+            --bg: #f4f7f6;
+            --surface: #ffffff;
+            --text: #2c3e50;
+            --text-light: #7f8c8d;
+            --border: #e0e6ed;
+            --error: #e74c3c;
+            --warning: #f1c40f;
+            --info: #3498db;
+        }
+
+        body { 
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; 
+            background-color: var(--bg); 
+            color: var(--text);
+            margin: 0;
+            padding: 40px 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .main-wrapper {
+            max-width: 800px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .card { 
+            background-color: var(--surface); 
+            padding: 30px; 
+            border-radius: 12px; 
+            box-shadow: 0 8px 16px rgba(0,0,0,0.05); 
+        }
+
+        h2, h3 { 
+            color: var(--text); 
+            margin-top: 0;
+            font-weight: 600;
+        }
+
+        h2 { 
+            text-align: center; 
+            margin-bottom: 30px;
+            font-size: 24px;
+            letter-spacing: -0.5px;
+        }
+
+        h3 {
+            font-size: 18px;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        /* Form Elements */
+        .form-row { 
+            display: flex; 
+            gap: 20px; 
+            margin-bottom: 20px; 
+        }
+
+        .form-col { 
+            flex: 1; 
+        }
+
+        label { 
+            display: block; 
+            margin-bottom: 8px; 
+            font-weight: 600; 
+            color: var(--text-light); 
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        input[type="text"], 
+        input[type="number"],
+        textarea,
+        input[type="file"] { 
+            width: 100%; 
+            padding: 12px 14px; 
+            border: 2px solid var(--border); 
+            border-radius: 8px; 
+            box-sizing: border-box; 
+            transition: all 0.3s ease;
+            font-family: inherit;
+            font-size: 15px;
+            background-color: #f8fafc;
+        }
+
+        input[type="text"]:focus, 
+        input[type="number"]:focus,
+        textarea:focus {
+            border-color: var(--primary);
+            background-color: var(--surface);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(46, 204, 113, 0.1);
+        }
+
+        textarea {
+            font-family: 'Consolas', monospace;
+            resize: vertical;
+            min-height: 120px;
+            line-height: 1.5;
+        }
+
+        /* Buttons */
+        button { 
+            padding: 12px 24px; 
+            background-color: var(--primary); 
+            color: white; 
+            border: none; 
+            border-radius: 8px; 
+            font-size: 15px; 
+            font-weight: 600;
+            cursor: pointer; 
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        button:hover { 
+            background-color: var(--primary-dark); 
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(46, 204, 113, 0.2);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .btn-block { width: 100%; margin-top: 10px; }
+        
+        .btn-outline {
+            background-color: transparent;
+            border: 2px solid var(--primary);
+            color: var(--primary);
+        }
+
+        .btn-outline:hover {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 13px;
+            border-radius: 6px;
+        }
+
+        .btn-warning {
+            background-color: var(--warning);
+            color: #000;
+        }
+        .btn-warning:hover {
+            background-color: #f39c12;
+        }
+
+        /* File Upload Area */
+        .file-area {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: #f8fafc;
+            padding: 20px;
+            border-radius: 8px;
+            border: 2px dashed var(--border);
+            margin-bottom: 10px;
+        }
+
+        #active_file_display {
+            font-weight: 600;
+            color: var(--info);
+            margin-bottom: 20px;
+            padding: 12px;
+            background-color: rgba(52, 152, 219, 0.1);
+            border-radius: 8px;
+            display: none;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 10px;
+        }
+
+        .tab-btn {
+            background: none;
+            border: none;
+            color: var(--text-light);
+            font-weight: 600;
+            padding: 10px 20px;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.3s;
+            box-shadow: none;
+        }
+
+        .tab-btn:hover {
+            background-color: var(--bg);
+            transform: none;
+        }
+
+        .tab-btn.active {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        .tab-pane {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .tab-pane.active {
+            display: block;
+        }
+
+        /* Nested Table Input */
+        .table-input { 
+            width: 100%; 
+            border-collapse: separate; 
+            border-spacing: 0 10px;
+        }
+        .table-input th { 
+            text-align: left; 
+            color: var(--text-light); 
+            font-weight: 600;
+            font-size: 13px;
+            text-transform: uppercase;
+            padding: 0 10px;
+        }
+        .table-input td { 
+            padding: 0 10px;
+        }
+        .table-input td.label-cell {
+            color: var(--text);
+            font-weight: 600;
+            white-space: nowrap;
+            width: 120px;
+        }
+
+        /* History Table */
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            font-size: 14px;
+        }
+
+        .history-table th, .history-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .history-table th {
+            background-color: #f8fafc;
+            color: var(--text-light);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 12px;
+            letter-spacing: 0.5px;
+        }
+
+        .history-table tr:hover {
+            background-color: #f8fafc;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 30px;
+            color: var(--text-light);
+            font-style: italic;
+        }
+
+        /* Messages */
+        #message { 
+            margin-top: 20px; 
+            text-align: center; 
+            font-weight: 600; 
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+        }
+        .success { background-color: rgba(46, 204, 113, 0.1); color: var(--primary-dark); display: block !important; }
+        .error { background-color: rgba(231, 76, 60, 0.1); color: var(--error); display: block !important; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .row-edited {
+            background-color: rgba(241, 196, 15, 0.1);
+        }
+    \n</style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 
 <body>
+<header>
+      <div class="logo">
+        <div class="logo-icon">⚡</div>
+        <div class="logo-text">
+          <h1>Power Quality Analyser</h1>
+          <p>Phân tích chất lượng điện năng & Nhập liệu</p>
+        </div>
+      </div>
+      <div class="global-nav" style="display:flex; gap: 8px;">
+        <button class="btn active" id="btn-tool-kew" onclick="switchTool('kew')">📊 Phân Tích KEW</button>
+        <button class="btn" id="btn-tool-img" onclick="switchTool('img')">📸 Sửa Ảnh Đo</button>
+        <button class="btn" id="btn-tool-excel" onclick="switchTool('excel')">📝 Nhập Excel</button>
+      </div>
+      <div class="header-meta" id="headerMeta"></div>
+    </header>
 
   <!-- ══════════════════ UPLOAD SCREEN ══════════════════ -->
+  <div id="workspace-kew" class="workspace active">
   <div id="upload-container">
     <div class="logo-icon"
       style="margin: 0 auto 1.5rem; width: 64px; height: 64px; font-size: 32px; border-radius: 16px;">⚡</div>
@@ -843,16 +1290,7 @@
 
   <!-- ══════════════════ DASHBOARD APP ══════════════════ -->
   <div id="app-container">
-    <header>
-      <div class="logo">
-        <div class="logo-icon">⚡</div>
-        <div class="logo-text">
-          <h1>Power Quality Analyser</h1>
-          <p id="deviceInfo">KEW — Power Quality Dashboard</p>
-        </div>
-      </div>
-      <div class="header-meta" id="headerMeta"></div>
-    </header>
+    
 
     <nav>
       <div class="tab active" onclick="switchTab('overview')">📊 Tổng quan</div>
@@ -863,7 +1301,7 @@
       <div class="tab" onclick="switchTab('events')">🚨 Sự kiện</div>
       <div class="tab" onclick="switchTab('assessment')">✅ Đánh giá</div>
       <div class="tab" onclick="switchTab('correction')">🔧 Sửa số liệu</div>
-      <div class="tab" onclick="switchTab('edit-img')">📸 Sửa Ảnh Đo</div>
+      
     </nav>
 
     <!-- ══════════════════ OVERVIEW TAB ══════════════════ -->
@@ -1078,7 +1516,206 @@
     </div>
 
     <!-- ══════════════════ CORRECTION TAB ══════════════════ -->
-    <div class="content" id="tab-edit-img">
+  <div class="content" id="tab-correction">
+    <div class="section-header">Tính toán nhanh & Hiệu chỉnh số liệu</div>
+
+    <!-- Quick Calculator -->
+    <div class="chart-card" style="margin-bottom:1.2rem; border-color: var(--accent)40;">
+      <h3>🧮 Máy tính nhanh (U-I-P)</h3>
+      <p style="font-size:0.76rem;color:var(--text-muted);margin-bottom:1rem">Chọn thông số cần tính, sau đó nhập 2
+        thông số còn lại.</p>
+      <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-end">
+        <div style="flex:1;min-width:140px">
+          <label style="font-size:0.72rem;color:var(--text-muted);display:block;margin-bottom:4px">Thông số cần
+            tính</label>
+          <select id="calc-target" onchange="updateCalcTarget()"
+            style="width:100%;padding:6px 10px;border-color:var(--accent);color:var(--accent);font-weight:600">
+            <option value="p">Tính Công suất (P)</option>
+            <option value="i">Tính Dòng điện (I)</option>
+            <option value="u">Tính Điện áp (U)</option>
+          </select>
+        </div>
+        <div style="flex:1;min-width:110px">
+          <label style="font-size:0.72rem;color:var(--text-muted);display:block;margin-bottom:4px">Điện áp U (V)</label>
+          <input type="number" id="calc-u" class="btn calc-inp" style="width:100%;padding:6px 10px" placeholder="U"
+            oninput="quickCalc()">
+        </div>
+        <div style="flex:1;min-width:110px">
+          <label style="font-size:0.72rem;color:var(--text-muted);display:block;margin-bottom:4px">Dòng điện I
+            (A)</label>
+          <input type="number" id="calc-i" class="btn calc-inp" style="width:100%;padding:6px 10px" placeholder="I"
+            oninput="quickCalc()">
+        </div>
+        <div style="flex:1;min-width:110px">
+          <label style="font-size:0.72rem;color:var(--text-muted);display:block;margin-bottom:4px">Công suất P
+            (kW)</label>
+          <input type="number" id="calc-p" class="btn calc-inp" style="width:100%;padding:6px 10px" placeholder="P"
+            oninput="quickCalc()" disabled>
+        </div>
+        <div style="flex:0.5;min-width:80px">
+          <label style="font-size:0.72rem;color:var(--text-muted);display:block;margin-bottom:4px">Hệ số PF</label>
+          <input type="number" id="calc-pf" class="btn" style="width:100%;padding:6px 10px" value="0.85" step="0.01"
+            oninput="quickCalc()">
+        </div>
+        <div style="flex:1;min-width:130px">
+          <label style="font-size:0.72rem;color:var(--text-muted);display:block;margin-bottom:4px">Loại lưới</label>
+          <select id="calc-type" onchange="quickCalc()" style="width:100%;padding:6px 10px">
+            <option value="3p">3 Pha (√3)</option>
+            <option value="1p">1 Pha</option>
+          </select>
+        </div>
+        <button class="btn" style="border-color:var(--danger);color:var(--danger)" onclick="resetCalc()">Xóa</button>
+      </div>
+      <div id="calc-hint" style="font-size:0.72rem;color:var(--accent);margin-top:8px;font-style:italic;height:12px">
+      </div>
+    </div>
+
+    <div class="section-header">Tự động nhận dạng</div>
+    <div class="chart-card" style="margin-bottom:1.2rem">
+      <h3>⚡ Phím tắt hiệu chỉnh nhanh</h3>
+      <div style="display:flex;gap:1.5rem;flex-wrap:wrap;margin-top:0.75rem">
+        <div>
+          <label style="font-size:0.78rem;color:var(--text-muted);display:block;margin-bottom:6px">Tỉ số CT thực / CT
+            cài đặt</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input type="number" id="ct-real" placeholder="CT thực (A)" class="btn"
+              style="width:110px;padding:6px 10px">
+            <span style="color:var(--text-muted)">÷</span>
+            <input type="number" id="ct-set" placeholder="CT cài (A)" class="btn" style="width:110px;padding:6px 10px">
+            <button class="btn" style="border-color:var(--accent);color:var(--accent)" onclick="applyCTPreset()">Áp
+              dụng</button>
+          </div>
+        </div>
+        <div>
+          <label style="font-size:0.78rem;color:var(--text-muted);display:block;margin-bottom:6px">Tỉ số VT thực / VT
+            cài đặt</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input type="number" id="vt-real" placeholder="VT thực (V)" class="btn"
+              style="width:110px;padding:6px 10px">
+            <span style="color:var(--text-muted)">÷</span>
+            <input type="number" id="vt-set" placeholder="VT cài (V)" class="btn" style="width:110px;padding:6px 10px">
+            <button class="btn" style="border-color:var(--accent);color:var(--accent)" onclick="applyVTPreset()">Áp
+              dụng</button>
+          </div>
+        </div>
+        <div style="display:flex;align-items:flex-end;gap:8px">
+          <button class="btn" onclick="autoDetectCorrection()"
+            style="border-color:var(--accent3);color:var(--accent3);font-weight:600">🧠 Tự nhận dạng</button>
+          <button class="btn" onclick="resetCorrections()" style="border-color:var(--danger);color:var(--danger)">↺
+            Reset tất cả</button>
+        </div>
+      </div>
+    </div>
+    <div id="auto-detect-result" style="display:none;margin-bottom:1.2rem"></div>
+    <div class="chart-card" style="margin-bottom:1.2rem">
+      <h3>🔢 Thông số hiệu chỉnh từng kênh</h3>
+      <p style="font-size:0.76rem;color:var(--text-muted);margin-bottom:1rem">Công thức: <code
+          style="background:var(--surface2);padding:2px 8px;border-radius:4px">Giá trị hiệu chỉnh = Giá trị gốc × Hệ số nhân + Offset</code>
+      </p>
+      <div style="overflow-x:auto">
+        <table class="events-table">
+          <thead>
+            <tr>
+              <th>Kênh</th>
+              <th>Mô tả</th>
+              <th>Hệ số nhân (×)</th>
+              <th>Offset (+)</th>
+              <th>TB gốc</th>
+              <th>TB sau sửa</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong style="color:var(--accent3)">A</strong></td>
+              <td style="color:var(--text-muted)">Dòng điện A1, A2, A3</td>
+              <td><input type="number" class="corr-input btn" data-g="A" data-t="multiply" value="1" step="0.001"
+                  style="width:100px" oninput="updateCorrPreview()"></td>
+              <td><input type="number" class="corr-input btn" data-g="A" data-t="offset" value="0" step="0.1"
+                  style="width:90px" oninput="updateCorrPreview()"></td>
+              <td id="orig-A" style="color:var(--text-muted)">—</td>
+              <td id="prev-A" style="color:var(--accent3);font-weight:600">—</td>
+            </tr>
+            <tr>
+              <td><strong style="color:var(--accent)">V</strong></td>
+              <td style="color:var(--text-muted)">Điện áp V1, V2, V3</td>
+              <td><input type="number" class="corr-input btn" data-g="V" data-t="multiply" value="1" step="0.001"
+                  style="width:100px" oninput="updateCorrPreview()"></td>
+              <td><input type="number" class="corr-input btn" data-g="V" data-t="offset" value="0" step="0.1"
+                  style="width:90px" oninput="updateCorrPreview()"></td>
+              <td id="orig-V" style="color:var(--text-muted)">—</td>
+              <td id="prev-V" style="color:var(--accent);font-weight:600">—</td>
+            </tr>
+            <tr>
+              <td><strong style="color:var(--accent4)">P</strong></td>
+              <td style="color:var(--text-muted)">Công suất tác dụng P</td>
+              <td><input type="number" class="corr-input btn" data-g="P" data-t="multiply" value="1" step="0.001"
+                  style="width:100px" oninput="updateCorrPreview()"></td>
+              <td><input type="number" class="corr-input btn" data-g="P" data-t="offset" value="0" step="1"
+                  style="width:90px" oninput="updateCorrPreview()"></td>
+              <td id="orig-P" style="color:var(--text-muted)">—</td>
+              <td id="prev-P" style="color:var(--accent4);font-weight:600">—</td>
+            </tr>
+            <tr>
+              <td><strong style="color:var(--accent2)">Q</strong></td>
+              <td style="color:var(--text-muted)">Công suất phản kháng Q</td>
+              <td><input type="number" class="corr-input btn" data-g="Q" data-t="multiply" value="1" step="0.001"
+                  style="width:100px" oninput="updateCorrPreview()"></td>
+              <td><input type="number" class="corr-input btn" data-g="Q" data-t="offset" value="0" step="1"
+                  style="width:90px" oninput="updateCorrPreview()"></td>
+              <td id="orig-Q" style="color:var(--text-muted)">—</td>
+              <td id="prev-Q" style="color:var(--accent2);font-weight:600">—</td>
+            </tr>
+            <tr>
+              <td><strong style="color:var(--danger)">S</strong></td>
+              <td style="color:var(--text-muted)">Công suất biểu kiến S</td>
+              <td><input type="number" class="corr-input btn" data-g="S" data-t="multiply" value="1" step="0.001"
+                  style="width:100px" oninput="updateCorrPreview()"></td>
+              <td><input type="number" class="corr-input btn" data-g="S" data-t="offset" value="0" step="1"
+                  style="width:90px" oninput="updateCorrPreview()"></td>
+              <td id="orig-S" style="color:var(--text-muted)">—</td>
+              <td id="prev-S" style="color:var(--danger);font-weight:600">—</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="section-header">Xem trước kết quả hiệu chỉnh (realtime)</div>
+    <div class="charts-grid">
+      <div class="chart-card">
+        <h3>⚡ Điện áp hiệu chỉnh (V)</h3>
+        <canvas id="corrVoltChart"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>🔌 Dòng điện hiệu chỉnh (A)</h3>
+        <canvas id="corrCurrChart"></canvas>
+      </div>
+    </div>
+    <div class="charts-grid">
+      <div class="chart-card">
+        <h3>💡 Công suất hiệu chỉnh (W)</h3>
+        <canvas id="corrPowerChart"></canvas>
+      </div>
+      <div class="chart-card"
+        style="display:flex;flex-direction:column;justify-content:center;align-items:center;gap:1.2rem;padding:2rem;text-align:center">
+        <div style="font-size:0.85rem;color:var(--text-muted);line-height:1.7">Kiểm tra biểu đồ preview, sau đó nhấn nút
+          để xuất file KEW đã hiệu chỉnh.</div>
+        <button id="btn-apply-corr" onclick="applyAndDownloadCorrection()"
+          style="background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:white;padding:12px 28px;border-radius:12px;font-size:0.88rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;transition:opacity 0.15s">
+          <div id="corr-spinner"
+            style="width:14px;height:14px;border:2px solid rgba(255,255,255,0.3);border-radius:50%;border-top-color:white;animation:spin 0.8s linear infinite;display:none">
+          </div>
+          <span id="corr-btn-text">📥 Áp dụng & Tải ZIP</span>
+        </button>
+        <div id="corr-error" style="color:var(--danger);font-size:0.78rem;display:none"></div>
+      </div>
+    </div>
+  </div>
+
+  </div> <!-- end workspace-kew -->
+
+  <!-- ══════════════════ IMAGE WORKSPACE ══════════════════ -->
+  <div id="workspace-img" class="workspace" style="display:none;">
+    <div class="content active" id="tab-edit-img">
       <div class="section-header">Sửa Ảnh Đo (Pixel Replacement)</div>
       <div class="chart-card" style="margin-bottom: 1.5rem;">
         <h3>Tải lên dữ liệu ảnh (.BMP)</h3>
@@ -1330,201 +1967,13 @@
   </div>
   </div>
 
-  <div class="content" id="tab-correction">
-    <div class="section-header">Tính toán nhanh & Hiệu chỉnh số liệu</div>
 
-    <!-- Quick Calculator -->
-    <div class="chart-card" style="margin-bottom:1.2rem; border-color: var(--accent)40;">
-      <h3>🧮 Máy tính nhanh (U-I-P)</h3>
-      <p style="font-size:0.76rem;color:var(--text-muted);margin-bottom:1rem">Chọn thông số cần tính, sau đó nhập 2
-        thông số còn lại.</p>
-      <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-end">
-        <div style="flex:1;min-width:140px">
-          <label style="font-size:0.72rem;color:var(--text-muted);display:block;margin-bottom:4px">Thông số cần
-            tính</label>
-          <select id="calc-target" onchange="updateCalcTarget()"
-            style="width:100%;padding:6px 10px;border-color:var(--accent);color:var(--accent);font-weight:600">
-            <option value="p">Tính Công suất (P)</option>
-            <option value="i">Tính Dòng điện (I)</option>
-            <option value="u">Tính Điện áp (U)</option>
-          </select>
-        </div>
-        <div style="flex:1;min-width:110px">
-          <label style="font-size:0.72rem;color:var(--text-muted);display:block;margin-bottom:4px">Điện áp U (V)</label>
-          <input type="number" id="calc-u" class="btn calc-inp" style="width:100%;padding:6px 10px" placeholder="U"
-            oninput="quickCalc()">
-        </div>
-        <div style="flex:1;min-width:110px">
-          <label style="font-size:0.72rem;color:var(--text-muted);display:block;margin-bottom:4px">Dòng điện I
-            (A)</label>
-          <input type="number" id="calc-i" class="btn calc-inp" style="width:100%;padding:6px 10px" placeholder="I"
-            oninput="quickCalc()">
-        </div>
-        <div style="flex:1;min-width:110px">
-          <label style="font-size:0.72rem;color:var(--text-muted);display:block;margin-bottom:4px">Công suất P
-            (kW)</label>
-          <input type="number" id="calc-p" class="btn calc-inp" style="width:100%;padding:6px 10px" placeholder="P"
-            oninput="quickCalc()" disabled>
-        </div>
-        <div style="flex:0.5;min-width:80px">
-          <label style="font-size:0.72rem;color:var(--text-muted);display:block;margin-bottom:4px">Hệ số PF</label>
-          <input type="number" id="calc-pf" class="btn" style="width:100%;padding:6px 10px" value="0.85" step="0.01"
-            oninput="quickCalc()">
-        </div>
-        <div style="flex:1;min-width:130px">
-          <label style="font-size:0.72rem;color:var(--text-muted);display:block;margin-bottom:4px">Loại lưới</label>
-          <select id="calc-type" onchange="quickCalc()" style="width:100%;padding:6px 10px">
-            <option value="3p">3 Pha (√3)</option>
-            <option value="1p">1 Pha</option>
-          </select>
-        </div>
-        <button class="btn" style="border-color:var(--danger);color:var(--danger)" onclick="resetCalc()">Xóa</button>
-      </div>
-      <div id="calc-hint" style="font-size:0.72rem;color:var(--accent);margin-top:8px;font-style:italic;height:12px">
-      </div>
-    </div>
-
-    <div class="section-header">Tự động nhận dạng</div>
-    <div class="chart-card" style="margin-bottom:1.2rem">
-      <h3>⚡ Phím tắt hiệu chỉnh nhanh</h3>
-      <div style="display:flex;gap:1.5rem;flex-wrap:wrap;margin-top:0.75rem">
-        <div>
-          <label style="font-size:0.78rem;color:var(--text-muted);display:block;margin-bottom:6px">Tỉ số CT thực / CT
-            cài đặt</label>
-          <div style="display:flex;gap:6px;align-items:center">
-            <input type="number" id="ct-real" placeholder="CT thực (A)" class="btn"
-              style="width:110px;padding:6px 10px">
-            <span style="color:var(--text-muted)">÷</span>
-            <input type="number" id="ct-set" placeholder="CT cài (A)" class="btn" style="width:110px;padding:6px 10px">
-            <button class="btn" style="border-color:var(--accent);color:var(--accent)" onclick="applyCTPreset()">Áp
-              dụng</button>
-          </div>
-        </div>
-        <div>
-          <label style="font-size:0.78rem;color:var(--text-muted);display:block;margin-bottom:6px">Tỉ số VT thực / VT
-            cài đặt</label>
-          <div style="display:flex;gap:6px;align-items:center">
-            <input type="number" id="vt-real" placeholder="VT thực (V)" class="btn"
-              style="width:110px;padding:6px 10px">
-            <span style="color:var(--text-muted)">÷</span>
-            <input type="number" id="vt-set" placeholder="VT cài (V)" class="btn" style="width:110px;padding:6px 10px">
-            <button class="btn" style="border-color:var(--accent);color:var(--accent)" onclick="applyVTPreset()">Áp
-              dụng</button>
-          </div>
-        </div>
-        <div style="display:flex;align-items:flex-end;gap:8px">
-          <button class="btn" onclick="autoDetectCorrection()"
-            style="border-color:var(--accent3);color:var(--accent3);font-weight:600">🧠 Tự nhận dạng</button>
-          <button class="btn" onclick="resetCorrections()" style="border-color:var(--danger);color:var(--danger)">↺
-            Reset tất cả</button>
-        </div>
-      </div>
-    </div>
-    <div id="auto-detect-result" style="display:none;margin-bottom:1.2rem"></div>
-    <div class="chart-card" style="margin-bottom:1.2rem">
-      <h3>🔢 Thông số hiệu chỉnh từng kênh</h3>
-      <p style="font-size:0.76rem;color:var(--text-muted);margin-bottom:1rem">Công thức: <code
-          style="background:var(--surface2);padding:2px 8px;border-radius:4px">Giá trị hiệu chỉnh = Giá trị gốc × Hệ số nhân + Offset</code>
-      </p>
-      <div style="overflow-x:auto">
-        <table class="events-table">
-          <thead>
-            <tr>
-              <th>Kênh</th>
-              <th>Mô tả</th>
-              <th>Hệ số nhân (×)</th>
-              <th>Offset (+)</th>
-              <th>TB gốc</th>
-              <th>TB sau sửa</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td><strong style="color:var(--accent3)">A</strong></td>
-              <td style="color:var(--text-muted)">Dòng điện A1, A2, A3</td>
-              <td><input type="number" class="corr-input btn" data-g="A" data-t="multiply" value="1" step="0.001"
-                  style="width:100px" oninput="updateCorrPreview()"></td>
-              <td><input type="number" class="corr-input btn" data-g="A" data-t="offset" value="0" step="0.1"
-                  style="width:90px" oninput="updateCorrPreview()"></td>
-              <td id="orig-A" style="color:var(--text-muted)">—</td>
-              <td id="prev-A" style="color:var(--accent3);font-weight:600">—</td>
-            </tr>
-            <tr>
-              <td><strong style="color:var(--accent)">V</strong></td>
-              <td style="color:var(--text-muted)">Điện áp V1, V2, V3</td>
-              <td><input type="number" class="corr-input btn" data-g="V" data-t="multiply" value="1" step="0.001"
-                  style="width:100px" oninput="updateCorrPreview()"></td>
-              <td><input type="number" class="corr-input btn" data-g="V" data-t="offset" value="0" step="0.1"
-                  style="width:90px" oninput="updateCorrPreview()"></td>
-              <td id="orig-V" style="color:var(--text-muted)">—</td>
-              <td id="prev-V" style="color:var(--accent);font-weight:600">—</td>
-            </tr>
-            <tr>
-              <td><strong style="color:var(--accent4)">P</strong></td>
-              <td style="color:var(--text-muted)">Công suất tác dụng P</td>
-              <td><input type="number" class="corr-input btn" data-g="P" data-t="multiply" value="1" step="0.001"
-                  style="width:100px" oninput="updateCorrPreview()"></td>
-              <td><input type="number" class="corr-input btn" data-g="P" data-t="offset" value="0" step="1"
-                  style="width:90px" oninput="updateCorrPreview()"></td>
-              <td id="orig-P" style="color:var(--text-muted)">—</td>
-              <td id="prev-P" style="color:var(--accent4);font-weight:600">—</td>
-            </tr>
-            <tr>
-              <td><strong style="color:var(--accent2)">Q</strong></td>
-              <td style="color:var(--text-muted)">Công suất phản kháng Q</td>
-              <td><input type="number" class="corr-input btn" data-g="Q" data-t="multiply" value="1" step="0.001"
-                  style="width:100px" oninput="updateCorrPreview()"></td>
-              <td><input type="number" class="corr-input btn" data-g="Q" data-t="offset" value="0" step="1"
-                  style="width:90px" oninput="updateCorrPreview()"></td>
-              <td id="orig-Q" style="color:var(--text-muted)">—</td>
-              <td id="prev-Q" style="color:var(--accent2);font-weight:600">—</td>
-            </tr>
-            <tr>
-              <td><strong style="color:var(--danger)">S</strong></td>
-              <td style="color:var(--text-muted)">Công suất biểu kiến S</td>
-              <td><input type="number" class="corr-input btn" data-g="S" data-t="multiply" value="1" step="0.001"
-                  style="width:100px" oninput="updateCorrPreview()"></td>
-              <td><input type="number" class="corr-input btn" data-g="S" data-t="offset" value="0" step="1"
-                  style="width:90px" oninput="updateCorrPreview()"></td>
-              <td id="orig-S" style="color:var(--text-muted)">—</td>
-              <td id="prev-S" style="color:var(--danger);font-weight:600">—</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-    <div class="section-header">Xem trước kết quả hiệu chỉnh (realtime)</div>
-    <div class="charts-grid">
-      <div class="chart-card">
-        <h3>⚡ Điện áp hiệu chỉnh (V)</h3>
-        <canvas id="corrVoltChart"></canvas>
-      </div>
-      <div class="chart-card">
-        <h3>🔌 Dòng điện hiệu chỉnh (A)</h3>
-        <canvas id="corrCurrChart"></canvas>
-      </div>
-    </div>
-    <div class="charts-grid">
-      <div class="chart-card">
-        <h3>💡 Công suất hiệu chỉnh (W)</h3>
-        <canvas id="corrPowerChart"></canvas>
-      </div>
-      <div class="chart-card"
-        style="display:flex;flex-direction:column;justify-content:center;align-items:center;gap:1.2rem;padding:2rem;text-align:center">
-        <div style="font-size:0.85rem;color:var(--text-muted);line-height:1.7">Kiểm tra biểu đồ preview, sau đó nhấn nút
-          để xuất file KEW đã hiệu chỉnh.</div>
-        <button id="btn-apply-corr" onclick="applyAndDownloadCorrection()"
-          style="background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:white;padding:12px 28px;border-radius:12px;font-size:0.88rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;transition:opacity 0.15s">
-          <div id="corr-spinner"
-            style="width:14px;height:14px;border:2px solid rgba(255,255,255,0.3);border-radius:50%;border-top-color:white;animation:spin 0.8s linear infinite;display:none">
-          </div>
-          <span id="corr-btn-text">📥 Áp dụng & Tải ZIP</span>
-        </button>
-        <div id="corr-error" style="color:var(--danger);font-size:0.78rem;display:none"></div>
-      </div>
-    </div>
   </div>
 
+  <!-- ══════════════════ EXCEL WORKSPACE ══════════════════ -->
+  <div id="workspace-excel" class="workspace" style="display:none;">
+     <!-- Will inject excel content via multi_replace later -->
+  </div>
   <script>
     // ════════════════════════════════════
     // Load data
@@ -3094,6 +3543,365 @@
         .then(data => renderAll(data));
     }
   </script>
-</body>
+\n<script>\n
+/* ── GLOBAL TOOL SWITCHING ── */
+function switchTool(toolId) {
+    document.querySelectorAll('.workspace').forEach(el => el.style.display = 'none');
+    document.querySelectorAll('.global-nav .btn').forEach(el => el.classList.remove('active'));
+    
+    document.getElementById('workspace-' + toolId).style.display = 'block';
+    
+    const btn = document.getElementById('btn-tool-' + toolId);
+    if(btn) btn.classList.add('active');
+}
+</script>\n\n<script>\n/* ── EXCEL MODULE SCRIPT ── */\nlet currentMode = 'string_mode';
+        let historyData = [];
+        let editingIndex = -1;
+
+        // Xử lý chuyển tab
+        function switchTab(modeId) {
+            document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            
+            document.getElementById(modeId).classList.add('active');
+            
+            if (modeId === 'string_mode') {
+                document.getElementById('tab_string').classList.add('active');
+            } else {
+                document.getElementById('tab_manual').classList.add('active');
+            }
+            currentMode = modeId;
+        }
+
+        // Hiện thông báo
+        function showMessage(msg, isError = false) {
+            const msgDiv = document.getElementById('message');
+            msgDiv.textContent = msg;
+            msgDiv.className = isError ? 'error' : 'success';
+        }
+
+        // Lấy hoặc tạo session ID (để phân biệt các user/tab)
+        let sessionId = localStorage.getItem('dien_excel_session');
+        if (!sessionId) {
+            sessionId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+            localStorage.setItem('dien_excel_session', sessionId);
+        }
+
+        // API Upload File
+        async function uploadFile() {
+            const fileInput = document.getElementById('excel_file');
+            if (!fileInput.files.length) {
+                alert('Vui lòng chọn ít nhất một tệp Excel (.xlsx).');
+                return;
+            }
+
+            const formData = new FormData();
+            for (let i = 0; i < fileInput.files.length; i++) {
+                formData.append('file', fileInput.files[i]);
+            }
+            formData.append('session_id', sessionId);
+
+            try {
+                const response = await fetch('/api/excel/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+
+                if (response.ok) {
+                    // Kích hoạt vùng nhập liệu
+                    document.getElementById('data_entry_section').style.opacity = '1';
+                    document.getElementById('data_entry_section').style.pointerEvents = 'auto';
+                    
+                    document.getElementById('active_file_display').style.display = 'flex';
+                    
+                    const selectEl = document.getElementById('active_filename');
+                    // Add new files to select list if they don't exist
+                    result.filenames.forEach(fname => {
+                        let exists = false;
+                        for (let i = 0; i < selectEl.options.length; i++) {
+                            if (selectEl.options[i].value === fname) {
+                                exists = true; break;
+                            }
+                        }
+                        if (!exists) {
+                            const opt = document.createElement('option');
+                            opt.value = fname;
+                            opt.textContent = fname;
+                            selectEl.appendChild(opt);
+                        }
+                    });
+                    
+                    // Select the last uploaded file
+                    selectEl.value = result.filenames[result.filenames.length - 1];
+
+                    document.getElementById('btn_download').style.display = 'block';
+                    
+                    fileInput.value = ''; // Reset input
+                    showMessage(result.message);
+                } else {
+                    alert(result.error);
+                }
+            } catch (error) {
+                alert('Lỗi kết nối khi tải file lên.');
+            }
+        }
+
+        // Tải file xuống (thành file ZIP)
+        function downloadFile() {
+             window.location.href = `/api/excel/download?session_id=${encodeURIComponent(sessionId)}`;
+        }
+
+        // Kéo thả file vào màn hình để upload
+        const dropZone = document.body;
+        const dragOverlay = document.createElement('div');
+        dragOverlay.id = 'drag_overlay';
+        dragOverlay.innerHTML = '<h2>Kéo thả file(s) Excel vào đây để tải lên</h2>';
+        dragOverlay.style.cssText = `
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(46, 204, 113, 0.9);
+            color: white;
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        `;
+        document.body.appendChild(dragOverlay);
+
+        let dragCounter = 0;
+        dropZone.addEventListener('dragenter', (e) => {
+            e.preventDefault();
+            dragCounter++;
+            dragOverlay.style.display = 'flex';
+        });
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dragCounter--;
+            if (dragCounter === 0) dragOverlay.style.display = 'none';
+        });
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+        });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dragCounter = 0;
+            dragOverlay.style.display = 'none';
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                document.getElementById('excel_file').files = e.dataTransfer.files;
+                uploadFile();
+            }
+        });
+
+        // Xử lý Paste cho tất cả các field Manual (Trợ giúp nhanh cho Manual Mode)
+        document.getElementById('bt_price').addEventListener('paste', function(event) {
+            const pasteData = (event.clipboardData || window.clipboardData).getData('text');
+            const lines = pasteData.trim().split(/\\r?\\n/).map(line => line.trim()).filter(line => line.length > 0);
+            
+            if (lines.length >= 3) {
+                event.preventDefault(); 
+                const parseLine = (line) => line.split(/\\s+/);
+                const bt = parseLine(lines[0]), cd = parseLine(lines[1]), td = parseLine(lines[2]);
+                
+                if (bt.length >= 2) { document.getElementById('bt_price').value = bt[0]; document.getElementById('bt_usage').value = bt[1]; }
+                if (cd.length >= 2) { document.getElementById('cd_price').value = cd[0]; document.getElementById('cd_usage').value = cd[1]; }
+                if (td.length >= 2) { document.getElementById('td_price').value = td[0]; document.getElementById('td_usage').value = td[1]; }
+            }
+        });
+
+        // Submit Dữ Liệu
+        async function submitData() {
+            // Chuẩn bị payload
+            let payload = {
+                session_id: sessionId,
+                filename: document.getElementById('active_filename').value,
+                sheet_name: document.getElementById('sheet_name').value,
+                month: parseInt(document.getElementById('month').value),
+                period: parseInt(document.getElementById('period').value)
+            };
+
+            // Gom logic parser vào server, client gửi kèm mode
+            if (currentMode === 'string_mode') {
+                payload.mode = 'string';
+                payload.raw_data = document.getElementById('raw_data').value;
+            } else {
+                payload.mode = 'manual';
+                payload.bt_price = document.getElementById('bt_price').value;
+                payload.bt_usage = document.getElementById('bt_usage').value;
+                payload.cd_price = document.getElementById('cd_price').value;
+                payload.cd_usage = document.getElementById('cd_usage').value;
+                payload.td_price = document.getElementById('td_price').value;
+                payload.td_usage = document.getElementById('td_usage').value;
+            }
+
+            showMessage('Đang xử lý...');
+
+            try {
+                const response = await fetch('/api/excel/submit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showMessage(editingIndex > -1 ? `✓ Đã cập nhật thành công kỳ hiện tại!` : `✓ Đã ghi thành công! (Kỳ ${payload.period} tháng ${payload.month} năm ${payload.sheet_name})`);
+                    
+                    // Lưu vào history nội bộ để tạo bảng
+                    const timeStr = new Date().toLocaleTimeString('vi-VN');
+                    
+                    if (result.inserted_groups) {
+                        if (editingIndex > -1) {
+                            historyData.splice(editingIndex, 1);
+                        }
+                        
+                        // Đảo ngược mảng để đẩy lên đầu history theo đúng thứ tự
+                        const groupsToShow = [...result.inserted_groups].reverse();
+                        groupsToShow.forEach(g => {
+                            const historyItem = {
+                                time: timeStr,
+                                filename: result.filename,
+                                sheet: payload.sheet_name,
+                                month: payload.month,
+                                period: payload.period,
+                                parsed_data: g.parsed_data,
+                                row: g.row
+                            };
+                            historyData.unshift(historyItem);
+                        });
+                        
+                        if (editingIndex > -1) {
+                            cancelEdit(); // Thoát mode edit
+                        } else {
+                            // Chỉ tự động tăng nếu không phải trong chế độ Edit và checkbox được tick
+                            if (document.getElementById('auto_increment').checked) {
+                                let next_month = payload.month;
+                                let next_period = payload.period;
+                                if (next_period === 3) {
+                                    next_period = 1;
+                                    next_month = next_month < 12 ? next_month + 1 : 1;
+                                } else {
+                                    next_period += 1;
+                                }
+                                document.getElementById('month').value = next_month;
+                                document.getElementById('period').value = next_period;
+                            }
+                        }
+                    }
+                    
+                    renderHistoryTable();
+                    
+                    // LƯU Ý: Không clear textarea/input theo yêu cầu để người dùng giữ tham số.
+                    
+                } else {
+                    showMessage(`Lỗi: ${result.error}`, true);
+                }
+            } catch (error) {
+                showMessage(`Lỗi kết nối tới server. Vui lòng thử lại.`, true);
+            }
+        }
+
+        // Bảng History
+        function renderHistoryTable() {
+            const tbody = document.getElementById('history_body');
+            tbody.innerHTML = '';
+
+            if (historyData.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" class="empty-state">Chưa có kết quả nào được ghi trong phiên này.</td></tr>`;
+                return;
+            }
+
+            historyData.forEach((item, index) => {
+                const tr = document.createElement('tr');
+                if (index === editingIndex) {
+                    tr.className = 'row-edited';
+                }
+
+                const formatCell = (pair) => `<b>${pair[0]}</b> - ${pair[1]}`;
+                const fileDisp = item.filename.length > 20 ? item.filename.substring(0, 17) + '...' : item.filename;
+                
+                tr.innerHTML = `
+                    <td>${item.time}</td>
+                    <td title="${item.filename}"><b>${fileDisp}</b></td>
+                    <td><b>${item.month}</b></td>
+                    <td><b>${item.period}</b></td>
+                    <td>${formatCell(item.parsed_data[0])}</td>
+                    <td>${formatCell(item.parsed_data[1])}</td>
+                    <td>${formatCell(item.parsed_data[2])}</td>
+                    <td style="text-align: right;">
+                        <button class="btn-small btn-warning" onclick="editRow(${index})">🛠 Sửa</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Nhấn nút Edit trên lịch sử
+        function editRow(index) {
+            editingIndex = index;
+            const item = historyData[index];
+            
+            // Chọn đúng file trong dropdown
+            const selectEl = document.getElementById('active_filename');
+            for(let i=0; i<selectEl.options.length; i++){
+                if(selectEl.options[i].value === item.filename) {
+                    selectEl.value = item.filename;
+                    break;
+                }
+            }
+            
+            // Điền lại form
+            document.getElementById('sheet_name').value = item.sheet;
+            document.getElementById('month').value = item.month;
+            document.getElementById('period').value = item.period;
+            
+            const [bt, cd, td] = item.parsed_data;
+            
+            // Điền dữ liệu Manual (LUÔN update Manual Mode để có sẵn)
+            document.getElementById('bt_price').value = bt[0]; document.getElementById('bt_usage').value = bt[1];
+            document.getElementById('cd_price').value = cd[0]; document.getElementById('cd_usage').value = cd[1];
+            document.getElementById('td_price').value = td[0]; document.getElementById('td_usage').value = td[1];
+            
+            // Lắp ráp lại chuỗi Textarea
+            document.getElementById('raw_data').value = `${bt[0]} ${bt[1]}\\n${cd[0]} ${cd[1]}\\n${td[0]} ${td[1]}`;
+            
+            // Chuyển UI nút Submit
+            const btnSubmit = document.getElementById('btn_submit');
+            btnSubmit.textContent = `LƯU VÀ GHI ĐÈ EXCEL (KỲ ${item.period} THÁNG ${item.month} NĂM ${item.sheet})`;
+            btnSubmit.className = "btn-block btn-warning";
+            
+            document.getElementById('btn_cancel_edit').style.display = 'block';
+            
+            // Trượt lên form
+            document.getElementById('data_entry_section').scrollIntoView({ behavior: 'smooth' });
+            
+            renderHistoryTable(); // Highlight row
+        }
+
+        function cancelEdit() {
+            editingIndex = -1;
+            
+            const btnSubmit = document.getElementById('btn_submit');
+            btnSubmit.textContent = "GHI DỮ LIỆU VÀO EXCEL";
+            btnSubmit.className = "btn-block";
+            
+            document.getElementById('btn_cancel_edit').style.display = 'none';
+            renderHistoryTable(); // Remove highlight
+        }
+
+        // Bắt sự kiện Enter global
+        document.addEventListener('keydown', function(event) {
+            if (event.ctrlKey && event.key === 'Enter') {
+                submitData();
+            }
+        });
+        document.getElementById('raw_data').addEventListener('keydown', function(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                submitData();
+            }
+        });\n</script>\n</body>
 
 </html>
