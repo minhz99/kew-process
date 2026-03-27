@@ -1,25 +1,27 @@
-  <!-- Sidebar -->
-  <div class="d-flex flex-column flex-shrink-0 p-3 text-bg-dark app-sidebar"
-    style="width: 260px; background: var(--surface) !important; border-right: 1px solid var(--border);">
-    <a href="/" class="d-flex align-items-center mb-3 mb-md-0 me-md-auto text-white text-decoration-none gap-2">
-      <div class="logo-icon" style="width:32px; height:32px; background: linear-gradient(135deg, var(--accent), var(--accent2)); border-radius:8px; display:flex; align-items:center; justify-content:center; font-weight:bold;">⚡</div>
-      <span class="fs-5 fw-bold">PLT Process</span>
-    </a>
-    <p class="small text-muted mt-2 mb-3">Bộ công cụ xử lý công việc. Chọn từng tool theo tab để làm việc tập trung.</p>
+<!-- Sidebar -->
+<div class="d-flex flex-column flex-shrink-0 p-3 text-bg-dark app-sidebar"
+  style="width: 260px; background: var(--surface) !important; border-right: 1px solid var(--border);">
+  <a href="/" class="d-flex align-items-center mb-3 mb-md-0 me-md-auto text-white text-decoration-none gap-2">
+    <div class="logo-icon"
+      style="width:32px; height:32px; background: linear-gradient(135deg, var(--accent), var(--accent2)); border-radius:8px; display:flex; align-items:center; justify-content:center; font-weight:bold;">
+      ⚡</div>
+    <span class="fs-5 fw-bold">POLYTEE Tools</span>
+  </a>
+  <p class="small text-muted mt-2 mb-3">Bộ công cụ xử lý công việc - made by minh</p>
 
-    <div class="tool-tabs d-flex flex-column gap-2 mb-3" id="tool-tabs" role="tablist" aria-label="Công cụ">
-      <button class="tool-tab active" id="btn-tool-kew" onclick="switchTool('kew')" type="button">
-        <i class="bi bi-bar-chart-line"></i> Phân Tích KEW
-      </button>
-      <button class="tool-tab" id="btn-tool-img" onclick="switchTool('img')" type="button">
-        <i class="bi bi-camera"></i> Sửa Ảnh Đo
-      </button>
-      <button class="tool-tab" id="btn-tool-excel" onclick="switchTool('excel')" type="button">
-        <i class="bi bi-file-earmark-spreadsheet"></i> Nhập Excel
-      </button>
-    </div>
-
-    <hr class="mt-auto">
-    <div id="deviceInfo" class="small text-muted mb-2">Thiết bị: chưa có dữ liệu</div>
-    <div id="headerMeta" class="small text-muted"></div>
+  <div class="tool-tabs d-flex flex-column gap-2 mb-3" id="tool-tabs" role="tablist" aria-label="Công cụ">
+    <button class="tool-tab active" id="btn-tool-kew" onclick="switchTool('kew')" type="button">
+      <i class="bi bi-bar-chart-line"></i> Phân tích KEW
+    </button>
+    <button class="tool-tab" id="btn-tool-img" onclick="switchTool('img')" type="button">
+      <i class="bi bi-camera"></i> Sửa ảnh đo
+    </button>
+    <button class="tool-tab" id="btn-tool-excel" onclick="switchTool('excel')" type="button">
+      <i class="bi bi-file-earmark-spreadsheet"></i> Excel số điện
+    </button>
   </div>
+
+  <hr class="mt-auto">
+  <div id="deviceInfo" class="small text-muted mb-2">Thiết bị: chưa có dữ liệu</div>
+  <div id="headerMeta" class="small text-muted"></div>
+</div>
