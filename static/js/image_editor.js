@@ -284,35 +284,42 @@ let EDITED_FILES = [];
     async function processImageClientSide(file, screenIdx, params) {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
-        reader.onload = async (e) => {
+        reader.onload = (e) => {
           const img = new Image();
           img.onload = async () => {
-            const canvas = document.createElement('canvas');
-            canvas.width = img.width;
-            canvas.height = img.height;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0);
+            try {
+              const canvas = document.createElement('canvas');
+              canvas.width = img.width;
+              canvas.height = img.height;
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(img, 0, 0);
 
-            const templateSelect = document.getElementById('ei-template-select');
-            const meterModel = templateSelect ? templateSelect.value : 'kew6315';
-            
-            let sc;
-            if (meterModel === 'kew6315') {
-                sc = SCREENS[screenIdx % 6] || SCREENS[0];
-            } else {
-                // Placeholder cho các mẫu đồng hồ khác (Hioki, Chauvin). Tạm thời fallback về SCREENS.
-                sc = SCREENS[screenIdx % 6] || SCREENS[0];
-            }
-            
-            for (const overlay of sc.overlays) {
-              let val = params[overlay.id];
-              if (val === undefined && overlay.alias) val = params[overlay.alias];
-              if (val !== undefined && val !== null && val !== "") {
-                await applyTextToCanvas(ctx, overlay, String(val));
+              const templateSelect = document.getElementById('ei-template-select');
+              const meterModel = templateSelect ? templateSelect.value : 'kew6315';
+              
+              let sc;
+              if (meterModel === 'kew6315') {
+                  sc = SCREENS[screenIdx % 6] || SCREENS[0];
+              } else {
+                  // Placeholder cho các mẫu đồng hồ khác (Hioki, Chauvin). Tạm thời fallback về SCREENS.
+                  sc = SCREENS[screenIdx % 6] || SCREENS[0];
               }
-            }
+              
+              for (const overlay of sc.overlays) {
+                let val = params[overlay.id];
+                if (val === undefined && overlay.alias) val = params[overlay.alias];
+                if (val !== undefined && val !== null && val !== "") {
+                  await applyTextToCanvas(ctx, overlay, String(val));
+                }
+              }
 
-            canvas.toBlob(blob => resolve(blob), 'image/bmp');
+              canvas.toBlob(blob => {
+                 if (blob) resolve(blob);
+                 else reject(new Error('Lỗi xuất canvas ra dạng BMP.'));
+              }, 'image/bmp');
+            } catch (err) {
+              reject(err);
+            }
           };
           img.onerror = reject;
           img.src = e.target.result;
@@ -333,8 +340,8 @@ let EDITED_FILES = [];
       const x_left = Math.max(0, x_right - w_clear + 1);
       const y_top = Math.max(0, y_bot - h_clear + 1);
 
-      // 1. Clear background (sample from bottom-left of clear area)
-      const pixel = ctx.getImageData(x_left, y_bot, 1, 1).data;
+      // 1. Clear background (sample from top-left of clear area to avoid intersecting grids/text baselines)
+      const pixel = ctx.getImageData(x_left, y_top, 1, 1).data;
       ctx.fillStyle = `rgb(${pixel[0]},${pixel[1]},${pixel[2]})`;
       ctx.fillRect(x_left, y_top, w_clear, h_clear);
 
