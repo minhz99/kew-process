@@ -1,7 +1,9 @@
 import os
 import io
+import json
 import shutil
 import tempfile
+import traceback
 import zipfile
 import re
 from flask import Blueprint, request, jsonify, send_file
@@ -153,7 +155,6 @@ def fix_files():
         memory_file.seek(0)
         return send_file(memory_file, download_name='KEW_Fixed_Data.zip', as_attachment=True, mimetype='application/zip')
     except Exception as e:
-        import traceback
         traceback.print_exc()
         return jsonify({'error': f"Lỗi nội suy: {str(e)}"}), 500
     finally:
@@ -197,7 +198,7 @@ def detect_phases():
 
         return jsonify({'results': results})
     except Exception as e:
-        import traceback; traceback.print_exc()
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
     finally:
         shutil.rmtree(temp_in, ignore_errors=True)
@@ -207,7 +208,6 @@ def detect_phases():
 def correct_files():
     """Apply per-channel multiplier/offset corrections and return corrected KEW files as ZIP."""
     from modules.kew import correct_kew
-    import json
     temp_in = tempfile.mkdtemp(prefix='kew_corr_in_')
     temp_out = tempfile.mkdtemp(prefix='kew_corr_out_')
     try:
@@ -260,7 +260,7 @@ def correct_files():
         mem.seek(0)
         return send_file(mem, download_name='KEW_Corrected.zip', as_attachment=True, mimetype='application/zip')
     except Exception as e:
-        import traceback; traceback.print_exc()
+        traceback.print_exc()
         return jsonify({'error': f'Lỗi hiệu chỉnh: {str(e)}'}), 500
     finally:
         shutil.rmtree(temp_in, ignore_errors=True)

@@ -1,7 +1,6 @@
 let EDITED_FILES = [];
-
-    let PENDING_FILES = []; // Array of { id, file, url }
-    let SLOT_MAPPING = [null, null, null, null, null, null]; // Stores the PENDING_FILES id for each slot
+let PENDING_FILES = []; // Array of { id, file, url }
+let SLOT_MAPPING = [null, null, null, null, null, null]; // slot index → PENDING_FILES entry
 
     function handleBulkDrop(e) {
       e.preventDefault();
@@ -102,7 +101,6 @@ let EDITED_FILES = [];
           parameters[f] = el.value.trim().replace(/,/g, '.');
         }
       });
-      parameters['fluctuate'] = false;
 
       for (let item of selectedFiles) {
         const file = item.file;
@@ -361,21 +359,3 @@ let EDITED_FILES = [];
         }
       }
     }
-
-
-
-    // Development fallback (only runs if accessed as local file)
-    if (window.location.protocol === 'file:') {
-      const uploadContainer = document.getElementById('upload-container');
-      const appContainer = document.getElementById('app-container');
-      if (uploadContainer) uploadContainer.style.display = 'none';
-      if (appContainer) appContainer.style.display = 'block';
-      if (typeof renderAll === 'function') {
-        fetch('kew_analysis.json')
-          .then(r => r.json())
-          .then(data => renderAll(data));
-      }
-    }
-  
-
-/* --------------------------------------------------- */

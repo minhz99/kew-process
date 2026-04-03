@@ -17,12 +17,6 @@ function to_number(val) {
     return isNaN(n) ? val : n;
 }
 
-function insert_and_setup_row(ws, original_row) {
-    // SheetJS doesn't have a simple insert_rows like openpyxl that shifts formulas automatically.
-    // For this specific template, we migrate to a simpler 'direct write' or 'append' if row not found.
-    // But to keep consistency with the Python 'find_row' logic:
-    return original_row;
-}
 
 function find_row(ws, target_month, target_period) {
     // Read target cells (Column D/4 is Month, Column E/5 is Period)
