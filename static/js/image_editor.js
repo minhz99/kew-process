@@ -237,33 +237,33 @@ let EDITED_FILES = [];
 
     const DIGIT_TEMPLATES = {};
     const CHAR_MAP = { '.': 'dot', '-': 'minus' };
-    let _digitsLoaded = false;
-    let _digitsLoading = null;
-
-    async function loadDigitTemplates() {
+        async function loadDigitTemplates() {
       if (_digitsLoaded) return;
-      // Tránh gọi nhiều lần song song
       if (_digitsLoading) return _digitsLoading;
 
       _digitsLoading = (async () => {
         try {
-          const resp = await fetch('/api/image/digits');
+          const resp = await fetch('/api/image/digits?t=' + Date.now());
           if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-          const data = await resp.json(); // { "0_w": "data:image/png;base64,...", ... }
+          const data = await resp.json();
 
           const loadPromises = Object.entries(data).map(([key, dataUrl]) =>
             new Promise(resolve => {
               const img = new Image();
               img.onload = () => { DIGIT_TEMPLATES[key] = img; resolve(); };
-              img.onerror = () => resolve(); // bỏ qua nếu lỗi
+              img.onerror = () => resolve();
               img.src = dataUrl;
             })
           );
 
           await Promise.all(loadPromises);
+          if (Object.keys(DIGIT_TEMPLATES).length === 0) {
+            throw new Error("Dữ liệu template rỗng từ server.");
+          }
           _digitsLoaded = true;
         } catch (err) {
           console.error('Không thể tải digit templates từ server:', err);
+          throw new Error('Lỗi tải font số: ' + err.message);
         } finally {
           _digitsLoading = null;
         }
@@ -276,7 +276,6 @@ let EDITED_FILES = [];
       const s = CHAR_MAP[char] || char;
       let key = `${s}_${color}`;
       if (DIGIT_TEMPLATES[key]) return DIGIT_TEMPLATES[key];
-      // Fallback
       key = `${s}_${color === 'w' ? 'g' : 'w'}`;
       return DIGIT_TEMPLATES[key] || null;
     }
@@ -301,7 +300,6 @@ let EDITED_FILES = [];
               if (meterModel === 'kew6315') {
                   sc = SCREENS[screenIdx % 6] || SCREENS[0];
               } else {
-                  // Placeholder cho các mẫu đồng hồ khác (Hioki, Chauvin). Tạm thời fallback về SCREENS.
                   sc = SCREENS[screenIdx % 6] || SCREENS[0];
               }
               
@@ -346,7 +344,6 @@ let EDITED_FILES = [];
       ctx.fillRect(x_left, y_top, w_clear, h_clear);
 
       // 2. Draw text
-      // Chuẩn hoá dấu phẩy thành dấu chấm thập phân trước khi vẽ
       const normalizedText = text.replace(/,/g, '.');
       const chars = normalizedText.split('').reverse();
       let curr_x = x_right + 1;
