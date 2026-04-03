@@ -38,16 +38,4 @@ dist/
 *.egg-info/
 
 # Project-specific
-*.KEW
-*.kew
-*.ZIP
-*.zip
-*.BMP
-*.bmp
-*.png
-*.jpg
-patch.py
-patch_v2.py
-kew_analysis.json
-*.xlsx
 /temp/
