@@ -237,7 +237,10 @@ let EDITED_FILES = [];
 
     const DIGIT_TEMPLATES = {};
     const CHAR_MAP = { '.': 'dot', '-': 'minus' };
-        async function loadDigitTemplates() {
+    let _digitsLoaded = false;
+    let _digitsLoading = null;
+
+    async function loadDigitTemplates() {
       if (_digitsLoaded) return;
       if (_digitsLoading) return _digitsLoading;
 
