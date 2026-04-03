@@ -21,18 +21,36 @@ def get_templates():
 @image_bp.route('/digits', methods=['GET'])
 def get_digits():
     """Trả về toàn bộ digit templates dạng base64 PNG để client-side dùng cho canvas."""
-    digits_dir = os.path.join(current_app.static_folder, 'digits')
+    # Determine absolute path to the static/digits directory safely
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+    digits_dir = os.path.join(base_dir, 'static', 'digits')
+    
     result = {}
+    
+    if not os.path.exists(digits_dir):
+        current_app.logger.error(f"Thư mục digits không tồn tại: {digits_dir}")
+        return jsonify(result)
 
     symbols = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'dot', 'minus']
     colors = ['w', 'g']
 
+    try:
+        dir_files = os.listdir(digits_dir)
+    except Exception as e:
+        current_app.logger.error(f"Không thể đọc thư mục {digits_dir}: {e}")
+        return jsonify(result)
+
     for s in symbols:
         for c in colors:
-            filename = f"{s}{c}.bmp"
-            filepath = os.path.join(digits_dir, filename)
-            if not os.path.exists(filepath):
+            target_lower = f"{s}{c}.bmp".lower()
+            
+            # Case-insensitive resolution for Linux deployment safety
+            actual_filename = next((f for f in dir_files if f.lower() == target_lower), None)
+            
+            if not actual_filename:
                 continue
+                
+            filepath = os.path.join(digits_dir, actual_filename)
             try:
                 img = Image.open(filepath).convert('RGBA')
                 buf = io.BytesIO()
@@ -41,6 +59,6 @@ def get_digits():
                 key = f"{s}_{c}"
                 result[key] = f"data:image/png;base64,{b64}"
             except Exception as e:
-                current_app.logger.warning(f"Không thể đọc digit {filename}: {e}")
+                current_app.logger.warning(f"Không thể đọc digit {actual_filename}: {e}")
 
     return jsonify(result)
