@@ -46,8 +46,8 @@ def get_digits():
 
     return jsonify(result)
 
-def make_grid(ids, x_rights, y_bot, bg, scale=0.96):
-    return [{"id": id_, "x": x, "y": y_bot, "bg": bg, "scale": scale} for id_, x in zip(ids, x_rights)]
+def make_grid(ids, x_rights, y_bot, bg):
+    return [{"id": id_, "x": x, "y": y_bot, "bg": bg} for id_, x in zip(ids, x_rights)]
 
 def _map_sd140(o):
     if o["id"] in ["PF1", "PF2", "PF3"]:
@@ -65,33 +65,33 @@ SCREENS = [
             make_grid(["S1", "S2", "S3"], [94, 158, 222], 118, "w") +
             make_grid(["PF1", "PF2", "PF3"], [94, 158, 222], 134, "g") +
             [
-                {"id": "P", "x": 94, "y": 153, "bg": "w", "scale": 0.96},
-                {"id": "freq", "alias": "f", "x": 222, "y": 153, "bg": "w", "scale": 0.96},
-                {"id": "Q", "x": 94, "y": 169, "bg": "g", "scale": 0.96},
-                {"id": "S", "x": 94, "y": 185, "bg": "w", "scale": 0.96},
-                {"id": "PF", "x": 94, "y": 201, "bg": "g", "scale": 0.96, "w_clear": 55},
-                {"id": "An", "x": 222, "y": 201, "bg": "g", "scale": 0.96}
+                {"id": "P", "x": 94, "y": 153, "bg": "w"},
+                {"id": "freq", "alias": "f", "x": 222, "y": 153, "bg": "w"},
+                {"id": "Q", "x": 94, "y": 169, "bg": "g"},
+                {"id": "S", "x": 94, "y": 185, "bg": "w"},
+                {"id": "PF", "x": 94, "y": 201, "bg": "g", "w_clear": 55},
+                {"id": "An", "x": 222, "y": 201, "bg": "g"}
             ]
         ))
     },
     {
         "id": "SD141",
         "overlays": [
-          {"id": "V1", "x": 63, "y": 36, "bg": "w", "scale": 0.85, "w_clear": 45},
-          {"id": "Vdeg1", "x": 121, "y": 36, "bg": "w", "scale": 0.85, "w_clear": 45},
-          {"id": "V2", "x": 63, "y": 52, "bg": "g", "scale": 0.85, "w_clear": 45},
-          {"id": "Vdeg2", "x": 121, "y": 52, "bg": "g", "scale": 0.85, "w_clear": 45},
-          {"id": "V3", "x": 63, "y": 68, "bg": "w", "scale": 0.85, "w_clear": 45},
-          {"id": "Vdeg3", "x": 121, "y": 68, "bg": "w", "scale": 0.85, "w_clear": 45},
-          {"id": "A1", "x": 63, "y": 87, "bg": "w", "scale": 0.85, "w_clear": 45},
-          {"id": "Adeg1", "x": 121, "y": 87, "bg": "w", "scale": 0.85, "w_clear": 45},
-          {"id": "A2", "x": 63, "y": 103, "bg": "g", "scale": 0.85, "w_clear": 45},
-          {"id": "Adeg2", "x": 121, "y": 103, "bg": "g", "scale": 0.85, "w_clear": 45},
-          {"id": "A3", "x": 63, "y": 119, "bg": "w", "scale": 0.85, "w_clear": 45},
-          {"id": "Adeg3", "x": 121, "y": 119, "bg": "w", "scale": 0.85, "w_clear": 45},
-          {"id": "freq", "alias": "f", "x": 83, "y": 154, "bg": "w", "scale": 0.85, "w_clear": 45},
-          {"id": "V_unb", "alias": "V%", "x": 83, "y": 189, "bg": "g", "scale": 0.85, "w_clear": 45},
-          {"id": "A_unb", "alias": "A%", "x": 83, "y": 205, "bg": "w", "scale": 0.85, "w_clear": 45}
+          {"id": "V1", "x": 63, "y": 36, "bg": "w", "w_clear": 45},
+          {"id": "Vdeg1", "x": 121, "y": 36, "bg": "w", "w_clear": 45},
+          {"id": "V2", "x": 63, "y": 52, "bg": "g", "w_clear": 45},
+          {"id": "Vdeg2", "x": 121, "y": 52, "bg": "g", "w_clear": 45},
+          {"id": "V3", "x": 63, "y": 68, "bg": "w", "w_clear": 45},
+          {"id": "Vdeg3", "x": 121, "y": 68, "bg": "w", "w_clear": 45},
+          {"id": "A1", "x": 63, "y": 87, "bg": "w", "w_clear": 45},
+          {"id": "Adeg1", "x": 121, "y": 87, "bg": "w", "w_clear": 45},
+          {"id": "A2", "x": 63, "y": 103, "bg": "g", "w_clear": 45},
+          {"id": "Adeg2", "x": 121, "y": 103, "bg": "g", "w_clear": 45},
+          {"id": "A3", "x": 63, "y": 119, "bg": "w", "w_clear": 45},
+          {"id": "Adeg3", "x": 121, "y": 119, "bg": "w", "w_clear": 45},
+          {"id": "freq", "alias": "f", "x": 83, "y": 154, "bg": "w", "w_clear": 45},
+          {"id": "V_unb", "alias": "V%", "x": 83, "y": 189, "bg": "g", "w_clear": 45},
+          {"id": "A_unb", "alias": "A%", "x": 83, "y": 205, "bg": "w", "w_clear": 45}
         ]
     },
     { 
@@ -148,7 +148,6 @@ def apply_text_to_image(img, img_draw, config, text, digits_dir):
     color = config.get('bg', 'w')
     w_clear = config.get('w_clear', 50)
     h_clear = 15
-    scale = config.get('scale', 1.0)
     
     x_left = max(0, x_right - w_clear + 1)
     y_top = max(0, y_bot - h_clear + 1)
@@ -164,21 +163,17 @@ def apply_text_to_image(img, img_draw, config, text, digits_dir):
         c = '.' if char == '/' else char
         digit_img = get_digit_img(c, color, digits_dir)
         if digit_img:
-            dw = int(digit_img.width * scale)
-            dh = int(digit_img.height * scale)
+            dw = digit_img.width
+            dh = digit_img.height
             spacing = 1 if dw >= 8 else 2
 
             curr_x -= dw
             paste_y = y_bot - dh + 1
-            if scale != 1.0:
-                digit_resized = digit_img.resize((dw, dh), Image.NEAREST)
-            else:
-                digit_resized = digit_img
                 
-            img.paste(digit_resized, (curr_x, paste_y), digit_resized)
+            img.paste(digit_img, (curr_x, paste_y), digit_img)
             curr_x -= spacing
         else:
-            curr_x -= int(6 * scale)
+            curr_x -= 6
 
 @image_bp.route('/process', methods=['POST'])
 def process_image():
