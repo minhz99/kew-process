@@ -98,7 +98,8 @@ let EDITED_FILES = [];
       fields.forEach(f => {
         const el = document.getElementById('ei-' + f);
         if (el && el.value && el.value.trim() !== "") {
-          parameters[f] = el.value.trim();
+          // Chuẩn hoá: dấu phẩy thập phân -> dấu chấm
+          parameters[f] = el.value.trim().replace(/,/g, '.');
         }
       });
       parameters['fluctuate'] = false;
@@ -325,7 +326,9 @@ let EDITED_FILES = [];
       ctx.fillRect(x_left, y_top, w_clear, h_clear);
 
       // 2. Draw text
-      const chars = text.split('').reverse();
+      // Chuẩn hoá dấu phẩy thành dấu chấm thập phân trước khi vẽ
+      const normalizedText = text.replace(/,/g, '.');
+      const chars = normalizedText.split('').reverse();
       let curr_x = x_right + 1;
 
       for (const char of chars) {
