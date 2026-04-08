@@ -2,7 +2,7 @@
 
 /* ── GLOBAL TOOL SWITCHING ── */
 function switchTool(toolId) {
-    const allowedTools = ['kew', 'img', 'excel'];
+    const allowedTools = ['kew', 'synopex', 'img', 'excel'];
     const activeTool = allowedTools.includes(toolId) ? toolId : 'kew';
 
     document.querySelectorAll('.workspace').forEach(el => { 

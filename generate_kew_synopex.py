@@ -1,20 +1,23 @@
 """
 generate_kew_synopex.py
 =======================
-Tạo báo cáo KEW tự động — Dự án SYNOPEX BẮC NINH 335-357.
-- Clone file mẫu giữ nguyên 100% styles / font / page setup.
-- Tên máy tự động lấy từ tên thư mục (dạng "S0335 - Tên máy").
-- Dùng Tesseract OCR đọc thông số từ ảnh để tự điền Nhận xét.
+Tạo báo cáo KEW tự động cho bộ ảnh Synopex.
+- Clone file mẫu giữ nguyên styles / font / page setup.
+- Tên máy lấy từ tên thư mục dạng "S0335 - Tên máy".
+- Ưu tiên OCR theo template pixel trên 6 ảnh detail chuẩn KEW6315.
+- Fallback về Tesseract nếu có cài và field nào đó không nhận diện được.
 
-Yêu cầu:
-    1. Cài Tesseract: https://github.com/UB-Mannheim/tesseract/wiki
-    2. pip install pytesseract pillow lxml
-
-Chạy:   python generate_kew_synopex.py
+Chạy CLI:
+    python generate_kew_synopex.py
 """
 
 import os, re, shutil, zipfile, copy, traceback
-from lxml import etree
+
+try:
+    from lxml import etree
+except ImportError:
+    etree = None
+
 from PIL import Image
 
 try:
@@ -22,7 +25,7 @@ try:
 except ImportError:
     pytesseract = None
 
-from modules.image.kew6315_ocr import coerce_number, read_kew6315_screen_fields
+from modules.synopex.kew6315_ocr import coerce_number, read_kew6315_screen_fields
 
 # ==============================================================================
 # CẤU HÌNH — CHỈ CẦN CHỈNH 4 DÒNG NÀY
@@ -35,6 +38,11 @@ TESSERACT_CMD = r"C:\Users\Acer\AppData\Local\Programs\Tesseract-OCR\tesseract.e
 
 if pytesseract is not None:
     pytesseract.pytesseract.tesseract_cmd = TESSERACT_CMD
+
+
+def set_tesseract_cmd(tesseract_cmd):
+    if pytesseract is not None and tesseract_cmd:
+        pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
 
 VALID_EXT = ('.png', '.jpg', '.jpeg', '.bmp')
 
@@ -88,6 +96,21 @@ def expand_tc(name, first=True):
     if not name.startswith("TC "):
         return name
     return ("Tổng cấp " if first else "tổng cấp ") + name[3:]
+
+
+def list_machine_folders(base_dir):
+    machine_dirs = sorted([
+        d for d in os.listdir(base_dir)
+        if os.path.isdir(os.path.join(base_dir, d)) and re.match(r'^[Ss]\d+', d)
+    ])
+    if machine_dirs:
+        return [(name, os.path.join(base_dir, name)) for name in machine_dirs]
+
+    folder_name = os.path.basename(os.path.normpath(base_dir))
+    if re.match(r'^[Ss]\d+', folder_name):
+        return [(folder_name, base_dir)]
+
+    return []
 
 
 # ==============================================================================
@@ -389,8 +412,12 @@ def build_nhanxet(ma_so, ten_may, p):
 
 class KewReportBuilder:
 
-    def __init__(self):
-        self.work_dir    = OUTPUT_FILE + "_workdir"
+    def __init__(self, template_file=TEMPLATE_FILE, base_dir=BASE_DIR, output_file=OUTPUT_FILE, tesseract_cmd=TESSERACT_CMD):
+        self.template_file = template_file
+        self.base_dir = base_dir
+        self.output_file = output_file
+        self.tesseract_cmd = tesseract_cmd
+        self.work_dir    = output_file + "_workdir"
         self.media_dir   = os.path.join(self.work_dir, "word", "media")
         self._rid_num    = 200
         self._img_num    = 1
@@ -402,7 +429,7 @@ class KewReportBuilder:
     def unpack(self):
         if os.path.exists(self.work_dir):
             shutil.rmtree(self.work_dir)
-        with zipfile.ZipFile(TEMPLATE_FILE, 'r') as z:
+        with zipfile.ZipFile(self.template_file, 'r') as z:
             z.extractall(self.work_dir)
         print("✓ Giải nén file mẫu")
 
@@ -605,51 +632,52 @@ class KewReportBuilder:
         self.rels_tree.write(self.rels_path, xml_declaration=True, encoding="UTF-8", standalone=True)
         self.ct_tree.write(  self.ct_path,   xml_declaration=True, encoding="UTF-8", standalone=True)
 
-        if os.path.exists(OUTPUT_FILE):
-            try: os.remove(OUTPUT_FILE)
+        if os.path.exists(self.output_file):
+            try: os.remove(self.output_file)
             except PermissionError:
                 print("✗ File đang mở trong Word — hãy đóng lại rồi chạy lại!")
                 shutil.rmtree(self.work_dir, ignore_errors=True); return
 
-        with zipfile.ZipFile(OUTPUT_FILE, 'w', zipfile.ZIP_DEFLATED) as z:
+        with zipfile.ZipFile(self.output_file, 'w', zipfile.ZIP_DEFLATED) as z:
             for root, dirs, files in os.walk(self.work_dir):
                 for f in files:
                     full = os.path.join(root, f)
                     z.write(full, os.path.relpath(full, self.work_dir))
 
         shutil.rmtree(self.work_dir)
-        print(f"\n✓ Hoàn thành! Lưu tại: {OUTPUT_FILE}")
+        print(f"\n✓ Hoàn thành! Lưu tại: {self.output_file}")
 
     # ── Main ───────────────────────────────────────────────────────────────────
 
     def build(self):
-        if pytesseract is None or not os.path.exists(TESSERACT_CMD):
+        if etree is None:
+            print("✗ Thiếu thư viện `lxml`, không thể tạo báo cáo Word.")
+            return None
+
+        set_tesseract_cmd(self.tesseract_cmd)
+
+        if pytesseract is None or not self.tesseract_cmd or not os.path.exists(self.tesseract_cmd):
             print("! Tesseract fallback không sẵn sàng, sẽ chỉ dùng OCR theo template pixel.")
             if pytesseract is None:
                 print("  → Thiếu module `pytesseract`.")
             else:
-                print(f"  → Không tìm thấy Tesseract: {TESSERACT_CMD}")
+                print(f"  → Không tìm thấy Tesseract: {self.tesseract_cmd}")
 
-        if not os.path.exists(TEMPLATE_FILE):
-            print(f"✗ Không tìm thấy file mẫu: {TEMPLATE_FILE}"); return
+        if not os.path.exists(self.template_file):
+            print(f"✗ Không tìm thấy file mẫu: {self.template_file}"); return None
 
-        if not os.path.exists(BASE_DIR):
-            print(f"✗ Không tìm thấy thư mục ảnh: {BASE_DIR}"); return
+        if not os.path.exists(self.base_dir):
+            print(f"✗ Không tìm thấy thư mục ảnh: {self.base_dir}"); return None
 
-        # Lấy danh sách thư mục S* (bao gồm cả tên có khoảng trắng như "S0335 - Tủ bơm...")
-        subdirs = sorted([
-            d for d in os.listdir(BASE_DIR)
-            if os.path.isdir(os.path.join(BASE_DIR, d)) and re.match(r'^[Ss]\d+', d)
-        ])
-        if not subdirs:
-            print(f"✗ Không tìm thấy thư mục S* trong {BASE_DIR}"); return
+        machine_folders = list_machine_folders(self.base_dir)
+        if not machine_folders:
+            print(f"✗ Không tìm thấy thư mục S* trong {self.base_dir}"); return None
 
-        print(f"✓ Tìm thấy {len(subdirs)} thư mục máy")
+        print(f"✓ Tìm thấy {len(machine_folders)} thư mục máy")
         self.unpack(); self.load(); self.clear_body()
 
         ok = skip = 0
-        for folder_name in subdirs:
-            folder_path = os.path.join(BASE_DIR, folder_name)
+        for folder_name, folder_path in machine_folders:
             files       = os.listdir(folder_path)
 
             trend_imgs  = sorted([f for f in files
@@ -693,8 +721,20 @@ class KewReportBuilder:
 
         print(f"\n  Tổng: {ok} máy | {skip} bỏ qua")
         self.save()
+        return self.output_file
+
+
+# ==============================================================================
+def build_synopex_report(template_file, base_dir, output_file, tesseract_cmd=TESSERACT_CMD):
+    builder = KewReportBuilder(
+        template_file=template_file,
+        base_dir=base_dir,
+        output_file=output_file,
+        tesseract_cmd=tesseract_cmd,
+    )
+    return builder.build()
 
 
 # ==============================================================================
 if __name__ == "__main__":
-    KewReportBuilder().build()
+    build_synopex_report(TEMPLATE_FILE, BASE_DIR, OUTPUT_FILE, TESSERACT_CMD)

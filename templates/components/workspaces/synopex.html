@@ -1,0 +1,70 @@
+<div id="workspace-synopex" class="workspace" style="display:none;">
+  <div class="content active" id="tab-synopex">
+    <div class="section-header">Báo cáo KEW Synopex</div>
+
+    <div class="chart-card" style="margin-bottom: 1.5rem;">
+      <h3>Tạo báo cáo từ bộ ảnh đo</h3>
+      <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1rem;">
+        Upload file mẫu `.docx` và nguồn dữ liệu gồm các thư mục `Sxxxx - Tên máy` chứa 1 ảnh trend `a*`
+        cùng tối thiểu 6 ảnh `ps-sd*`.
+      </p>
+
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+        <div>
+          <label class="form-label text-muted fw-semibold" style="font-size:0.85rem;">1. File mẫu Word</label>
+          <input type="file" id="synopex-template" accept=".docx" class="form-control">
+        </div>
+
+        <div>
+          <label class="form-label text-muted fw-semibold" style="font-size:0.85rem;">2A. Dữ liệu ZIP</label>
+          <input type="file" id="synopex-zip" accept=".zip" class="form-control">
+          <div style="font-size:0.75rem; color:var(--text-muted); margin-top:6px;">
+            Nếu chọn ZIP, hệ thống sẽ ưu tiên ZIP thay cho upload thư mục.
+          </div>
+        </div>
+
+        <div>
+          <label class="form-label text-muted fw-semibold" style="font-size:0.85rem;">2B. Hoặc chọn thư mục</label>
+          <input type="file" id="synopex-folder" webkitdirectory directory multiple class="form-control">
+          <div id="synopex-folder-meta" style="font-size:0.75rem; color:var(--text-muted); margin-top:6px;">
+            Chưa chọn thư mục dữ liệu.
+          </div>
+        </div>
+
+        <div>
+          <label class="form-label text-muted fw-semibold" style="font-size:0.85rem;">3. Tên file xuất</label>
+          <input type="text" id="synopex-output-name" value="KEW_Synopex_Report.docx" class="form-control">
+        </div>
+
+        <div>
+          <label class="form-label text-muted fw-semibold" style="font-size:0.85rem;">Tesseract path (tuỳ chọn)</label>
+          <input type="text" id="synopex-tesseract" class="form-control"
+            placeholder="Ví dụ: C:\\Users\\Acer\\AppData\\Local\\Programs\\Tesseract-OCR\\tesseract.exe">
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-card" style="margin-bottom: 1.5rem;">
+      <h3>Yêu cầu dữ liệu</h3>
+      <div style="font-size:0.82rem; color:var(--text-muted); line-height:1.7;">
+        <div>- Mỗi máy nằm trong 1 thư mục dạng `S0335 - Tên máy`.</div>
+        <div>- Mỗi thư mục cần có 1 ảnh trend bắt đầu bằng `a` và ít nhất 6 ảnh detail bắt đầu bằng `ps-sd`.</div>
+        <div>- OCR mới ưu tiên nhận diện theo pixel/template trên đúng 6 màn hình KEW6315 chuẩn.</div>
+      </div>
+    </div>
+
+    <div class="chart-card"
+      style="display:flex;flex-direction:column;justify-content:center;align-items:center;gap:1rem;text-align:center;">
+      <button id="btn-synopex-generate" onclick="runSynopexReport()"
+        style="background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:white;padding:12px 28px;border-radius:12px;font-size:0.88rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;transition:opacity 0.15s">
+        <div id="synopex-spinner"
+          style="width:14px;height:14px;border:2px solid rgba(255,255,255,0.3);border-radius:50%;border-top-color:white;animation:spin 0.8s linear infinite;display:none">
+        </div>
+        <span id="synopex-btn-text">Tạo báo cáo Word</span>
+      </button>
+
+      <div id="synopex-status" style="font-size:0.82rem; color:var(--text-muted);"></div>
+      <div id="synopex-error" style="display:none; color:var(--danger); font-size:0.82rem;"></div>
+    </div>
+  </div>
+</div>
