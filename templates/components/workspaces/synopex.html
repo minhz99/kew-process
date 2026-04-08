@@ -3,53 +3,30 @@
     <div class="section-header">Báo cáo KEW Word</div>
 
     <div class="chart-card" style="margin-bottom: 1.5rem;">
-      <h3>Tạo báo cáo từ bộ ảnh đo</h3>
+      <h3>Tạo báo cáo từ file ZIP</h3>
       <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1rem;">
-        Upload file mẫu `.docx` và nguồn dữ liệu gồm các thư mục `Sxxxx - Tên máy` chứa 1 ảnh trend `a*`
-        cùng tối thiểu 6 ảnh `ps-sd*`.
+        Upload 1 file `.zip` chứa các thư mục `Sxxxx - Tên máy`. Phần tạo báo cáo Word sẽ được xử lý toàn bộ ở phía server.
       </p>
 
       <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
         <div>
-          <label class="form-label text-muted fw-semibold" style="font-size:0.85rem;">1. File mẫu Word</label>
-          <input type="file" id="synopex-template" accept=".docx" class="form-control">
-        </div>
-
-        <div>
-          <label class="form-label text-muted fw-semibold" style="font-size:0.85rem;">2A. Dữ liệu ZIP</label>
+          <label class="form-label text-muted fw-semibold" style="font-size:0.85rem;">1. Dữ liệu ZIP</label>
           <input type="file" id="synopex-zip" accept=".zip" class="form-control">
-          <div style="font-size:0.75rem; color:var(--text-muted); margin-top:6px;">
-            Nếu chọn ZIP, hệ thống sẽ ưu tiên ZIP thay cho upload thư mục.
-          </div>
         </div>
 
         <div>
-          <label class="form-label text-muted fw-semibold" style="font-size:0.85rem;">2B. Hoặc chọn thư mục</label>
-          <input type="file" id="synopex-folder" webkitdirectory directory multiple class="form-control">
-          <div id="synopex-folder-meta" style="font-size:0.75rem; color:var(--text-muted); margin-top:6px;">
-            Chưa chọn thư mục dữ liệu.
-          </div>
-        </div>
-
-        <div>
-          <label class="form-label text-muted fw-semibold" style="font-size:0.85rem;">3. Tên file xuất</label>
+          <label class="form-label text-muted fw-semibold" style="font-size:0.85rem;">2. Tên file xuất</label>
           <input type="text" id="synopex-output-name" value="KEW_Synopex_Report.docx" class="form-control">
-        </div>
-
-        <div>
-          <label class="form-label text-muted fw-semibold" style="font-size:0.85rem;">Tesseract path (tuỳ chọn)</label>
-          <input type="text" id="synopex-tesseract" class="form-control"
-            placeholder="Ví dụ: C:\\Users\\Acer\\AppData\\Local\\Programs\\Tesseract-OCR\\tesseract.exe">
         </div>
       </div>
     </div>
 
     <div class="chart-card" style="margin-bottom: 1.5rem;">
-      <h3>Yêu cầu dữ liệu</h3>
+      <h3>Yêu cầu cơ bản</h3>
       <div style="font-size:0.82rem; color:var(--text-muted); line-height:1.7;">
-        <div>- Mỗi máy nằm trong 1 thư mục dạng `S0335 - Tên máy`.</div>
-        <div>- Mỗi thư mục cần có 1 ảnh trend bắt đầu bằng `a` và ít nhất 6 ảnh detail bắt đầu bằng `ps-sd`.</div>
-        <div>- OCR mới ưu tiên nhận diện theo pixel/template trên đúng 6 màn hình KEW6315 chuẩn.</div>
+        <div>- File ZIP cần chứa các thư mục dạng `S0335 - Tên máy`.</div>
+        <div>- Mỗi thư mục cần có 1 ảnh trend bắt đầu bằng `a` và ít nhất 6 ảnh `ps-sd`.</div>
+        <div>- Các bước nhận diện và dựng báo cáo được xử lý ở phía server.</div>
       </div>
     </div>
 

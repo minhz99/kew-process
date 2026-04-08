@@ -30,10 +30,10 @@ from modules.synopex.kew6315_ocr import coerce_number, read_kew6315_screen_field
 # ==============================================================================
 # CẤU HÌNH — CHỈ CẦN CHỈNH 4 DÒNG NÀY
 # ==============================================================================
-TEMPLATE_FILE = r"C:\Polytee\file_mau_kew.docx"
+TEMPLATE_FILE = os.environ.get("SYNOPEX_TEMPLATE_FILE", r"C:\Polytee\file_mau_kew.docx")
 BASE_DIR      = r"C:\Polytee\KEW SYNOPEX BẮC NINH 335-357\KEW SYNOPEX BẮC NINH 335-357"
 OUTPUT_FILE   = r"C:\Polytee\KEW_Synopex_BacNinh_Report.docx"
-TESSERACT_CMD = r"C:\Users\Acer\AppData\Local\Programs\Tesseract-OCR\tesseract.exe"
+TESSERACT_CMD = os.environ.get("TESSERACT_CMD", r"C:\Users\Acer\AppData\Local\Programs\Tesseract-OCR\tesseract.exe")
 # ==============================================================================
 
 if pytesseract is not None:
@@ -59,6 +59,107 @@ PIC = "http://schemas.openxmlformats.org/drawingml/2006/picture"
 REL_IMAGE = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"
 
 def qw(tag): return f"{{{W}}}{tag}"
+
+
+def natural_sort_key(value):
+    return [int(part) if part.isdigit() else part.lower() for part in re.split(r"(\d+)", value)]
+
+
+def is_valid_image_file(path):
+    try:
+        with Image.open(path) as image:
+            image.verify()
+        return True
+    except Exception:
+        return False
+
+
+def create_builtin_template_docx(target_path):
+    target_dir = os.path.dirname(target_path)
+    if target_dir:
+        os.makedirs(target_dir, exist_ok=True)
+
+    content_types = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+  <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
+</Types>"""
+
+    package_rels = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>"""
+
+    document_xml = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="{W}" xmlns:r="{R}">
+  <w:body>
+    <w:sectPr>
+      <w:pgSz w:w="11906" w:h="16838"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
+    </w:sectPr>
+  </w:body>
+</w:document>"""
+
+    document_rels = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>"""
+
+    styles_xml = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="{W}">
+  <w:docDefaults>
+    <w:rPrDefault>
+      <w:rPr>
+        <w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/>
+        <w:sz w:val="22"/>
+        <w:szCs w:val="22"/>
+      </w:rPr>
+    </w:rPrDefault>
+    <w:pPrDefault/>
+  </w:docDefaults>
+  <w:style w:type="paragraph" w:default="1" w:styleId="Normal">
+    <w:name w:val="Normal"/>
+    <w:qFormat/>
+  </w:style>
+  <w:style w:type="paragraph" w:styleId="onvn">
+    <w:name w:val="onvn"/>
+    <w:basedOn w:val="Normal"/>
+    <w:qFormat/>
+    <w:rPr>
+      <w:b/>
+      <w:sz w:val="24"/>
+      <w:szCs w:val="24"/>
+    </w:rPr>
+  </w:style>
+  <w:style w:type="paragraph" w:styleId="KHnhtrongbng">
+    <w:name w:val="KHnhtrongbng"/>
+    <w:basedOn w:val="Normal"/>
+    <w:qFormat/>
+  </w:style>
+  <w:style w:type="paragraph" w:styleId="DMhnhK">
+    <w:name w:val="DMhnhK"/>
+    <w:basedOn w:val="Normal"/>
+    <w:qFormat/>
+    <w:pPr>
+      <w:jc w:val="center"/>
+    </w:pPr>
+    <w:rPr>
+      <w:i/>
+    </w:rPr>
+  </w:style>
+  <w:style w:type="paragraph" w:styleId="onvnnhnxt">
+    <w:name w:val="onvnnhnxt"/>
+    <w:basedOn w:val="Normal"/>
+    <w:qFormat/>
+  </w:style>
+</w:styles>"""
+
+    with zipfile.ZipFile(target_path, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("[Content_Types].xml", content_types)
+        archive.writestr("_rels/.rels", package_rels)
+        archive.writestr("word/document.xml", document_xml)
+        archive.writestr("word/_rels/document.xml.rels", document_rels)
+        archive.writestr("word/styles.xml", styles_xml)
 
 
 # ==============================================================================
@@ -412,13 +513,14 @@ def build_nhanxet(ma_so, ten_may, p):
 
 class KewReportBuilder:
 
-    def __init__(self, template_file=TEMPLATE_FILE, base_dir=BASE_DIR, output_file=OUTPUT_FILE, tesseract_cmd=TESSERACT_CMD):
-        self.template_file = template_file
+    def __init__(self, template_file=None, base_dir=BASE_DIR, output_file=OUTPUT_FILE, tesseract_cmd=None):
+        self.template_file = template_file or TEMPLATE_FILE
         self.base_dir = base_dir
         self.output_file = output_file
-        self.tesseract_cmd = tesseract_cmd
+        self.tesseract_cmd = tesseract_cmd or TESSERACT_CMD
         self.work_dir    = output_file + "_workdir"
         self.media_dir   = os.path.join(self.work_dir, "word", "media")
+        self._generated_template_path = None
         self._rid_num    = 200
         self._img_num    = 1
         self._docpr_num  = 900000000
@@ -426,11 +528,26 @@ class KewReportBuilder:
 
     # ── Setup ──────────────────────────────────────────────────────────────────
 
+    def _resolve_template_file(self):
+        if self.template_file and os.path.exists(self.template_file):
+            return self.template_file
+
+        generated_template_path = self.work_dir + "_template.docx"
+        create_builtin_template_docx(generated_template_path)
+        self._generated_template_path = generated_template_path
+        print("! Không tìm thấy file mẫu cấu hình sẵn, dùng template Word tối thiểu tích hợp.")
+        return generated_template_path
+
     def unpack(self):
         if os.path.exists(self.work_dir):
             shutil.rmtree(self.work_dir)
-        with zipfile.ZipFile(self.template_file, 'r') as z:
+        template_path = self._resolve_template_file()
+        with zipfile.ZipFile(template_path, 'r') as z:
             z.extractall(self.work_dir)
+        os.makedirs(self.media_dir, exist_ok=True)
+        if self._generated_template_path and os.path.exists(self._generated_template_path):
+            os.remove(self._generated_template_path)
+            self._generated_template_path = None
         print("✓ Giải nén file mẫu")
 
     def load(self):
@@ -651,8 +768,7 @@ class KewReportBuilder:
 
     def build(self):
         if etree is None:
-            print("✗ Thiếu thư viện `lxml`, không thể tạo báo cáo Word.")
-            return None
+            raise RuntimeError("Thiếu thư viện `lxml`, không thể tạo báo cáo Word.")
 
         set_tesseract_cmd(self.tesseract_cmd)
 
@@ -663,15 +779,12 @@ class KewReportBuilder:
             else:
                 print(f"  → Không tìm thấy Tesseract: {self.tesseract_cmd}")
 
-        if not os.path.exists(self.template_file):
-            print(f"✗ Không tìm thấy file mẫu: {self.template_file}"); return None
-
         if not os.path.exists(self.base_dir):
-            print(f"✗ Không tìm thấy thư mục ảnh: {self.base_dir}"); return None
+            raise RuntimeError(f"Không tìm thấy thư mục ảnh: {self.base_dir}")
 
         machine_folders = list_machine_folders(self.base_dir)
         if not machine_folders:
-            print(f"✗ Không tìm thấy thư mục S* trong {self.base_dir}"); return None
+            raise RuntimeError(f"Không tìm thấy thư mục S* trong {self.base_dir}")
 
         print(f"✓ Tìm thấy {len(machine_folders)} thư mục máy")
         self.unpack(); self.load(); self.clear_body()
@@ -680,10 +793,24 @@ class KewReportBuilder:
         for folder_name, folder_path in machine_folders:
             files       = os.listdir(folder_path)
 
-            trend_imgs  = sorted([f for f in files
-                                   if f.lower().startswith("a") and f.lower().endswith(VALID_EXT)])
-            detail_imgs = sorted([f for f in files
-                                   if f.lower().startswith("ps-sd") and f.lower().endswith(VALID_EXT)])
+            trend_imgs = []
+            detail_imgs = []
+            invalid_images = []
+            for filename in sorted(files, key=natural_sort_key):
+                lower_name = filename.lower()
+                if not lower_name.endswith(VALID_EXT):
+                    continue
+                image_path = os.path.join(folder_path, filename)
+                if not is_valid_image_file(image_path):
+                    invalid_images.append(filename)
+                    continue
+                if lower_name.startswith("a"):
+                    trend_imgs.append(filename)
+                elif lower_name.startswith("ps-sd"):
+                    detail_imgs.append(filename)
+
+            if invalid_images:
+                print(f"     [bỏ qua file lỗi] {', '.join(invalid_images)}")
 
             if not trend_imgs or len(detail_imgs) < 6:
                 print(f"  [bỏ qua] {folder_name} — cần 1 ảnh 'a' và ít nhất 6 ảnh 'ps-sd'.")
@@ -725,7 +852,7 @@ class KewReportBuilder:
 
 
 # ==============================================================================
-def build_synopex_report(template_file, base_dir, output_file, tesseract_cmd=TESSERACT_CMD):
+def build_synopex_report(base_dir, output_file, template_file=None, tesseract_cmd=None):
     builder = KewReportBuilder(
         template_file=template_file,
         base_dir=base_dir,
@@ -737,4 +864,9 @@ def build_synopex_report(template_file, base_dir, output_file, tesseract_cmd=TES
 
 # ==============================================================================
 if __name__ == "__main__":
-    build_synopex_report(TEMPLATE_FILE, BASE_DIR, OUTPUT_FILE, TESSERACT_CMD)
+    build_synopex_report(
+        base_dir=BASE_DIR,
+        output_file=OUTPUT_FILE,
+        template_file=TEMPLATE_FILE,
+        tesseract_cmd=TESSERACT_CMD,
+    )

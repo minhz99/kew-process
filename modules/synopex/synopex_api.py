@@ -20,18 +20,8 @@ def _safe_relative_path(name):
     return Path(*parts)
 
 
-def _save_uploaded_files(files, destination):
-    for storage in files:
-        relative_path = _safe_relative_path(storage.filename or storage.name)
-        if not relative_path.parts:
-            continue
-        target = Path(destination) / relative_path
-        target.parent.mkdir(parents=True, exist_ok=True)
-        storage.save(target)
-
-
-def _extract_zip_safe(storage, destination):
-    with zipfile.ZipFile(io.BytesIO(storage.read()), "r") as archive:
+def _extract_zip_safe(archive_path, destination):
+    with zipfile.ZipFile(archive_path, "r") as archive:
         for member in archive.infolist():
             if member.is_dir():
                 continue
@@ -82,31 +72,19 @@ def _normalize_output_name(name):
 
 @synopex_bp.route("/generate", methods=["POST"])
 def generate_report():
-    if "template" not in request.files:
-        return jsonify({"error": "Thiếu file mẫu .docx."}), 400
-
-    template_file = request.files["template"]
-    if not template_file.filename.lower().endswith(".docx"):
-        return jsonify({"error": "File mẫu phải là .docx."}), 400
-
     data_zip = request.files.get("data_zip")
-    uploaded_files = request.files.getlist("files")
-    if (not data_zip or data_zip.filename == "") and not uploaded_files:
-        return jsonify({"error": "Cần upload thư mục ảnh hoặc file ZIP dữ liệu."}), 400
+    if not data_zip or data_zip.filename == "":
+        return jsonify({"error": "Cần upload file ZIP dữ liệu."}), 400
 
     work_dir = tempfile.mkdtemp(prefix="synopex_web_")
     try:
-        template_path = os.path.join(work_dir, "template.docx")
+        upload_zip_path = os.path.join(work_dir, "upload.zip")
         input_dir = os.path.join(work_dir, "input")
         output_dir = os.path.join(work_dir, "output")
         os.makedirs(input_dir, exist_ok=True)
         os.makedirs(output_dir, exist_ok=True)
-        template_file.save(template_path)
-
-        if data_zip and data_zip.filename:
-            _extract_zip_safe(data_zip, input_dir)
-        else:
-            _save_uploaded_files(uploaded_files, input_dir)
+        data_zip.save(upload_zip_path)
+        _extract_zip_safe(upload_zip_path, input_dir)
 
         machine_root = _find_machine_root(input_dir)
         if machine_root is None:
@@ -114,15 +92,12 @@ def generate_report():
 
         output_name = _normalize_output_name(request.form.get("output_name"))
         output_path = os.path.join(output_dir, output_name)
-        tesseract_cmd = request.form.get("tesseract_cmd", "").strip() or None
 
         from generate_kew_synopex import build_synopex_report
 
         generated_path = build_synopex_report(
-            template_file=template_path,
             base_dir=str(machine_root),
             output_file=output_path,
-            tesseract_cmd=tesseract_cmd,
         )
 
         if not generated_path or not os.path.exists(generated_path):
