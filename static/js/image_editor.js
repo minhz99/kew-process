@@ -299,14 +299,6 @@ function fillTimestampFromPicker(val) {
     document.getElementById('ei-ts-mi').value   = mi || '00';
 }
 
-function toggleTimestampRandomRange(enabled) {
-    const minInput = document.getElementById('ei-ts-step-min');
-    const maxInput = document.getElementById('ei-ts-step-max');
-    if (!minInput || !maxInput) return;
-    minInput.disabled = !enabled;
-    maxInput.disabled = !enabled;
-}
-
 function buildTimestampPlan(opts) {
     const { hasTimestamp, tsDD, tsMo, tsYYYY, tsHH, tsMi, tsSS, fileCount } = opts;
     if (!hasTimestamp) {
@@ -318,33 +310,22 @@ function buildTimestampPlan(opts) {
         return [baseTimestamp];
     }
 
-    const randomEnabled = document.getElementById('ei-ts-random-enabled')?.checked;
-    const fixedStep = parseNonNegativeInt(
-        document.getElementById('ei-ts-step-fixed')?.value || '',
-        'n (giây)',
-        true
+    const minStep = parseNonNegativeInt(
+        document.getElementById('ei-ts-step-min')?.value || '',
+        'm (giây)',
+        false
     );
-
-    if (!randomEnabled && fixedStep === 0) {
-        return Array(fileCount).fill(baseTimestamp);
+    const maxStep = parseNonNegativeInt(
+        document.getElementById('ei-ts-step-max')?.value || '',
+        'n (giây)',
+        false
+    );
+    if (maxStep < minStep) {
+        throw new Error('Khoảng ngẫu nhiên không hợp lệ: n phải lớn hơn hoặc bằng m.');
     }
 
-    let minStep = fixedStep;
-    let maxStep = fixedStep;
-    if (randomEnabled) {
-        minStep = parseNonNegativeInt(
-            document.getElementById('ei-ts-step-min')?.value || '',
-            'm (giây)',
-            false
-        );
-        maxStep = parseNonNegativeInt(
-            document.getElementById('ei-ts-step-max')?.value || '',
-            'n (giây)',
-            false
-        );
-        if (maxStep < minStep) {
-            throw new Error('Khoảng ngẫu nhiên không hợp lệ: n phải lớn hơn hoặc bằng m.');
-        }
+    if (minStep === 0 && maxStep === 0) {
+        return Array(fileCount).fill(baseTimestamp);
     }
 
     const baseDate = parseStrictTimestampDate(tsDD, tsMo, tsYYYY, tsHH, tsMi, tsSS);
@@ -355,7 +336,7 @@ function buildTimestampPlan(opts) {
     const planned = [baseTimestamp];
     let current = new Date(baseDate.getTime());
     for (let i = 1; i < fileCount; i++) {
-        const delta = randomEnabled ? randomIntInclusive(minStep, maxStep) : fixedStep;
+        const delta = randomIntInclusive(minStep, maxStep);
         current = new Date(current.getTime() + (delta * 1000));
         planned.push(formatTimestampFromDate(current));
     }
@@ -408,10 +389,3 @@ function formatTimestampFromDate(d) {
 function randomIntInclusive(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
 }
-
-(function initTimestampDelayInputs() {
-    const randomEnabled = document.getElementById('ei-ts-random-enabled');
-    if (randomEnabled) {
-        toggleTimestampRandomRange(randomEnabled.checked);
-    }
-})();

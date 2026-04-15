@@ -289,32 +289,18 @@
           <h5 style="font-size:0.84rem; margin:0 0 0.5rem 0; color:var(--text-muted);">Độ trễ thời gian giữa các ảnh</h5>
           <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:10px; align-items:end;">
             <div>
-              <label style="font-size:0.8rem; color:var(--text-muted)">Cố định n (giây)</label>
-              <input type="number" id="ei-ts-step-fixed" min="0" step="1" value="0" placeholder="n"
-                style="width:100%; padding:6px; background:var(--surface2); border:1px solid var(--border); color:var(--text); border-radius:4px;" />
-            </div>
-            <div>
-              <label style="font-size:0.8rem; color:var(--text-muted)">Ngẫu nhiên m-n</label>
-              <div
-                style="display:flex; align-items:center; gap:6px; background:var(--surface2); border:1px solid var(--border); border-radius:4px; padding:7px 8px;">
-                <input type="checkbox" id="ei-ts-random-enabled" onchange="toggleTimestampRandomRange(this.checked)"
-                  style="margin:0;" />
-                <span style="font-size:0.78rem;">Bật khoảng ngẫu nhiên</span>
-              </div>
-            </div>
-            <div>
               <label style="font-size:0.8rem; color:var(--text-muted)">m (giây)</label>
-              <input type="number" id="ei-ts-step-min" min="0" step="1" placeholder="m" disabled
+              <input type="number" id="ei-ts-step-min" min="0" step="1" placeholder="m" value="0"
                 style="width:100%; padding:6px; background:var(--surface2); border:1px solid var(--border); color:var(--text); border-radius:4px;" />
             </div>
             <div>
               <label style="font-size:0.8rem; color:var(--text-muted)">n (giây)</label>
-              <input type="number" id="ei-ts-step-max" min="0" step="1" placeholder="n" disabled
+              <input type="number" id="ei-ts-step-max" min="0" step="1" placeholder="n" value="0"
                 style="width:100%; padding:6px; background:var(--surface2); border:1px solid var(--border); color:var(--text); border-radius:4px;" />
             </div>
           </div>
           <p style="font-size:0.74rem; color:var(--text-muted); margin:0.55rem 0 0 0;">
-            Ảnh 1 dùng đúng thời gian bạn nhập. Từ ảnh 2 trở đi sẽ cộng thêm <code>n</code> giây, hoặc cộng ngẫu nhiên trong khoảng <code>m-n</code> nếu bật chế độ ngẫu nhiên.
+            Ảnh 1 dùng đúng thời gian bạn nhập. Từ ảnh 2 trở đi sẽ tự động cộng trễ ngẫu nhiên trong khoảng <code>m-n</code> giây.
           </p>
         </div>
       </div>
