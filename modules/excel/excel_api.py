@@ -47,20 +47,47 @@ def apply_updates():
     except Exception:
         return jsonify({"error": "Không đọc được file Excel đầu vào."}), 400
 
+    from copy import copy
+
     for idx, item in enumerate(updates):
         if not isinstance(item, dict):
             return jsonify({"error": f"Update tại vị trí {idx} không hợp lệ."}), 400
 
         sheet_name = str(item.get("sheet", "")).strip()
-        cell_address = str(item.get("address", "")).strip().upper()
         if not sheet_name:
             return jsonify({"error": f"Thiếu tên sheet tại vị trí {idx}."}), 400
         if sheet_name not in workbook.sheetnames:
             return jsonify({"error": f"Không tìm thấy sheet '{sheet_name}' trong file Excel."}), 400
+
+        worksheet = workbook[sheet_name]
+
+        if item.get("type") == "insert_row":
+            try:
+                row_idx = int(item.get("row"))
+            except (ValueError, TypeError):
+                return jsonify({"error": f"Dòng chèn tại vị trí {idx} không hợp lệ."}), 400
+            
+            worksheet.insert_rows(row_idx)
+            
+            # Copy styles from the row above
+            src_row = row_idx - 1
+            if src_row > 0:
+                for col_idx in range(1, worksheet.max_column + 1):
+                    src_cell = worksheet.cell(row=src_row, column=col_idx)
+                    tgt_cell = worksheet.cell(row=row_idx, column=col_idx)
+                    if src_cell.has_style:
+                        tgt_cell.font = copy(src_cell.font)
+                        tgt_cell.border = copy(src_cell.border)
+                        tgt_cell.fill = copy(src_cell.fill)
+                        tgt_cell.number_format = copy(src_cell.number_format)
+                        tgt_cell.protection = copy(src_cell.protection)
+                        tgt_cell.alignment = copy(src_cell.alignment)
+            continue
+
+        cell_address = str(item.get("address", "")).strip().upper()
         if not CELL_ADDR_RE.fullmatch(cell_address):
             return jsonify({"error": f"Địa chỉ ô '{cell_address}' không hợp lệ."}), 400
 
-        worksheet = workbook[sheet_name]
         worksheet[cell_address].value = item.get("value")
 
     output = io.BytesIO()

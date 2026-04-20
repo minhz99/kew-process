@@ -2,7 +2,7 @@ let currentMode = 'string_mode';
 let historyData = [];
 let workbook = null; // Store active workbook object
 let sourceExcelFile = null; // Keep original uploaded file for server-side export
-const pendingUpdateMap = new Map(); // key: `${sheet}::${address}` -> {sheet, address, value}
+const pendingUpdatesArray = []; // List of updates [{type, sheet, address/row, value}]
 let currentFilename = "";
 const DEFAULT_TEMPLATE_URL = "/static/excel-template/excel-so-dien.xlsx";
 const DEFAULT_TEMPLATE_NAME = "excel-so-dien.xlsx";
@@ -81,7 +81,8 @@ function fill_excel(ws, pairs, row) {
 
 function registerPendingUpdates(sheetName, updates) {
     updates.forEach(update => {
-        pendingUpdateMap.set(`${sheetName}::${update.address}`, {
+        pendingUpdatesArray.push({
+            type: 'cell_update',
             sheet: sheetName,
             address: update.address,
             value: update.value
@@ -89,8 +90,36 @@ function registerPendingUpdates(sheetName, updates) {
     });
 }
 
+function registerInsertRow(sheetName, rowIndex) {
+    pendingUpdatesArray.push({
+        type: 'insert_row',
+        sheet: sheetName,
+        row: rowIndex
+    });
+}
+
+function insertRowJS(ws, rowIndex1Based) {
+    if (!ws['!ref']) return;
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    const targetR = rowIndex1Based - 1;
+    for (let R = range.e.r; R >= targetR; R--) {
+        for (let C = range.s.c; C <= range.e.c; C++) {
+            const oldCellAddr = XLSX.utils.encode_cell({ r: R, c: C });
+            const newCellAddr = XLSX.utils.encode_cell({ r: R + 1, c: C });
+            if (ws[oldCellAddr]) {
+                ws[newCellAddr] = ws[oldCellAddr];
+                delete ws[oldCellAddr];
+            } else {
+                delete ws[newCellAddr];
+            }
+        }
+    }
+    range.e.r++;
+    ws['!ref'] = XLSX.utils.encode_range(range);
+}
+
 function resetSessionEdits() {
-    pendingUpdateMap.clear();
+    pendingUpdatesArray.length = 0;
     historyData = [];
 }
 
@@ -232,7 +261,7 @@ async function downloadFile() {
     const ready = await ensureWorkbookLoaded();
     if (!ready || !sourceExcelFile) return;
 
-    const updates = Array.from(pendingUpdateMap.values());
+    const updates = pendingUpdatesArray;
     if (updates.length === 0) {
         showMessage("Chưa có dữ liệu nào để xuất file.", true);
         return;
@@ -427,6 +456,11 @@ async function submitData() {
 
     parsed_groups.forEach((group, i) => {
         const targetRow = startRow + i;
+        if (i > 0) {
+            // Chèn thêm 1 dòng bên dưới nếu có nhiều group cho cùng 1 kỳ
+            insertRowJS(ws, targetRow);
+            registerInsertRow(sheetName, targetRow);
+        }
         const updates = fill_excel(ws, group, targetRow);
         registerPendingUpdates(sheetName, updates);
         inserted_results.push({ row: targetRow, parsed_data: group });
