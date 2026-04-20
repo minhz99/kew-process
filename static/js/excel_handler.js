@@ -2,6 +2,8 @@ let currentMode = 'string_mode';
 let historyData = [];
 let editingIndex = -1;
 let workbook = null; // Store active workbook object
+let sourceExcelFile = null; // Keep original uploaded file for server-side export
+const pendingUpdateMap = new Map(); // key: `${sheet}::${address}` -> {sheet, address, value}
 let currentFilename = "";
 
 // Helper functions from Python logic
@@ -49,17 +51,59 @@ function find_row(ws, target_month, target_period) {
     return (target_month - 1) * 4 + 4 + target_period;
 }
 
-function fill_excel(ws, pairs, row) {
+function buildCellUpdates(pairs, row) {
     const mapping = [
         { col: "F", val: pairs[0][1] }, { col: "G", val: pairs[0][0] },
         { col: "I", val: pairs[1][1] }, { col: "J", val: pairs[1][0] },
         { col: "L", val: pairs[2][1] }, { col: "M", val: pairs[2][0] }
     ];
-    mapping.forEach(m => {
-        const addr = m.col + row;
-        if (!ws[addr]) ws[addr] = { t: 'n' };
-        ws[addr].v = typeof m.val === 'string' ? to_number(m.val) : m.val;
+    return mapping.map(m => ({
+        address: m.col + row,
+        value: typeof m.val === 'string' ? to_number(m.val) : m.val
+    }));
+}
+
+function fill_excel(ws, pairs, row) {
+    const updates = buildCellUpdates(pairs, row);
+    updates.forEach(update => {
+        if (!ws[update.address]) {
+            ws[update.address] = { t: typeof update.value === 'number' ? 'n' : 's' };
+        }
+        ws[update.address].v = update.value;
     });
+    return updates;
+}
+
+function registerPendingUpdates(sheetName, updates) {
+    updates.forEach(update => {
+        pendingUpdateMap.set(`${sheetName}::${update.address}`, {
+            sheet: sheetName,
+            address: update.address,
+            value: update.value
+        });
+    });
+}
+
+function resetSessionEdits() {
+    pendingUpdateMap.clear();
+    historyData = [];
+    editingIndex = -1;
+    cancelEdit();
+}
+
+function parseFilenameFromContentDisposition(contentDisposition) {
+    if (!contentDisposition) return null;
+    const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+    if (utf8Match && utf8Match[1]) {
+        try {
+            return decodeURIComponent(utf8Match[1]);
+        } catch (_error) {
+            return utf8Match[1];
+        }
+    }
+
+    const asciiMatch = contentDisposition.match(/filename="?([^";]+)"?/i);
+    return asciiMatch ? asciiMatch[1] : null;
 }
 
 // Xử lý chuyển tab
@@ -103,7 +147,9 @@ async function uploadFile() {
     }
 
     const file = fileInput.files[0];
+    sourceExcelFile = file;
     currentFilename = file.name;
+    resetSessionEdits();
 
     const reader = new FileReader();
     reader.onload = function (e) {
@@ -125,10 +171,70 @@ async function uploadFile() {
     reader.readAsArrayBuffer(file);
 }
 
-// CLIENT-SIDE Download File
-function downloadFile() {
-    if (!workbook) return;
-    XLSX.writeFile(workbook, currentFilename || `KetQua_Excel_${new Date().getTime()}.xlsx`);
+// SERVER-SIDE Download File (preserve workbook formatting)
+async function downloadFile() {
+    if (!sourceExcelFile) {
+        showMessage("Vui lòng tải file Excel lên trước.", true);
+        return;
+    }
+
+    const updates = Array.from(pendingUpdateMap.values());
+    if (updates.length === 0) {
+        showMessage("Chưa có dữ liệu nào để xuất file.", true);
+        return;
+    }
+
+    const btnDownload = document.getElementById('btn_download');
+    const originalLabel = btnDownload ? btnDownload.textContent : null;
+    if (btnDownload) {
+        btnDownload.disabled = true;
+        btnDownload.textContent = 'Đang tạo file...';
+    }
+
+    try {
+        const formData = new FormData();
+        formData.append('file', sourceExcelFile, currentFilename || sourceExcelFile.name);
+        formData.append('updates', JSON.stringify(updates));
+        formData.append('filename', currentFilename || sourceExcelFile.name || `KetQua_Excel_${new Date().getTime()}.xlsx`);
+
+        const response = await fetch('/api/excel/apply-updates', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!response.ok) {
+            let errorMessage = 'Không thể tạo file Excel kết quả.';
+            try {
+                const payload = await response.json();
+                if (payload && payload.error) errorMessage = payload.error;
+            } catch (_error) {
+                // ignore parse errors and use fallback error message
+            }
+            throw new Error(errorMessage);
+        }
+
+        const blob = await response.blob();
+        const headerName = parseFilenameFromContentDisposition(response.headers.get('Content-Disposition') || '');
+        const outputName = headerName || currentFilename || `KetQua_Excel_${new Date().getTime()}.xlsx`;
+
+        const downloadUrl = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = downloadUrl;
+        anchor.download = outputName;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        URL.revokeObjectURL(downloadUrl);
+
+        showMessage("✓ Đã tạo file Excel thành công, định dạng ô được giữ nguyên.");
+    } catch (error) {
+        showMessage(error.message || "Xuất file thất bại.", true);
+    } finally {
+        if (btnDownload) {
+            btnDownload.disabled = false;
+            btnDownload.textContent = originalLabel;
+        }
+    }
 }
 
 // Kéo thả file vào màn hình để upload
@@ -269,7 +375,8 @@ async function submitData() {
 
     parsed_groups.forEach((group, i) => {
         const targetRow = startRow + i;
-        fill_excel(ws, group, targetRow);
+        const updates = fill_excel(ws, group, targetRow);
+        registerPendingUpdates(sheetName, updates);
         inserted_results.push({ row: targetRow, parsed_data: group });
     });
 
@@ -295,7 +402,7 @@ async function submitData() {
     }
 
     renderHistoryTable();
-    showMessage("✓ Đã ghi dữ liệu vào memory thành công! Sẵn sàng tải xuống.");
+    showMessage("✓ Đã ghi dữ liệu thành công! Có thể tải file xuống và giữ nguyên định dạng ô.");
 }
 
 // Bảng History
