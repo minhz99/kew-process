@@ -20,6 +20,7 @@ Công cụ chỉnh sửa thông số hiển thị trên ảnh chụp màn hình 
 Công cụ tự động hóa việc nhập liệu và xử lý tệp Excel báo cáo số điện.
 - Đọc dữ liệu từ text thô (String mode) hoặc nhập thủ công.
 - Tự động tìm kiếm và ghi đè giá trị vào đúng dòng, cột trong file Excel báo cáo.
+- Nếu chưa tải file mẫu, hệ thống tự dùng file mặc định `static/excel-template/excel-so-dien.xlsx`.
 - Hỗ trợ quản lý lịch sử nhập liệu trong phiên làm việc.
 
 ## 4. 📝 Báo cáo KEW Word (Synopex)
