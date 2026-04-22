@@ -6,8 +6,140 @@ import tempfile
 import traceback
 import zipfile
 import re
-from flask import Blueprint, request, jsonify, send_file
+import urllib.parse
+from typing import Mapping, Optional
+from copy import copy
+from flask import Blueprint, request, jsonify, send_file, current_app
 from utils.file_utils import process_zip, group_kew_files_by_id, analyse_folder
+
+try:
+    import pandas as pd
+    from openpyxl import load_workbook
+    _MBA_DEPS_OK = True
+except ImportError:
+    _MBA_DEPS_OK = False
+
+# ─── Cấu hình MBA export ─────────────────────────────────────────────────────
+_MBA_SKIP_ROWS = 1
+_MBA_START_ROW = 2
+_MBA_START_COL = 2
+_MBA_TEMPLATE_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    '..', '..', 'static', 'excel-template', 'MBA.xlsx'
+)
+_MBA_COLUMN_MAPPING: Mapping[str, str] = {
+    "AVG_A1[A]": "AVG_A1[A]",
+    "AVG_A2[A]": "AVG_A2[A]",
+    "AVG_A3[A]": "AVG_A3[A]",
+    "AVG_P[W]": "AVG_P[W]",
+    "AVG_Q[var]": "AVG_Q[var]",
+    "AVG_S[VA]": "AVG_S[VA]",
+    "AVG_PF[_]": "AVG_PF",
+    "AVG_VL1[V]": "AVG_VL1[V]",
+    "AVG_VL2[V]": "AVG_VL2[V]",
+    "AVG_VL3[V]": "AVG_VL3[V]",
+    "AVG_THDVR1[%]": "AVG_Vthd1[%]",
+    "AVG_THDVR2[%]": "AVG_Vthd2[%]",
+    "AVG_THDVR3[%]": "AVG_Vthd3[%]",
+    "AVG_THDAR1[%]": "AVG_Athd1[%]",
+    "AVG_THDAR2[%]": "AVG_Athd2[%]",
+    "AVG_THDAR3[%]": "AVG_Athd3[%]",
+    "AVG_UV[%]": "AVG_Vunb[%]",
+    "AVG_UA[%]": "AVG_Aunb[%]",
+}
+_MBA_SCALE_DIV_1000 = ("AVG_P[W]", "AVG_Q[var]", "AVG_S[VA]")
+_MBA_ROUND: Mapping[str, int] = {
+    "AVG_A1[A]": 2, "AVG_A2[A]": 2, "AVG_A3[A]": 2,
+    "AVG_P[W]": 2, "AVG_Q[var]": 2, "AVG_S[VA]": 2,
+    "AVG_PF": 4,
+    "AVG_VL1[V]": 1, "AVG_VL2[V]": 1, "AVG_VL3[V]": 1,
+    "AVG_Vthd1[%]": 3, "AVG_Vthd2[%]": 3, "AVG_Vthd3[%]": 3,
+    "AVG_Athd1[%]": 2, "AVG_Athd2[%]": 2, "AVG_Athd3[%]": 2,
+    "AVG_Vunb[%]": 4, "AVG_Aunb[%]": 3,
+}
+_MBA_FMT: Mapping[str, str] = {
+    "AVG_A1[A]": "0.00", "AVG_A2[A]": "0.00", "AVG_A3[A]": "0.00",
+    "AVG_P[W]": "0.00", "AVG_Q[var]": "0.00", "AVG_S[VA]": "0.00",
+    "AVG_PF": "0.0000",
+    "AVG_VL1[V]": "0.0", "AVG_VL2[V]": "0.0", "AVG_VL3[V]": "0.0",
+    "AVG_Vthd1[%]": "0.000", "AVG_Vthd2[%]": "0.000", "AVG_Vthd3[%]": "0.000",
+    "AVG_Athd1[%]": "0.00", "AVG_Athd2[%]": "0.00", "AVG_Athd3[%]": "0.00",
+    "AVG_Vunb[%]": "0.0000", "AVG_Aunb[%]": "0.000",
+}
+_KM_RE = re.compile(r"^\s*([+-]?\d+(?:\.\d+)?)\s*([kKmM])\s*$")
+
+
+def _mba_to_number(v):
+    if v is None or (isinstance(v, float) and pd.isna(v)):
+        return pd.NA
+    s = str(v).strip()
+    if not s or set(s) == {"-"}:
+        return pd.NA
+    if s.lower() == "nan":
+        return pd.NA
+    m = _KM_RE.match(s)
+    if m:
+        base = float(m.group(1))
+        mult = 1_000.0 if m.group(2).lower() == "k" else 1_000_000.0
+        return base * mult
+    return pd.to_numeric(s, errors="coerce")
+
+
+def _mba_extract(df: "pd.DataFrame") -> "tuple[pd.DataFrame, list[str]]":
+    orig_cols = list(_MBA_COLUMN_MAPPING.keys())
+    available_cols = [c for c in orig_cols if c in df.columns]
+    missing = [c for c in orig_cols if c not in df.columns]
+    
+    out = df[available_cols].copy()
+    rename_mapping = {k: v for k, v in _MBA_COLUMN_MAPPING.items() if k in available_cols}
+    out = out.rename(columns=rename_mapping)
+    
+    for m in missing:
+        out[_MBA_COLUMN_MAPPING[m]] = pd.NA
+
+    target_ordered = list(_MBA_COLUMN_MAPPING.values())
+    out = out[target_ordered]
+
+    for col in out.columns:
+        out[col] = out[col].map(_mba_to_number)
+    for col in _MBA_SCALE_DIV_1000:
+        renamed = dict(_MBA_COLUMN_MAPPING).get(col, col)
+        if renamed in out.columns:
+            out[renamed] = out[renamed] / 1000.0
+    for col, nd in _MBA_ROUND.items():
+        if col in out.columns:
+            out[col] = out[col].round(nd)
+            
+    warnings = []
+    if missing:
+        warnings.append(f"Dữ liệu gốc khuyết {len(missing)} cột: {missing}")
+        
+    return out, warnings
+
+
+def _mba_write(ws, df: "pd.DataFrame") -> None:
+    """Ghi header + data vào sheet, bắt đầu từ B2."""
+    sr, sc = _MBA_START_ROW, _MBA_START_COL
+    
+    # Xoá vùng dữ liệu mẫu cũ (nếu có)
+    last_row = ws.max_row
+    last_col = sc + len(df.columns) - 1
+    for r in range(sr + 1, last_row + 1):
+        for c in range(sc, last_col + 1):
+            cell = ws.cell(row=r, column=c)
+            cell.value = None
+            cell.number_format = "General"
+            
+    for ci, cname in enumerate(df.columns):
+        ws.cell(row=sr, column=sc + ci, value=cname)
+    for ri, row in enumerate(df.values):
+        for ci, val in enumerate(row):
+            if pd.notna(val):
+                cname = df.columns[ci]
+                cell = ws.cell(row=sr + 1 + ri, column=sc + ci, value=float(val))
+                fmt = _MBA_FMT.get(cname)
+                if fmt:
+                    cell.number_format = fmt
 
 kew_bp = Blueprint('kew_bp', __name__)
 
@@ -265,3 +397,140 @@ def correct_files():
     finally:
         shutil.rmtree(temp_in, ignore_errors=True)
         shutil.rmtree(temp_out, ignore_errors=True)
+
+
+@kew_bp.route('/export-mba', methods=['POST'])
+def export_mba():
+    """
+    Nhận nhiều file INPS (.KEW hoặc .ZIP), mỗi file → 1 sheet trong output Excel.
+    Form fields:
+        files[]  – list các file KEW / ZIP (multipart, có thể gửi nhiều)
+        sheets   – JSON array tên sheet tương ứng, ví dụ '["MBA1","MBA2"]'
+                   Nếu thiếu / ngắn hơn số file, các sheet còn lại tự đặt tên MBA1, MBA2, ...
+        filename – tên file xuất (mặc định 'MBA_Export.xlsx')
+    """
+    if not _MBA_DEPS_OK:
+        return jsonify({'error': 'Thiếu thư viện pandas hoặc openpyxl.'}), 500
+
+    out_filename = request.form.get('filename', '').strip() or 'MBA_Export.xlsx'
+    if not out_filename.lower().endswith('.xlsx'):
+        out_filename += '.xlsx'
+
+    # ── Parse danh sách tên sheet ─────────────────────────────────────────────
+    sheets_raw = request.form.get('sheets', '[]')
+    try:
+        sheet_names_in = json.loads(sheets_raw)
+        if not isinstance(sheet_names_in, list):
+            sheet_names_in = []
+    except Exception:
+        sheet_names_in = []
+
+    # ── Lấy tất cả file KEW bytes từ request ─────────────────────────────────
+    def _extract_kew_bytes(f) -> list:
+        """Từ 1 FileStorage trả về list [(name, bytes)]."""
+        raw = f.read()
+        if f.filename.upper().endswith('.ZIP'):
+            with zipfile.ZipFile(io.BytesIO(raw), 'r') as zf:
+                entries = [n for n in zf.namelist() if n.upper().endswith('.KEW')]
+                return [(os.path.basename(n), zf.read(n)) for n in entries]
+        return [(os.path.basename(f.filename), raw)]
+
+    kew_list = []  # list of (name, bytes)
+    if 'files' in request.files:
+        for f in request.files.getlist('files'):
+            kew_list.extend(_extract_kew_bytes(f))
+    elif 'zip' in request.files:
+        kew_list.extend(_extract_kew_bytes(request.files['zip']))
+
+    if not kew_list:
+        return jsonify({'error': 'Cần upload ít nhất 1 file .KEW hoặc .ZIP.'}), 400
+
+    # ── Đặt tên sheet: ưu tiên từ form, fallback MBA1/MBA2/... ──────────────
+    def _sanitize_sheet(name: str, idx: int) -> str:
+        s = (name or '').strip()
+        if not s:
+            s = f'MBA{idx + 1}'
+        # Excel giới hạn 31 ký tự, không được có: \ / ? * [ ] :
+        s = re.sub(r'[\\/?*\[\]:]', '_', s)[:31]
+        return s or f'MBA{idx + 1}'
+
+    sheet_names = [
+        _sanitize_sheet(sheet_names_in[i] if i < len(sheet_names_in) else '', i)
+        for i in range(len(kew_list))
+    ]
+
+    # Đảm bảo tên sheet không trùng nhau
+    seen = {}
+    for i, sn in enumerate(sheet_names):
+        if sn in seen:
+            seen[sn] += 1
+            sheet_names[i] = f'{sn}_{seen[sn]}'
+        else:
+            seen[sn] = 0
+
+    # ── Load template ─────────────────────────────────────────────────────────
+    template_path = os.path.normpath(_MBA_TEMPLATE_PATH)
+    if not os.path.isfile(template_path):
+        return jsonify({'error': f'Không tìm thấy template MBA.xlsx tại {template_path}'}), 500
+
+    try:
+        wb = load_workbook(template_path)
+    except Exception as e:
+        return jsonify({'error': f'Không mở được template: {e}'}), 500
+
+    # Sheet đầu tiên trong template dùng làm "khuôn"; thêm các sheet sau bằng copy
+    template_sheet_name = wb.sheetnames[0]
+    ws_template = wb[template_sheet_name]
+
+    errors_list = []
+
+    for idx, (kew_name, kew_bytes) in enumerate(kew_list):
+        target_name = sheet_names[idx]
+
+        # ── Parse KEW ────────────────────────────────────────────────────────
+        try:
+            df_raw = pd.read_csv(
+                io.BytesIO(kew_bytes),
+                skiprows=_MBA_SKIP_ROWS,
+                low_memory=False,
+            )
+            df_raw.columns = df_raw.columns.str.strip()
+        except Exception as e:
+            errors_list.append(f'{kew_name}: không đọc được ({e})')
+            continue
+
+        df, warnings = _mba_extract(df_raw)
+        if warnings:
+            errors_list.extend([f"{kew_name}: {w}" for w in warnings])
+            
+        # ── Lấy / tạo sheet đích ─────────────────────────────────────────────
+        try:
+            ws = wb.copy_worksheet(ws_template)
+            ws.title = target_name
+        except Exception as e:
+            errors_list.append(f'{kew_name}: không thể tạo sheet ({e})')
+            continue
+
+        _mba_write(ws, df)
+
+    # ── Sau khi xử lý xong tất cả, loại bỏ sheet template gốc ────────────────
+    if ws_template in wb.worksheets:
+        wb.remove(ws_template)
+
+    if errors_list and len(errors_list) == len(kew_list):
+        # Tất cả đều lỗi
+        return jsonify({'error': 'Tất cả file thất bại: ' + '; '.join(errors_list)}), 400
+
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    resp = send_file(
+        output,
+        as_attachment=True,
+        download_name=out_filename,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    if errors_list:
+        resp.headers['X-MBA-Warnings'] = urllib.parse.quote('; '.join(errors_list))
+    return resp

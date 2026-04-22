@@ -1,3 +1,10 @@
+"""
+kew6315_ocr.py
+==============
+OCR engine cho ảnh KEW6315 thực tế (320x240).
+Dùng template matching với digit templates.
+"""
+
 from __future__ import annotations
 
 import re
@@ -91,6 +98,7 @@ def _open_reference_image(image_or_path) -> Image.Image:
     else:
         image = Image.open(image_or_path).convert("RGB")
 
+    # Resize về kích thước reference 320x240 nếu cần
     if image.size != (KEW6315_REF_WIDTH, KEW6315_REF_HEIGHT):
         image = image.resize((KEW6315_REF_WIDTH, KEW6315_REF_HEIGHT), Image.Resampling.BILINEAR)
 
@@ -124,12 +132,24 @@ def _match_template(
     return score, left
 
 
+def _estimate_background(field_arr: np.ndarray, color: str) -> np.ndarray:
+    """Ước lượng background từ các pixel sáng nhất trong field."""
+    brightness = field_arr.sum(axis=2)
+    threshold = np.percentile(brightness, 85)  # Top 15% sáng nhất
+    bright_pixels = field_arr[brightness >= threshold]
+    if len(bright_pixels) == 0:
+        return BACKGROUND_BY_KEY[color]
+    return bright_pixels.mean(axis=0)
+
+
 def _read_field(field_arr: np.ndarray, color: str, digits_dir: str) -> str | None:
     templates = _load_templates(digits_dir).get(color, [])
     if not templates:
         return None
 
-    field_contrast = _contrast_from_background(field_arr, BACKGROUND_BY_KEY[color])
+    # Ước lượng background thực tế từ field (thay vì dùng fixed value)
+    actual_bg = _estimate_background(field_arr, color)
+    field_contrast = _contrast_from_background(field_arr, actual_bg)
     active_columns = field_contrast.max(axis=0) > ACTIVE_COLUMN_THRESHOLD
 
     def skip_blank(cursor: int) -> int:
@@ -186,6 +206,7 @@ def read_kew6315_screen_fields(
     field_ids: Iterable[str] | None = None,
     digits_dir: str | Path | None = None,
 ) -> dict[str, str | None]:
+    """Đọc các field từ màn hình KEW6315."""
     screen = SCREEN_BY_INDEX.get(screen_idx)
     if screen is None:
         raise ValueError(f"Unsupported KEW6315 screen index: {screen_idx}")
@@ -206,6 +227,7 @@ def read_kew6315_screen_fields(
 
 
 def coerce_number(text: str | None) -> float | None:
+    """Chuyển text thành số, bỏ qua ký tự không phải số."""
     if text is None:
         return None
 

@@ -20,39 +20,13 @@
 
   <!-- ══════════════════ DASHBOARD APP ══════════════════ -->
   <div id="app-container">
-    <div class="content-header" style="padding-bottom: 0;">
-      <div id="kew-upload-section" class="chart-card kew-upload-card">
-        <div class="kew-upload-header">
-          <div>
-            <div class="section-header m-0">Nạp file đo</div>
-            <p class="kew-upload-note">Kéo thả hoặc chọn file `.KEW` / `.ZIP` để phân tích và cập nhật biểu đồ trực
-              tiếp.</p>
-          </div>
-          <button type="button" class="btn" onclick="document.getElementById('file-input').click()">
-            <i class="bi bi-upload me-1"></i> Chọn file
-          </button>
-        </div>
+    <div class="content-header d-flex flex-column flex-xl-row align-items-stretch gap-3" style="padding-bottom: 0;">
 
-        <div id="upload-area" onclick="document.getElementById('file-input').click()">
-          <div class="upload-icon">📂</div>
-          <div class="upload-text">Kéo thả file dữ liệu vào đây</div>
-          <div class="upload-sub">Hệ thống tự phân tích tổng quan, sóng hài, sự kiện và tab đánh giá.</div>
-          <input type="file" id="file-input" multiple accept=".KEW,.kew,.ZIP,.zip" style="display: none">
-        </div>
-
-        <div id="loading-screen">
-          <div class="spinner"></div>
-          <div id="loading-text">Đang phân tích dữ liệu...</div>
-        </div>
-
-        <div id="upload-error" class="kew-upload-feedback is-error" style="display: none;"></div>
-        <div id="upload-success" class="kew-upload-feedback is-success" style="display: none;"></div>
-      </div>
-
-      <div id="kew-nav-section" class="chart-card kew-nav-card">
+      <div id="kew-nav-section" class="chart-card kew-nav-card"
+        style="flex: 1; min-width: 300px; margin-bottom: 1.5rem;">
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
           <div>
-            <div class="section-header m-0">Báo cáo</div>
+            <div class="section-header m-0">Báo cáo máy phân tích</div>
             <div class="small text-muted mt-2">Chọn tab báo cáo để xem từng nhóm chỉ số.</div>
           </div>
           <button type="button" class="btn" data-bs-toggle="modal" data-bs-target="#settingsModal">
@@ -85,8 +59,37 @@
           <button type="button" class="tab" data-kew-tab="correction" onclick="switchKewTab('correction')">
             <i class="bi bi-tools me-1"></i> Sửa số liệu
           </button>
+          <button type="button" class="tab" data-kew-tab="mba" onclick="switchKewTab('mba')">
+            <i class="bi bi-journal-check me-1"></i> Xuất MBA
+          </button>
         </div>
       </div>
+
+      <div id="kew-upload-section" class="chart-card kew-upload-card"
+        style="flex: 0 0 350px; margin-bottom: 1.5rem; display: flex; flex-direction: column; justify-content: center;">
+        <div class="kew-upload-header" style="margin-bottom: 0.8rem;">
+          <div class="section-header m-0" style="font-size:1.1rem">Nạp file đo</div>
+        </div>
+
+        <div id="upload-area" onclick="document.getElementById('file-input').click()"
+          style="padding: 1.2rem; min-height: unset;">
+          <div class="upload-icon" style="font-size: 2rem; margin-bottom: 0.5rem;">📂</div>
+          <div class="upload-text" style="font-size: 0.95rem;">Kéo thả `.KEW` / `.ZIP` vào đây</div>
+          <div class="upload-sub" style="font-size: 0.8rem;">hoặc click để chọn file</div>
+          <input type="file" id="file-input" multiple accept=".KEW,.kew,.ZIP,.zip" style="display: none">
+        </div>
+
+        <div id="loading-screen" style="padding: 1.5rem;">
+          <div class="spinner" style="width: 28px; height: 28px; border-width: 3px;"></div>
+          <div id="loading-text" style="font-size: 0.85rem; margin-top: 10px;">Đang phân tích...</div>
+        </div>
+
+        <div id="upload-error" class="kew-upload-feedback is-error"
+          style="display: none; padding: 0.6rem; font-size: 0.85rem;"></div>
+        <div id="upload-success" class="kew-upload-feedback is-success"
+          style="display: none; padding: 0.6rem; font-size: 0.85rem;"></div>
+      </div>
+
     </div>
 
     <!-- ══════════════════ OVERVIEW TAB ══════════════════ -->
@@ -286,6 +289,8 @@
 
       <div class="section-header">Đánh giá chi tiết</div>
       <div class="assessment-grid" id="assessmentGrid"></div>
+
+
       <div class="section-header" style="margin-top:2rem">Thông tin thiết bị đo</div>
       <div class="chart-card">
         <table class="events-table" id="deviceTable">
@@ -500,5 +505,224 @@
       </div>
     </div>
 
+    <!-- ══════════════════ MBA EXPORT TAB ══════════════════ -->
+    <div class="content" id="tab-mba">
+      <div class="section-header">Xuất số liệu cho Máy Biến Áp</div>
+
+      <div class="chart-card" id="mba-manager-panel" style="border-color:var(--accent3)40">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+          <div>
+            <h3 style="margin:0;color:var(--accent3)">📊 Xuất Excel máy biến áp</h3>
+            <p style="font-size:0.76rem;color:var(--text-muted);margin:4px 0 0">Thêm từng file INPS và đặt tên sheet →
+              xuất 1 file Excel nhiều sheet.</p>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="text" id="mba-out-filename" class="btn" style="width:200px;padding:5px 10px;font-size:0.8rem"
+              placeholder="Tên file xuất (VD: MBA_NhaMay.xlsx)" value="MBA_Export.xlsx">
+            <button class="btn" id="btn-mba-export-all"
+              style="border-color:var(--accent3);color:var(--accent3);font-weight:600" onclick="exportMbaAll()">
+              <span id="mba-all-spinner"
+                style="display:none;width:12px;height:12px;border:2px solid rgba(0,0,0,0.2);border-radius:50%;border-top-color:var(--accent3);animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:4px"></span>
+              📥 Xuất tất cả
+            </button>
+          </div>
+        </div>
+
+        <input type="file" id="mba-file-picker" multiple accept=".KEW,.kew,.ZIP,.zip" style="display:none">
+
+        <!-- Drag & Drop Zone -->
+        <div id="mba-drop-area" onclick="document.getElementById('mba-file-picker').click()"
+          style="border: 2px dashed rgba(59, 130, 246, 0.4); border-radius: 12px; padding: 2rem 1rem; text-align: center; cursor: pointer; transition: all 0.2s; margin-bottom: 1.5rem; background: var(--surface2);">
+          <div style="font-size: 2.5rem; margin-bottom: 0.5rem; opacity: 0.8;">📥</div>
+          <div style="font-size: 1.05rem; font-weight: 500; color: var(--text);">Kéo thả file INPSxxxx.KEW vào khung này
+          </div>
+          <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 5px;">hoặc click để duyệt file trên máy
+          </div>
+        </div>
+
+        <!-- Danh sách MBA entries -->
+        <div id="mba-entries-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:1rem">
+          <!-- entries được render bởi JS -->
+        </div>
+
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn" style="border-color: var(--border); font-size: 0.82rem;"
+            onclick="document.getElementById('mba-entries-list').innerHTML=''; _mbaEntries=[]; _mbaRender();">
+            🗑 Xóa danh sách
+          </button>
+          <span id="mba-status-msg" style="font-size:0.76rem;color:var(--text-muted);margin-left:auto;"></span>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
+
+<!-- ══════════════════ MBA MANAGER SCRIPT ══════════════════ -->
+
+
+
+<script>
+  (function () {
+    var _mbaEntries = [];
+    var _mbaNextId = 0;
+
+    setTimeout(function () {
+      var picker = document.getElementById('mba-file-picker');
+      var dropArea = document.getElementById('mba-drop-area');
+
+      if (picker) {
+        picker.addEventListener('change', function () {
+          if (!picker.files || !picker.files.length) return;
+          for (var i = 0; i < picker.files.length; i++) {
+            _mbaAddEntry(picker.files[i]);
+          }
+          picker.value = '';
+          _mbaRender();
+        });
+      }
+
+      if (dropArea) {
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+          dropArea.addEventListener(eventName, preventDefaults, false);
+        });
+        function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+          dropArea.addEventListener(eventName, () => dropArea.style.borderColor = 'var(--accent)');
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+          dropArea.addEventListener(eventName, () => dropArea.style.borderColor = 'rgba(59, 130, 246, 0.4)');
+        });
+
+        dropArea.addEventListener('drop', function (e) {
+          var dt = e.dataTransfer;
+          var files = dt.files;
+          if (!files || !files.length) return;
+          for (var i = 0; i < files.length; i++) {
+            var name = files[i].name.toLowerCase();
+            if (name.endsWith('.kew') || name.endsWith('.zip')) {
+              _mbaAddEntry(files[i]);
+            }
+          }
+          _mbaRender();
+        });
+      }
+    }, 0);
+
+    function _mbaAddEntry(file) {
+      var sheetName = 'MBA ' + (_mbaEntries.length + 1);
+      _mbaEntries.push({ id: _mbaNextId++, file: file, sheetName: sheetName });
+    }
+
+    window._mbaRemoveEntry = function (id) {
+      _mbaEntries = _mbaEntries.filter(function (e) { return e.id !== id; });
+      _mbaRender();
+    };
+
+    window._mbaUpdateSheet = function (id, val) {
+      var entry = _mbaEntries.find(function (e) { return e.id === id; });
+      if (entry) entry.sheetName = val;
+    };
+
+    function _mbaRender() {
+      var list = document.getElementById('mba-entries-list');
+      var msg = document.getElementById('mba-status-msg');
+      if (!list) return;
+
+      if (_mbaEntries.length === 0) {
+        list.innerHTML = '<div style="color:var(--text-muted);font-size:0.78rem;padding:8px 0">Chưa có file nào. Nhấn "➕ Thêm file INPS" để bắt đầu.</div>';
+        if (msg) msg.textContent = '';
+        return;
+      }
+
+      list.innerHTML = _mbaEntries.map(function (entry, idx) {
+        return '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">' +
+          '<span style="font-size:0.72rem;color:var(--text-muted);min-width:20px">#' + (idx + 1) + '</span>' +
+          '<span style="flex:1;font-size:0.8rem;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + _esc(entry.file.name) + '"><span style="margin-right:6px">📄</span>' + _esc(entry.file.name) + '</span>' +
+          '<span style="color:var(--text-muted)">→</span>' +
+          '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:0.68rem;color:var(--text-muted)">Tên sheet</label>' +
+          '<input type="text" class="btn" value="' + _esc(entry.sheetName) + '" oninput="window._mbaUpdateSheet(' + entry.id + ',this.value)" maxlength="31" style="width:110px;padding:4px 8px;font-size:0.8rem;text-align:center"></div>' +
+          '<button onclick="window._mbaRemoveEntry(' + entry.id + ')" style="background:none;border:1px solid var(--danger);color:var(--danger);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:0.75rem;line-height:1">✕</button>' +
+          '</div>';
+      }).join('');
+
+      if (msg) msg.textContent = _mbaEntries.length + ' MBA đã thêm';
+    }
+
+    function _esc(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    window.exportMbaAll = function () {
+      if (_mbaEntries.length === 0) {
+        alert('Chưa có file INPS nào. Vui lòng nhấn "➕ Thêm file INPS".');
+        return;
+      }
+      var btn = document.getElementById('btn-mba-export-all');
+      var spinner = document.getElementById('mba-all-spinner');
+      var msg = document.getElementById('mba-status-msg');
+
+      if (btn) btn.disabled = true;
+      if (spinner) spinner.style.display = 'inline-block';
+      if (msg) msg.textContent = 'Đang xử lý...';
+
+      var outName = (document.getElementById('mba-out-filename').value || '').trim() || 'MBA_Export.xlsx';
+      if (!outName.toLowerCase().endsWith('.xlsx')) outName += '.xlsx';
+
+      var fd = new FormData();
+      var sheetNames = [];
+      var duplicates = [];
+
+      _mbaEntries.forEach(function (e) {
+        var sName = (e.sheetName || '').trim();
+        if (sheetNames.includes(sName)) {
+          duplicates.push(sName);
+        }
+        sheetNames.push(sName);
+        fd.append('files', e.file);
+      });
+
+      if (duplicates.length > 0) {
+        alert('⚠️ Cảnh báo: Tên sheet trùng lặp (' + Array.from(new Set(duplicates)).join(', ') + ')!\nExcel không cho phép tạo sheet có cùng tên. Vui lòng kiểm tra lại!');
+        if (btn) btn.disabled = false;
+        if (spinner) spinner.style.display = 'none';
+        if (msg) msg.textContent = 'Trùng tên sheet!';
+        return;
+      }
+
+      fd.append('sheets', JSON.stringify(sheetNames));
+      fd.append('filename', outName);
+
+      fetch('/api/kew/export-mba', { method: 'POST', body: fd })
+        .then(function (r) {
+          if (!r.ok) return r.json().then(function (j) { throw new Error(j.error || 'HTTP ' + r.status); });
+          var warn = r.headers.get('X-MBA-Warnings');
+          if (warn) {
+            try { warn = decodeURIComponent(warn); } catch (e) { }
+          }
+          return r.blob().then(function (blob) { return { blob: blob, warn: warn }; });
+        })
+        .then(function (res) {
+          var url = URL.createObjectURL(res.blob);
+          var a = document.createElement('a');
+          a.href = url; a.download = outName;
+          document.body.appendChild(a); a.click();
+          setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 500);
+          if (msg) msg.textContent = '✅ Đã xuất ' + _mbaEntries.length + ' sheet thành công!';
+          if (res.warn) setTimeout(function () { alert('Cảnh báo:\n' + res.warn); }, 300);
+        })
+        .catch(function (err) {
+          alert('Lỗi xuất Excel MBA: ' + err.message);
+          if (msg) msg.textContent = '❌ Xuất thất bại.';
+        })
+        .finally(function () {
+          if (btn) btn.disabled = false;
+          if (spinner) spinner.style.display = 'none';
+        });
+    };
+
+    _mbaRender();
+  })();
+</script>

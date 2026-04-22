@@ -1,6 +1,7 @@
 import io
 import json
 import re
+from copy import copy
 
 from flask import Blueprint, jsonify, request, send_file
 
@@ -11,12 +12,6 @@ except Exception:  # pragma: no cover - dependency guard
 
 excel_bp = Blueprint('excel_bp', __name__)
 CELL_ADDR_RE = re.compile(r"^[A-Z]{1,3}[1-9][0-9]*$")
-
-@excel_bp.route('/check-structure', methods=['POST'])
-def check_structure():
-    """Kiểm tra cấu trúc file Excel trước khi thực hiện ghi đè."""
-    # Sẽ triển khai logic kiểm tra Header, Sheet để đảm bảo tính an toàn dữ liệu
-    return jsonify({"status": "success", "message": "Excel structure is valid (Placeholder)"})
 
 
 @excel_bp.route('/apply-updates', methods=['POST'])
@@ -46,8 +41,6 @@ def apply_updates():
         workbook = load_workbook(filename=io.BytesIO(uploaded_file.read()))
     except Exception:
         return jsonify({"error": "Không đọc được file Excel đầu vào."}), 400
-
-    from copy import copy
 
     for idx, item in enumerate(updates):
         if not isinstance(item, dict):
