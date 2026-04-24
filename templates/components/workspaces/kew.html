@@ -612,18 +612,12 @@
     }, 0);
 
     function _mbaAddEntry(file) {
-      var sheetName = 'MBA ' + (_mbaEntries.length + 1);
-      _mbaEntries.push({ id: _mbaNextId++, file: file, sheetName: sheetName });
+      _mbaEntries.push({ id: _mbaNextId++, file: file });
     }
 
     window._mbaRemoveEntry = function (id) {
       _mbaEntries = _mbaEntries.filter(function (e) { return e.id !== id; });
       _mbaRender();
-    };
-
-    window._mbaUpdateSheet = function (id, val) {
-      var entry = _mbaEntries.find(function (e) { return e.id === id; });
-      if (entry) entry.sheetName = val;
     };
 
     function _mbaRender() {
@@ -642,8 +636,7 @@
           '<span style="font-size:0.72rem;color:var(--text-muted);min-width:20px">#' + (idx + 1) + '</span>' +
           '<span style="flex:1;font-size:0.8rem;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + _esc(entry.file.name) + '"><span style="margin-right:6px">📄</span>' + _esc(entry.file.name) + '</span>' +
           '<span style="color:var(--text-muted)">→</span>' +
-          '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:0.68rem;color:var(--text-muted)">Tên sheet</label>' +
-          '<input type="text" class="btn" value="' + _esc(entry.sheetName) + '" oninput="window._mbaUpdateSheet(' + entry.id + ',this.value)" maxlength="31" style="width:110px;padding:4px 8px;font-size:0.8rem;text-align:center"></div>' +
+          '<span style="background:var(--accent3);color:white;padding:2px 8px;border-radius:12px;font-size:0.75rem;font-weight:600">MBA' + (idx + 1) + '</span>' +
           '<button onclick="window._mbaRemoveEntry(' + entry.id + ')" style="background:none;border:1px solid var(--danger);color:var(--danger);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:0.75rem;line-height:1">✕</button>' +
           '</div>';
       }).join('');
@@ -674,27 +667,11 @@
       }
 
       var fd = new FormData();
-      var sheetNames = [];
-      var duplicates = [];
 
       _mbaEntries.forEach(function (e) {
-        var sName = (e.sheetName || '').trim();
-        if (sheetNames.includes(sName)) {
-          duplicates.push(sName);
-        }
-        sheetNames.push(sName);
         fd.append('files', e.file);
       });
 
-      if (duplicates.length > 0) {
-        alert('⚠️ Cảnh báo: Tên sheet trùng lặp (' + Array.from(new Set(duplicates)).join(', ') + ')!\nExcel không cho phép tạo sheet có cùng tên. Vui lòng kiểm tra lại!');
-        if (btn) btn.disabled = false;
-        if (spinner) spinner.style.display = 'none';
-        if (msg) msg.textContent = 'Trùng tên sheet!';
-        return;
-      }
-
-      fd.append('sheets', JSON.stringify(sheetNames));
       fd.append('filename', outName);
 
       fetch('/api/kew/export-mba', { method: 'POST', body: fd })

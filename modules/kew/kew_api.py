@@ -74,15 +74,24 @@ def _mba_to_number(v):
     if v is None or (isinstance(v, float) and pd.isna(v)):
         return pd.NA
     s = str(v).strip()
-    if not s or set(s) == {"-"}:
+    
+    # Xoá dấu âm để lấy giá trị tuyệt đối
+    s = s.replace('-', '')
+    
+    if not s or s.lower() == "nan":
         return pd.NA
-    if s.lower() == "nan":
-        return pd.NA
-    m = _KM_RE.match(s)
+        
+    # Regex tìm số thập phân và ký tự k/m (chấp nhận dính chữ như kvar, kW)
+    m = re.search(r"(\d+(?:\.\d+)?)\s*([kKmM])?", s)
     if m:
         base = float(m.group(1))
-        mult = 1_000.0 if m.group(2).lower() == "k" else 1_000_000.0
-        return base * mult
+        unit = (m.group(2) or "").lower()
+        if unit == "k":
+            base *= 1_000.0
+        elif unit == "m":
+            base *= 1_000_000.0
+        return base
+        
     return pd.to_numeric(s, errors="coerce")
 
 
@@ -119,7 +128,7 @@ def _mba_extract(df: "pd.DataFrame") -> "tuple[pd.DataFrame, list[str]]":
             out[renamed] = out[renamed] / 1000.0
     for col, nd in _MBA_ROUND.items():
         if col in out.columns:
-            out[col] = out[col].round(nd)
+            out[col] = pd.to_numeric(out[col], errors='coerce').round(nd)
             
     warnings = []
     if missing:
@@ -428,15 +437,6 @@ def export_mba():
     if not out_filename.lower().endswith(('.xlsx', '.xlsm')):
         out_filename += '.xlsm'
 
-    # ── Parse danh sách tên sheet ─────────────────────────────────────────────
-    sheets_raw = request.form.get('sheets', '[]')
-    try:
-        sheet_names_in = json.loads(sheets_raw)
-        if not isinstance(sheet_names_in, list):
-            sheet_names_in = []
-    except Exception:
-        sheet_names_in = []
-
     # ── Lấy tất cả file KEW bytes từ request ─────────────────────────────────
     def _extract_kew_bytes(f) -> list:
         """Từ 1 FileStorage trả về list [(name, bytes)]."""
@@ -457,28 +457,6 @@ def export_mba():
     if not kew_list:
         return jsonify({'error': 'Cần upload ít nhất 1 file .KEW hoặc .ZIP.'}), 400
 
-    # ── Đặt tên sheet: ưu tiên từ form, fallback MBA1/MBA2/... ──────────────
-    def _sanitize_sheet(name: str, idx: int) -> str:
-        s = (name or '').strip()
-        if not s:
-            s = f'MBA{idx + 1}'
-        # Excel giới hạn 31 ký tự, không được có: \ / ? * [ ] :
-        s = re.sub(r'[\\/?*\[\]:]', '_', s)[:31]
-        return s or f'MBA{idx + 1}'
-
-    sheet_names = [
-        _sanitize_sheet(sheet_names_in[i] if i < len(sheet_names_in) else '', i)
-        for i in range(len(kew_list))
-    ]
-
-    # Đảm bảo tên sheet không trùng nhau
-    seen = {}
-    for i, sn in enumerate(sheet_names):
-        if sn in seen:
-            seen[sn] += 1
-            sheet_names[i] = f'{sn}_{seen[sn]}'
-        else:
-            seen[sn] = 0
 
     # ── Load template ─────────────────────────────────────────────────────────
     template_path = os.path.normpath(_MBA_TEMPLATE_PATH)
@@ -496,51 +474,55 @@ def export_mba():
     prebuilt_sheets = wb.sheetnames[:_MBA_PREBUILT_COUNT]
 
     errors_list = []
+    try:
+        for idx, (kew_name, kew_bytes) in enumerate(kew_list):
+            # ── Parse KEW ────────────────────────────────────────────────────────
+            try:
+                df_raw = pd.read_csv(
+                    io.BytesIO(kew_bytes),
+                    skiprows=_MBA_SKIP_ROWS,
+                    low_memory=False,
+                )
+                df_raw.columns = df_raw.columns.str.strip()
+            except Exception as e:
+                errors_list.append(f'{kew_name}: không đọc được ({e})')
+                continue
 
-    for idx, (kew_name, kew_bytes) in enumerate(kew_list):
-        target_name = sheet_names[idx]
+            df, warnings = _mba_extract(df_raw)
+            if warnings:
+                errors_list.extend([f"{kew_name}: {w}" for w in warnings])
 
-        # ── Parse KEW ────────────────────────────────────────────────────────
-        try:
-            df_raw = pd.read_csv(
-                io.BytesIO(kew_bytes),
-                skiprows=_MBA_SKIP_ROWS,
-                low_memory=False,
-            )
-            df_raw.columns = df_raw.columns.str.strip()
-        except Exception as e:
-            errors_list.append(f'{kew_name}: không đọc được ({e})')
-            continue
+            # ── Lấy sheet đích ───────────────────────────────────────────────────
+            try:
+                if idx < len(prebuilt_sheets):
+                    # Tái sử dụng sheet có sẵn, KHÔNG đổi tên
+                    ws = wb[prebuilt_sheets[idx]]
+                else:
+                    # Vượt quá số sheet template → copy từ sheet cuối cùng có sẵn
+                    ws_ref = wb[wb.sheetnames[len(prebuilt_sheets) - 1]]
+                    ws = wb.copy_worksheet(ws_ref)
+                    ws.title = f'MBA{idx + 1}'
+            except Exception as e:
+                errors_list.append(f'{kew_name}: không thể lấy sheet ({e})')
+                continue
 
-        df, warnings = _mba_extract(df_raw)
-        if warnings:
-            errors_list.extend([f"{kew_name}: {w}" for w in warnings])
+            try:
+                _mba_write(ws, df)
+            except Exception as e:
+                errors_list.append(f'{kew_name}: lỗi ghi dữ liệu ({e})')
+                continue
 
-        # ── Lấy sheet đích ───────────────────────────────────────────────────
-        try:
-            if idx < len(prebuilt_sheets):
-                # Tái sử dụng sheet có sẵn: đổi tên trực tiếp
-                ws = wb[prebuilt_sheets[idx]]
-                ws.title = target_name
-            else:
-                # Vượt quá số sheet template → copy từ sheet cuối cùng có sẵn
-                ws_ref = wb[wb.sheetnames[len(prebuilt_sheets) - 1]]
-                ws = wb.copy_worksheet(ws_ref)
-                ws.title = target_name
-        except Exception as e:
-            errors_list.append(f'{kew_name}: không thể lấy sheet ({e})')
-            continue
+        if errors_list and len(errors_list) == len(kew_list):
+            # Tất cả đều lỗi
+            return jsonify({'error': 'Tất cả file thất bại: ' + '; '.join(errors_list)}), 400
 
-        _mba_write(ws, df)
-
-
-    if errors_list and len(errors_list) == len(kew_list):
-        # Tất cả đều lỗi
-        return jsonify({'error': 'Tất cả file thất bại: ' + '; '.join(errors_list)}), 400
-
-    output = io.BytesIO()
-    wb.save(output)
-    output.seek(0)
+        output = io.BytesIO()
+        wb.save(output)
+        output.seek(0)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Lỗi hệ thống khi xử lý: {str(e)}'}), 500
 
     # Giữ đuôi .xlsm để bảo toàn macro
     if not out_filename.lower().endswith('.xlsm'):
