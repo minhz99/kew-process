@@ -418,12 +418,12 @@ def export_mba():
         files[]  – list các file KEW / ZIP (multipart, có thể gửi nhiều)
         sheets   – JSON array tên sheet tương ứng, ví dụ '["MBA1","MBA2"]'
                    Nếu thiếu / ngắn hơn số file, các sheet còn lại tự đặt tên MBA1, MBA2, ...
-        filename – tên file xuất (mặc định 'MBA_Export.xlsx')
+        filename – tên file xuất (mặc định 'NX-MBA.xlsm')
     """
     if not _MBA_DEPS_OK:
         return jsonify({'error': 'Thiếu thư viện pandas hoặc openpyxl.'}), 500
 
-    out_filename = request.form.get('filename', '').strip() or 'MBA_Export.xlsm'
+    out_filename = request.form.get('filename', '').strip() or 'NX-MBA.xlsm'
     # Đảm bảo đuôi .xlsm để bảo toàn macro của template
     if not out_filename.lower().endswith(('.xlsx', '.xlsm')):
         out_filename += '.xlsm'
