@@ -669,7 +669,9 @@
       if (msg) msg.textContent = 'Đang xử lý...';
 
       var outName = (document.getElementById('mba-out-filename').value || '').trim() || 'NX-MBA.xlsm';
-      if (!outName.toLowerCase().endsWith('.xlsx')) outName += '.xlsx';
+      if (!outName.toLowerCase().endsWith('.xlsx') && !outName.toLowerCase().endsWith('.xlsm')) {
+        outName += '.xlsm';
+      }
 
       var fd = new FormData();
       var sheetNames = [];
