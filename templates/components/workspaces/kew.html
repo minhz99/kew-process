@@ -518,7 +518,7 @@
           </div>
           <div style="display:flex;gap:8px;align-items:center">
             <input type="text" id="mba-out-filename" class="btn" style="width:200px;padding:5px 10px;font-size:0.8rem"
-              placeholder="Tên file xuất (VD: MBA_NhaMay.xlsx)" value="MBA_Export.xlsx">
+              placeholder="Tên file xuất (VD: MBA_NhaMay.xlsx)" value="NX-MBA.xlsm">
             <button class="btn" id="btn-mba-export-all"
               style="border-color:var(--accent3);color:var(--accent3);font-weight:600" onclick="exportMbaAll()">
               <span id="mba-all-spinner"
@@ -668,7 +668,7 @@
       if (spinner) spinner.style.display = 'inline-block';
       if (msg) msg.textContent = 'Đang xử lý...';
 
-      var outName = (document.getElementById('mba-out-filename').value || '').trim() || 'MBA_Export.xlsx';
+      var outName = (document.getElementById('mba-out-filename').value || '').trim() || 'NX-MBA.xlsm';
       if (!outName.toLowerCase().endsWith('.xlsx')) outName += '.xlsx';
 
       var fd = new FormData();
