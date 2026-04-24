@@ -25,8 +25,9 @@ _MBA_START_ROW = 2
 _MBA_START_COL = 2
 _MBA_TEMPLATE_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
-    '..', '..', 'static', 'excel-template', 'MBA.xlsx'
+    '..', '..', 'static', 'excel-template', 'MBA.xlsm'
 )
+_MBA_PREBUILT_COUNT = 10  # Số sheet có sẵn trong template (MBA1 … MBA10)
 _MBA_COLUMN_MAPPING: Mapping[str, str] = {
     "AVG_A1[A]": "AVG_A1[A]",
     "AVG_A2[A]": "AVG_A2[A]",
@@ -102,6 +103,16 @@ def _mba_extract(df: "pd.DataFrame") -> "tuple[pd.DataFrame, list[str]]":
 
     for col in out.columns:
         out[col] = out[col].map(_mba_to_number)
+        
+    cols_to_check = [
+        "AVG_A1[A]", "AVG_A2[A]", "AVG_A3[A]",
+        "AVG_P[W]", "AVG_Q[var]", "AVG_S[VA]"
+    ]
+    for col in cols_to_check:
+        renamed = dict(_MBA_COLUMN_MAPPING).get(col, col)
+        if renamed in out.columns:
+            out[renamed] = out[renamed].apply(lambda x: x * 1000.0 if pd.notna(x) and abs(x) < 10.0 else x)
+
     for col in _MBA_SCALE_DIV_1000:
         renamed = dict(_MBA_COLUMN_MAPPING).get(col, col)
         if renamed in out.columns:
@@ -412,9 +423,10 @@ def export_mba():
     if not _MBA_DEPS_OK:
         return jsonify({'error': 'Thiếu thư viện pandas hoặc openpyxl.'}), 500
 
-    out_filename = request.form.get('filename', '').strip() or 'MBA_Export.xlsx'
-    if not out_filename.lower().endswith('.xlsx'):
-        out_filename += '.xlsx'
+    out_filename = request.form.get('filename', '').strip() or 'MBA_Export.xlsm'
+    # Đảm bảo đuôi .xlsm để bảo toàn macro của template
+    if not out_filename.lower().endswith(('.xlsx', '.xlsm')):
+        out_filename += '.xlsm'
 
     # ── Parse danh sách tên sheet ─────────────────────────────────────────────
     sheets_raw = request.form.get('sheets', '[]')
@@ -471,16 +483,17 @@ def export_mba():
     # ── Load template ─────────────────────────────────────────────────────────
     template_path = os.path.normpath(_MBA_TEMPLATE_PATH)
     if not os.path.isfile(template_path):
-        return jsonify({'error': f'Không tìm thấy template MBA.xlsx tại {template_path}'}), 500
+        return jsonify({'error': f'Không tìm thấy template MBA.xlsm tại {template_path}'}), 500
 
     try:
-        wb = load_workbook(template_path)
+        wb = load_workbook(template_path, keep_vba=True)
     except Exception as e:
         return jsonify({'error': f'Không mở được template: {e}'}), 500
 
-    # Sheet đầu tiên trong template dùng làm "khuôn"; thêm các sheet sau bằng copy
-    template_sheet_name = wb.sheetnames[0]
-    ws_template = wb[template_sheet_name]
+    # ── Danh sách sheet có sẵn trong template (MBA1 … MBA10) ─────────────────
+    # Template đã có sẵn _MBA_PREBUILT_COUNT sheet; chỉ cần trỏ vào và đổi tên.
+    # Nếu số lượng MBA vượt quá số sheet có sẵn → copy_worksheet từ sheet cuối.
+    prebuilt_sheets = wb.sheetnames[:_MBA_PREBUILT_COUNT]
 
     errors_list = []
 
@@ -502,20 +515,29 @@ def export_mba():
         df, warnings = _mba_extract(df_raw)
         if warnings:
             errors_list.extend([f"{kew_name}: {w}" for w in warnings])
-            
-        # ── Lấy / tạo sheet đích ─────────────────────────────────────────────
+
+        # ── Lấy sheet đích ───────────────────────────────────────────────────
         try:
-            ws = wb.copy_worksheet(ws_template)
-            ws.title = target_name
+            if idx < len(prebuilt_sheets):
+                # Tái sử dụng sheet có sẵn: đổi tên trực tiếp
+                ws = wb[prebuilt_sheets[idx]]
+                ws.title = target_name
+            else:
+                # Vượt quá số sheet template → copy từ sheet cuối cùng có sẵn
+                ws_ref = wb[wb.sheetnames[len(prebuilt_sheets) - 1]]
+                ws = wb.copy_worksheet(ws_ref)
+                ws.title = target_name
         except Exception as e:
-            errors_list.append(f'{kew_name}: không thể tạo sheet ({e})')
+            errors_list.append(f'{kew_name}: không thể lấy sheet ({e})')
             continue
 
         _mba_write(ws, df)
 
-    # ── Sau khi xử lý xong tất cả, loại bỏ sheet template gốc ────────────────
-    if ws_template in wb.worksheets:
-        wb.remove(ws_template)
+    # ── Ẩn / xoá các sheet có sẵn nhưng không được dùng ─────────────────────
+    used_count = min(len(kew_list), _MBA_PREBUILT_COUNT)
+    for sn in prebuilt_sheets[used_count:]:
+        if sn in wb.sheetnames:
+            wb.remove(wb[sn])
 
     if errors_list and len(errors_list) == len(kew_list):
         # Tất cả đều lỗi
@@ -525,11 +547,15 @@ def export_mba():
     wb.save(output)
     output.seek(0)
 
+    # Giữ đuôi .xlsm để bảo toàn macro
+    if not out_filename.lower().endswith('.xlsm'):
+        out_filename = os.path.splitext(out_filename)[0] + '.xlsm'
+
     resp = send_file(
         output,
         as_attachment=True,
         download_name=out_filename,
-        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        mimetype='application/vnd.ms-excel.sheet.macroEnabled.12',
     )
     if errors_list:
         resp.headers['X-MBA-Warnings'] = urllib.parse.quote('; '.join(errors_list))
