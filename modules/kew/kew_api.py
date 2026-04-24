@@ -533,11 +533,6 @@ def export_mba():
 
         _mba_write(ws, df)
 
-    # ── Ẩn / xoá các sheet có sẵn nhưng không được dùng ─────────────────────
-    used_count = min(len(kew_list), _MBA_PREBUILT_COUNT)
-    for sn in prebuilt_sheets[used_count:]:
-        if sn in wb.sheetnames:
-            wb.remove(wb[sn])
 
     if errors_list and len(errors_list) == len(kew_list):
         # Tất cả đều lỗi
