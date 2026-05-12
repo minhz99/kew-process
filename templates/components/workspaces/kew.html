@@ -1,6 +1,15 @@
-<!-- ══════════════════ Excel MBA (workspace-kew) ══════════════════ -->
+<!-- ══════════════════ Xử lý KEW workspace ══════════════════ -->
 <div id="workspace-kew" class="workspace active" style="display: block;">
   <div id="app-container">
+    <div
+      style="display:flex;gap:8px;padding:0.75rem 1rem 0;flex-wrap:wrap;align-items:center;border-bottom:1px solid var(--border)">
+      <button type="button" class="btn" id="kew-subtab-field-btn" onclick="window.switchKewSubtab && window.switchKewSubtab('field')"
+      style="font-size:0.85rem;border-color:var(--border)">Xử lý file sơ bộ</button>
+      <button type="button" class="btn" id="kew-subtab-mba-btn" onclick="window.switchKewSubtab && window.switchKewSubtab('mba')"
+        style="font-size:0.85rem;font-weight:600;border-color:var(--accent3);color:var(--accent3)">Xuất Excel MBA</button>
+    </div>
+
+    <div id="kew-panel-mba" class="kew-subpanel" style="display:block">
     <div class="content active" id="tab-mba" style="padding-top: 1rem;">
       <div class="chart-card" id="mba-manager-panel" style="border-color:var(--accent3)40">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:10px">
@@ -44,9 +53,77 @@
         </div>
       </div>
     </div>
+    </div>
+
+    <div id="kew-panel-field" class="kew-subpanel" style="display:none;padding:1rem;">
+      <div class="chart-card" style="border-color:rgba(16,185,129,0.35)">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem;flex-wrap:wrap;gap:12px">
+          <div>
+            <h3 style="margin:0;color:var(--accent2, #10b981)">📦 Xử lý KEW (hồ sơ hiện trường)</h3>
+            <p style="font-size:0.76rem;color:var(--text-muted);margin:6px 0 0;max-width:52rem">
+              Upload một file <strong>.zip</strong> gồm: file Excel hiện trường (cột <em>Tên thiết bị</em>, <em>File</em>, <em>IMG</em>, <em>IMG end</em>),
+              các thư mục record dạng <code>S0001</code>, <code>S0002</code>, … và ảnh <code>PS-SDxxx.BMP</code>.
+              Hệ thống đổi tên thư mục theo tên thiết bị, chuyển ảnh vào đúng thư mục tương ứng, kiểm tra thiếu file / trùng dải ảnh, rồi trả về file
+              <strong>KEW_HoSoDaXuLy.zip</strong> (cấu trúc <code>Project_Output/</code>…).
+            </p>
+          </div>
+        </div>
+
+        <input type="file" id="kew-field-zip-input" accept=".zip,application/zip" style="display:none">
+
+        <div id="kew-field-drop" onclick="document.getElementById('kew-field-zip-input').click()"
+          style="border:2px dashed rgba(16,185,129,0.45);border-radius:12px;padding:1.75rem 1rem;text-align:center;cursor:pointer;margin-bottom:1rem;background:var(--surface2)">
+          <div style="font-size:2rem;margin-bottom:0.35rem">📁</div>
+          <div style="font-weight:500;color:var(--text)">Chọn hoặc kéo thả file ZIP hồ sơ KEW6315</div>
+          <div style="font-size:0.82rem;color:var(--text-muted);margin-top:6px">Excel .xlsx/.xlsm + thư mục Sxxxx + ảnh BMP</div>
+        </div>
+
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button type="button" class="btn" id="btn-kew-field-process"
+            style="border-color:var(--accent2, #10b981);color:var(--accent2, #10b981);font-weight:600"
+            onclick="window.kewFieldProcessZip && window.kewFieldProcessZip()" disabled>
+            <span id="kew-field-spinner"
+              style="display:none;width:12px;height:12px;border:2px solid rgba(0,0,0,0.15);border-radius:50%;border-top-color:var(--accent2, #10b981);animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:6px"></span>
+            Xử lý và tải ZIP
+          </button>
+          <span id="kew-field-file-label" style="font-size:0.8rem;color:var(--text-muted)">Chưa chọn file</span>
+          <span id="kew-field-status" style="font-size:0.78rem;color:var(--text-muted);margin-left:auto"></span>
+        </div>
+      </div>
+    </div>
 
   </div>
 </div>
+
+<script>
+  window.switchKewSubtab = function (which) {
+    var mba = document.getElementById('kew-panel-mba');
+    var field = document.getElementById('kew-panel-field');
+    var bMba = document.getElementById('kew-subtab-mba-btn');
+    var bField = document.getElementById('kew-subtab-field-btn');
+    if (!mba || !field) return;
+    var isMba = which !== 'field';
+    mba.style.display = isMba ? 'block' : 'none';
+    field.style.display = isMba ? 'none' : 'block';
+    if (bMba) {
+      bMba.style.fontWeight = isMba ? '600' : '400';
+      bMba.style.borderColor = isMba ? 'var(--accent3)' : 'var(--border)';
+      bMba.style.color = isMba ? 'var(--accent3)' : 'inherit';
+    }
+    if (bField) {
+      bField.style.fontWeight = !isMba ? '600' : '400';
+      bField.style.borderColor = !isMba ? 'var(--accent2, #10b981)' : 'var(--border)';
+      bField.style.color = !isMba ? 'var(--accent2, #10b981)' : 'inherit';
+    }
+    try { localStorage.setItem('plt_kew_subtab', isMba ? 'mba' : 'field'); } catch (e) { }
+  };
+  document.addEventListener('DOMContentLoaded', function () {
+    try {
+      var s = localStorage.getItem('plt_kew_subtab');
+      if (s === 'field') window.switchKewSubtab('field');
+    } catch (e) { }
+  });
+</script>
 
 <script>
   (function () {
@@ -194,5 +271,111 @@
     };
 
     _mbaRender();
+  })();
+</script>
+
+<script>
+  (function () {
+    var _kewFieldFile = null;
+
+    function _setBtnState() {
+      var btn = document.getElementById('btn-kew-field-process');
+      if (btn) btn.disabled = !_kewFieldFile;
+    }
+
+    function _label(name) {
+      var el = document.getElementById('kew-field-file-label');
+      if (el) el.textContent = name ? ('Đã chọn: ' + name) : 'Chưa chọn file';
+    }
+
+    setTimeout(function () {
+      var inp = document.getElementById('kew-field-zip-input');
+      var drop = document.getElementById('kew-field-drop');
+      if (inp) {
+        inp.addEventListener('change', function () {
+          var f = inp.files && inp.files[0];
+          _kewFieldFile = f || null;
+          _label(f ? f.name : '');
+          _setBtnState();
+          inp.value = '';
+        });
+      }
+      if (drop) {
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(function (ev) {
+          drop.addEventListener(ev, function (e) { e.preventDefault(); e.stopPropagation(); }, false);
+        });
+        ['dragenter', 'dragover'].forEach(function (ev) {
+          drop.addEventListener(ev, function () { drop.style.borderColor = 'var(--accent2, #10b981)'; });
+        });
+        ['dragleave', 'drop'].forEach(function (ev) {
+          drop.addEventListener(ev, function () { drop.style.borderColor = 'rgba(16,185,129,0.45)'; });
+        });
+        drop.addEventListener('drop', function (e) {
+          var files = e.dataTransfer && e.dataTransfer.files;
+          if (!files || !files.length) return;
+          var f = files[0];
+          if (!f.name.toLowerCase().endsWith('.zip')) {
+            alert('Vui lòng chọn file .zip');
+            return;
+          }
+          _kewFieldFile = f;
+          _label(f.name);
+          _setBtnState();
+        });
+      }
+    }, 0);
+
+    window.kewFieldProcessZip = function () {
+      if (!_kewFieldFile) {
+        alert('Chưa chọn file ZIP.');
+        return;
+      }
+      var btn = document.getElementById('btn-kew-field-process');
+      var spin = document.getElementById('kew-field-spinner');
+      var st = document.getElementById('kew-field-status');
+      if (btn) btn.disabled = true;
+      if (spin) spin.style.display = 'inline-block';
+      if (st) st.textContent = 'Đang xử lý…';
+
+      var fd = new FormData();
+      fd.append('zip', _kewFieldFile, _kewFieldFile.name);
+
+      fetch('/api/kew/organize-field-zip', { method: 'POST', body: fd })
+        .then(function (r) {
+          if (!r.ok) {
+            return r.json().then(function (j) {
+              var parts = [];
+              if (j.errors && j.errors.length) parts.push(j.errors.join('\n'));
+              if (j.error) parts.push(j.error);
+              if (j.warnings && j.warnings.length) parts.push('Cảnh báo:\n' + j.warnings.join('\n'));
+              throw new Error(parts.join('\n\n') || ('HTTP ' + r.status));
+            });
+          }
+          var hdr = r.headers.get('X-KEW-Field-Warnings');
+          if (hdr) { try { hdr = decodeURIComponent(hdr); } catch (e) { } }
+          return r.blob().then(function (blob) { return { blob: blob, warn: hdr }; });
+        })
+        .then(function (res) {
+          var url = URL.createObjectURL(res.blob);
+          var a = document.createElement('a');
+          a.href = url;
+          a.download = 'KEW_HoSoDaXuLy.zip';
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 400);
+          if (st) st.textContent = '✅ Đã tải KEW_HoSoDaXuLy.zip';
+          if (res.warn) setTimeout(function () { alert('Cảnh báo từ server:\n' + res.warn); }, 250);
+        })
+        .catch(function (err) {
+          alert('Lỗi: ' + err.message);
+          if (st) st.textContent = '❌ Xử lý thất bại';
+        })
+        .finally(function () {
+          if (btn) btn.disabled = !_kewFieldFile;
+          if (spin) spin.style.display = 'none';
+        });
+    };
+
+    _setBtnState();
   })();
 </script>

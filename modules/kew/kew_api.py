@@ -537,3 +537,47 @@ def export_mba():
     if errors_list:
         resp.headers['X-MBA-Warnings'] = urllib.parse.quote('; '.join(errors_list))
     return resp
+
+
+@kew_bp.route("/organize-field-zip", methods=["POST"])
+def organize_field_zip():
+    """
+    Nhận một ZIP: Excel hiện trường + thư mục Sxxxx + ảnh PS-SDxxx.BMP.
+    Đổi tên thư mục theo cột «Tên thiết bị», chuyển ảnh vào đúng thư mục, trả về ZIP Project_Output.
+    """
+    from modules.kew import organize_field_zip as organize_mod
+
+    zf = request.files.get("zip") or request.files.get("file")
+    if zf is None or not getattr(zf, "filename", None):
+        return jsonify({"error": "Cần upload file ZIP (form field zip hoặc file)."}), 400
+    if not str(zf.filename).lower().endswith(".zip"):
+        return jsonify({"error": "Chỉ chấp nhận file .zip."}), 400
+
+    zip_bytes = zf.read()
+    if not zip_bytes:
+        return jsonify({"error": "File ZIP rỗng."}), 400
+
+    work = tempfile.mkdtemp(prefix="kew_field_org_")
+    try:
+        out_path, warnings, fatal = organize_mod.process_field_zip_bytes(zip_bytes, work)
+        if fatal:
+            return jsonify({"errors": fatal, "warnings": warnings}), 400
+        if not out_path or not os.path.isfile(out_path):
+            return jsonify({"error": "Không tạo được file kết quả.", "warnings": warnings}), 500
+        with open(out_path, "rb") as fh:
+            buf = io.BytesIO(fh.read())
+        buf.seek(0)
+        resp = send_file(
+            buf,
+            as_attachment=True,
+            download_name="KEW_HoSoDaXuLy.zip",
+            mimetype="application/zip",
+        )
+        if warnings:
+            resp.headers["X-KEW-Field-Warnings"] = urllib.parse.quote("; ".join(warnings))
+        return resp
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": f"Lỗi xử lý hồ sơ KEW: {e}"}), 500
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
