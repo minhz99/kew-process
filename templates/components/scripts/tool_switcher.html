@@ -23,7 +23,8 @@ function switchTool(toolId) {
     const btn = document.getElementById('btn-tool-' + activeTool);
     if (btn) btn.classList.add('active');
 
-    const showKewMeta = activeTool === 'kew';
+    /* Workspace KEW chỉ còn Xuất MBA — không hiển thị meta phân tích file */
+    const showKewMeta = false;
     const deviceInfo = document.getElementById('deviceInfo');
     const headerMeta = document.getElementById('headerMeta');
     if (deviceInfo) deviceInfo.style.display = showKewMeta ? 'block' : 'none';

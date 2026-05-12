@@ -205,13 +205,12 @@
 
       renderHeaderMeta(data.summary);
       
-      // Re-initialize active tab
       const activeTabEl = document.querySelector('#workspace-kew .content.active');
-      const activeName = activeTabEl ? activeTabEl.id.replace('tab-', '') : 'overview';
-      
+      let activeName = activeTabEl ? activeTabEl.id.replace('tab-', '') : 'mba';
+      if (!document.getElementById('tab-' + activeName)) activeName = 'mba';
+
       if (activeName.includes('workspace')) {
-          // if we are in another workspace, switch back to overview in kew workspace
-          switchKewTab('overview');
+          switchKewTab(document.getElementById('tab-mba') ? 'mba' : activeName);
       } else {
           renderTabWithData(activeName);
       }
