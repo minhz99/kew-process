@@ -3,9 +3,9 @@ Tổ chức hồ sơ đo KEW6315 từ ZIP: đọc Excel hiện trường (.xlsx)
 chuyển ảnh PS-SDxxx.BMP vào đúng thư mục thiết bị, nén lại Project_Output.zip.
 
 Excel hiện trường chỉ hỗ trợ một bộ cột cố định (tên cột không phân biệt hoa thường):
-``name``, ``file``, ``img``, ``imgend``, ``type``, ``pdm``, ``p``, ``pf``,
+``stt``, ``name``, ``file``, ``img``, ``imgend``, ``type``, ``pdm``, ``p``, ``pf``,
 ``i1``, ``i2``, ``i3``, ``di``, ``thd``, ``tdd``. Bước tổ chức ZIP chỉ dùng
-``name`` / ``file`` / ``img`` / ``imgend``; các cột còn lại dành cho bước Word.
+``name`` / ``file`` / ``img`` / ``imgend``; ``stt`` và các cột còn lại dành cho bước Word (thứ tự thiết bị, metadata).
 """
 from __future__ import annotations
 
@@ -22,8 +22,9 @@ import pandas as pd
 
 _SKIP_DIR_NAMES = {"__MACOSX"}
 
-# Một file Excel hiện trường duy nhất: đủ 14 cột (so khớp sau chuẩn hóa NFKC + chữ thường).
+# Một file Excel hiện trường duy nhất: đủ 15 cột (so khớp sau chuẩn hóa NFKC + chữ thường).
 FIELD_XLSX_HEADERS: tuple[str, ...] = (
+    "stt",
     "name",
     "file",
     "img",
@@ -168,7 +169,8 @@ def sanitize_device_folder(name: Any) -> str:
         s = f"_{s}"
     if len(s) > 180:
         s = s[:180].rstrip(" .")
-    return s
+    # Dùng NFC để tên thư mục trùng khóa với Excel / macOS (HFS+ hay lưu NFD).
+    return unicodedata.normalize("NFC", s)
 
 
 def _unique_name(base: str, used: set[str]) -> str:

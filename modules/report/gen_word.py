@@ -3,8 +3,9 @@
 API chính:
 * ``mba(doc, ...)``, ``device(doc, ...)`` — dựng context cho từng template.
 * ``merge_rendered_docx`` / ``merge_mba_device_docx`` — ghép nhiều file đã render.
-* ``mba_kwargs_from_inps`` / ``device_kwargs_from_folder`` — tự tổng hợp số liệu &
-  chọn ảnh từ một thư mục thiết bị (INPSxxxx.KEW + PS-SDxxx.BMP).
+* ``mba_kwargs_from_inps`` / ``device_kwargs_from_folder`` — tự chọn ảnh từ thư mục
+  thiết bị (**bắt buộc** ``a.png`` + PS-SDxxx.BMP). **Tạm thời không** tổng hợp số liệu từ INPS;
+  bảng MBA render với ô ``"—"``.
 * ``build_field_word_report`` — quét một thư mục ``Project_Output/`` rồi xuất
   1 file Word duy nhất gồm nhiều MBA / device.
 * ``build_word_report_from_zip`` — entry-point cho API: nhận ZIP đã tổ chức
@@ -17,7 +18,6 @@ Tham số / khóa template — xem ``modules/report/context_keys.json``.
 from __future__ import annotations
 
 import io
-import os
 import re
 import unicodedata
 import zipfile
@@ -27,6 +27,7 @@ from tempfile import TemporaryDirectory
 from typing import Iterable, Literal, Mapping, Sequence
 
 from docx import Document
+from docx.enum.text import WD_BREAK
 from docx.shared import Mm
 from docxcompose.composer import Composer
 from docxtpl import DocxTemplate, InlineImage
@@ -53,18 +54,37 @@ WIDTH_A, WIDTH_SUB, HEIGHT_A, HEIGHT_SUB = Mm(166.3), Mm(54.3), Mm(60.0), Mm(41.
 
 SectionKind = Literal["mba", "device"]
 
+_DEVICE_KIND_LABELS = frozenset(
+    {"device", "thiết bị", "thiet bi", "tủ", "tu", "khac", "khác"}
+)
+_EXCEL_METRIC_REMARKS: tuple[tuple[str, str], ...] = (
+    ("p", "P"),
+    ("pf", "PF"),
+    ("i1", "I1"),
+    ("i2", "I2"),
+    ("i3", "I3"),
+    ("di", "ΔI"),
+    ("thd", "THD"),
+    ("tdd", "TDD"),
+)
+
 # Giới hạn / tiêu chuẩn dùng cho cột "Đánh giá" trong báo cáo MBA.
 _V_DEV_LIMIT_PCT = 5.0
 _PF_LIMIT = 0.9
 _THDV_LIMIT_PCT = 8.0
 _TDD_LIMIT_PCT = 12.0
 _STANDARD_VOLTAGES = (110, 127, 220, 230, 240, 380, 400, 415, 440, 480, 600, 690, 1000)
-_BMP_RE = re.compile(r"PS-?SD?(\d{1,4})\.BMP$", re.IGNORECASE)
+# Ảnh theo dải Excel / organize_field_zip: PS-SD641.BMP …
+_BMP_RE = re.compile(r"^PS-SD(\d+)\.BMP$", re.IGNORECASE)
 
 
 # ════════════════════════════════════════════════════════════════════
 #                     Context builders (template)
 # ════════════════════════════════════════════════════════════════════
+
+
+def _inline(doc: DocxTemplate, path: str, height, width) -> InlineImage:
+    return InlineImage(doc, path, height=height, width=width)
 
 
 def mba(
@@ -145,14 +165,13 @@ def mba(
     tdd3min: str,
     tdd3avg: str,
 ) -> dict:
-    ii = lambda p, h, w: InlineImage(doc, p, height=h, width=w)
     return {
         "mba_name": name,
-        "imga": ii(imga, HEIGHT_MBA, WIDTH_LARGE),
-        "img1": ii(img1, HEIGHT_MBA, WIDTH_SMALL),
-        "img2": ii(img2, HEIGHT_MBA, WIDTH_SMALL),
-        "img4": ii(img4, HEIGHT_MBA, WIDTH_SMALL),
-        "img6": ii(img6, HEIGHT_MBA, WIDTH_SMALL),
+        "imga": _inline(doc, imga, HEIGHT_MBA, WIDTH_LARGE),
+        "img1": _inline(doc, img1, HEIGHT_MBA, WIDTH_SMALL),
+        "img2": _inline(doc, img2, HEIGHT_MBA, WIDTH_SMALL),
+        "img4": _inline(doc, img4, HEIGHT_MBA, WIDTH_SMALL),
+        "img6": _inline(doc, img6, HEIGHT_MBA, WIDTH_SMALL),
         "cap_fig_mba": cap_fig_mba,
         "remarks_mba": remarks_mba,
         "cap_tab_mba": cap_tab_mba,
@@ -191,16 +210,15 @@ def device(
     cap_device: str,
     remarks_device: str,
 ) -> dict:
-    ii = lambda p, h, w: InlineImage(doc, p, height=h, width=w)
     return {
         "device_name": name,
-        "imga": ii(imga, HEIGHT_A, WIDTH_A),
-        "img1": ii(img1, HEIGHT_SUB, WIDTH_SUB),
-        "img2": ii(img2, HEIGHT_SUB, WIDTH_SUB),
-        "img3": ii(img3, HEIGHT_SUB, WIDTH_SUB),
-        "img4": ii(img4, HEIGHT_SUB, WIDTH_SUB),
-        "img5": ii(img5, HEIGHT_SUB, WIDTH_SUB),
-        "img6": ii(img6, HEIGHT_SUB, WIDTH_SUB),
+        "imga": _inline(doc, imga, HEIGHT_A, WIDTH_A),
+        "img1": _inline(doc, img1, HEIGHT_SUB, WIDTH_SUB),
+        "img2": _inline(doc, img2, HEIGHT_SUB, WIDTH_SUB),
+        "img3": _inline(doc, img3, HEIGHT_SUB, WIDTH_SUB),
+        "img4": _inline(doc, img4, HEIGHT_SUB, WIDTH_SUB),
+        "img5": _inline(doc, img5, HEIGHT_SUB, WIDTH_SUB),
+        "img6": _inline(doc, img6, HEIGHT_SUB, WIDTH_SUB),
         "cap_device": cap_device,
         "remarks_device": remarks_device,
     }
@@ -224,18 +242,9 @@ def _f(v, d: int = 1) -> str:
     return f"{x:.{d}f}".replace(".", ",")
 
 
-def _fp(v, d: int = 2) -> str:
-    """Tương tự ``_f`` nhưng có dấu ``+`` cho số dương."""
-    if v is None:
-        return "—"
-    try:
-        x = float(v)
-    except (TypeError, ValueError):
-        return "—"
-    if x != x:
-        return "—"
-    sign = "+" if x > 0 else ""
-    return f"{sign}{x:.{d}f}".replace(".", ",")
+def _tri(d: Mapping, dec: int = 1) -> tuple[str, str, str]:
+    """min / max / avg → ba chuỗi định dạng ``_f``."""
+    return _f(d.get("max"), dec), _f(d.get("min"), dec), _f(d.get("avg"), dec)
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -351,7 +360,10 @@ def _eval_thd(values: Iterable[float | None], limit: float) -> str:
 
 
 def list_bmp_in_folder(folder: str | Path) -> list[Path]:
-    """Trả về danh sách PS-SDxxx.BMP trong ``folder``, sắp theo số thứ tự."""
+    """Trả về danh sách ``PS-SDxxx.BMP`` trong ``folder``, sắp theo số trong tên (641→642→…).
+
+    Không gồm ``a.png`` — ảnh tổng quan dùng :func:`find_overview_png`.
+    """
     p = Path(folder)
     if not p.is_dir():
         return []
@@ -359,15 +371,47 @@ def list_bmp_in_folder(folder: str | Path) -> list[Path]:
     for f in p.iterdir():
         if not f.is_file():
             continue
-        m = _BMP_RE.search(f.name)
+        m = _BMP_RE.match(f.name)
         if m:
             bmps.append((int(m.group(1)), f))
     bmps.sort(key=lambda x: x[0])
-    # Fallback: file BMP bất kỳ nếu không có tên theo chuẩn
+    # Fallback: mọi file .bmp nếu không có tên PS-SD (hồ sơ cũ / tay)
     if not bmps:
-        bmps = [(i, f) for i, f in enumerate(sorted(p.glob("*.BMP")))]
-        bmps += [(i + 10_000, f) for i, f in enumerate(sorted(p.glob("*.bmp")))]
+        extra: list[tuple[int, Path]] = []
+        for i, f in enumerate(sorted(p.glob("*.BMP")) + sorted(p.glob("*.bmp"))):
+            if not f.is_file():
+                continue
+            extra.append((i, f))
+        bmps = extra
     return [pp for _, pp in bmps]
+
+
+def find_overview_png(folder: str | Path) -> Path | None:
+    """Ảnh tổng quan ``a.png`` / ``A.png`` (stem ``a``) trong thư mục thiết bị, nếu có."""
+    p = Path(folder)
+    if not p.is_dir():
+        return None
+    for f in p.iterdir():
+        if not f.is_file():
+            continue
+        if f.suffix.lower() == ".png" and f.stem.lower() == "a":
+            return f
+    return None
+
+
+def _require_overview_png_and_bmps(folder: str | Path) -> tuple[Path, list[Path]]:
+    """Trả về ``(a.png, danh_sách_PS-SD_BMP)`` hoặc ném lỗi nếu thiếu."""
+    p = Path(folder)
+    overview = find_overview_png(p)
+    if overview is None:
+        raise FileNotFoundError(
+            f"Thiếu file a.png (ảnh tổng quan) trong {p!s}. "
+            "Vui lòng đặt a.png trong thư mục thiết bị."
+        )
+    bmps = list_bmp_in_folder(p)
+    if not bmps:
+        raise FileNotFoundError(f"Không tìm thấy PS-SD*.BMP trong {p!s}.")
+    return overview, bmps
 
 
 def _take(lst: list[Path], idx: int, fallback: Path | None) -> Path | None:
@@ -375,50 +419,36 @@ def _take(lst: list[Path], idx: int, fallback: Path | None) -> Path | None:
 
 
 def auto_pick_mba_images(folder: str | Path) -> dict[str, str]:
-    """Chọn 5 ảnh BMP cho template MBA (imga, img1, img2, img4, img6).
+    """Chọn ảnh cho template MBA (``imga`` + ``img1, img2, img4, img6``).
 
-    Quy ước: ảnh #1 là tổng quan (``imga``); 4 ảnh tiếp theo theo thứ tự cho
-    ``img1, img2, img4, img6``. Nếu thiếu ảnh, dùng ảnh đầu tiên làm fallback.
+    * ``imga``: **bắt buộc** file ``a.png`` (stem ``a``, đuôi ``.png``) trong thư mục.
+    * Các ô nhỏ: ``PS-SD*.BMP`` theo thứ tự số → ``img1``, ``img2``, ``img4``, ``img6``.
     """
-    bmps = list_bmp_in_folder(folder)
-    if not bmps:
-        raise FileNotFoundError(f"Không tìm thấy ảnh BMP trong {folder!s} để dựng MBA.")
+    overview, bmps = _require_overview_png_and_bmps(folder)
     fb = bmps[0]
+    imga = str(overview)
     return {
-        "imga": str(_take(bmps, 0, fb)),
-        "img1": str(_take(bmps, 1, fb)),
-        "img2": str(_take(bmps, 2, fb)),
-        "img4": str(_take(bmps, 3, fb)),
-        "img6": str(_take(bmps, 4, fb)),
+        "imga": imga,
+        "img1": str(_take(bmps, 0, fb)),
+        "img2": str(_take(bmps, 1, fb)),
+        "img4": str(_take(bmps, 2, fb)),
+        "img6": str(_take(bmps, 3, fb)),
     }
 
 
 def auto_pick_device_images(folder: str | Path) -> dict[str, str]:
-    """Chọn 7 ảnh BMP cho template device (imga, img1..img6)."""
-    bmps = list_bmp_in_folder(folder)
-    if not bmps:
-        raise FileNotFoundError(f"Không tìm thấy ảnh BMP trong {folder!s} để dựng device.")
+    """Chọn ảnh cho template device (``imga`` + ``img1``…``img6``).
+
+    * ``imga``: **bắt buộc** file ``a.png`` trong thư mục.
+    * ``img1``…``img6``: ``PS-SD*.BMP`` theo thứ tự số (vd 641–646 → ``img1``–``img6``).
+    """
+    overview, bmps = _require_overview_png_and_bmps(folder)
     fb = bmps[0]
+    imga = str(overview)
     return {
-        "imga": str(_take(bmps, 0, fb)),
-        "img1": str(_take(bmps, 1, fb)),
-        "img2": str(_take(bmps, 2, fb)),
-        "img3": str(_take(bmps, 3, fb)),
-        "img4": str(_take(bmps, 4, fb)),
-        "img5": str(_take(bmps, 5, fb)),
-        "img6": str(_take(bmps, 6, fb)),
+        "imga": imga,
+        **{f"img{i}": str(_take(bmps, i - 1, fb)) for i in range(1, 7)},
     }
-
-
-def find_inps_file(folder: str | Path) -> Path | None:
-    """Tìm file ``INPSxxxx.KEW`` (không phân biệt hoa thường) trong ``folder``."""
-    p = Path(folder)
-    if not p.is_dir():
-        return None
-    for f in p.iterdir():
-        if f.is_file() and f.name.upper().startswith("INPS") and f.suffix.upper() == ".KEW":
-            return f
-    return None
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -427,7 +457,7 @@ def find_inps_file(folder: str | Path) -> Path | None:
 
 
 def mba_kwargs_from_inps(
-    inps_path: str | Path,
+    inps_path: str | Path | None,
     *,
     name: str,
     imga: str,
@@ -440,12 +470,18 @@ def mba_kwargs_from_inps(
     cap_tab_mba: str | None = None,
     nominal_voltage: float | None = None,
 ) -> dict:
-    """Đọc INPS, tổng hợp số liệu, trả về ``kwargs`` cho :func:`mba`.
+    """Đọc INPS (nếu có), tổng hợp số liệu, trả về ``kwargs`` cho :func:`mba`.
+
+    Khi ``inps_path`` là ``None`` hoặc không đọc được file, bảng số liệu dùng
+    ``"—"`` (vẫn render template MBA — ví dụ thiếu INPS nhưng Excel ghi loại MBA).
 
     ``imga, img1, img2, img4, img6`` là đường dẫn ảnh (đã tự chọn từ thư mục
     hoặc do người dùng chỉ định).
     """
-    stats = _parse_inps(inps_path)
+    if inps_path is None:
+        stats: dict[str, dict] = {}
+    else:
+        stats = _parse_inps(inps_path)
 
     # ─── Điện áp dây U12, U23, U31 (ưu tiên AVG_VLi[V]) ────────────
     u12 = _pick(stats, "AVG_VL1[V]", "AVG_V12[V]")
@@ -503,33 +539,24 @@ def mba_kwargs_from_inps(
         [tdd1.get("max"), tdd2.get("max"), tdd3.get("max")], _TDD_LIMIT_PCT
     )
 
-    def s1(d, dec=1):
-        return _f(d.get("max"), dec), _f(d.get("min"), dec), _f(d.get("avg"), dec)
-
-    def s2(d, dec=2):
-        return _f(d.get("max"), dec), _f(d.get("min"), dec), _f(d.get("avg"), dec)
-
-    def s3(d, dec=3):
-        return _f(d.get("max"), dec), _f(d.get("min"), dec), _f(d.get("avg"), dec)
-
-    u12max, u12min, u12avg = s1(u12)
-    u23max, u23min, u23avg = s1(u23)
-    u31max, u31min, u31avg = s1(u31)
-    i1max, i1min, i1avg = s2(i1)
-    i2max, i2min, i2avg = s2(i2)
-    i3max, i3min, i3avg = s2(i3)
-    dumax, dumin, duavg = s3(uv_unb)
-    dimax, dimin, diavg = s3(ua_unb)
-    pfmax, pfmin, pfavg = s3(pf)
-    pmax, pmin, pavg = s2(p_k)
-    qmax, qmin, qavg = s2(q_k)
-    smax, smin, savg = s2(s_k)
-    thd1max, thd1min, thd1avg = s2(thd1)
-    thd2max, thd2min, thd2avg = s2(thd2)
-    thd3max, thd3min, thd3avg = s2(thd3)
-    tdd1max, tdd1min, tdd1avg = s2(tdd1)
-    tdd2max, tdd2min, tdd2avg = s2(tdd2)
-    tdd3max, tdd3min, tdd3avg = s2(tdd3)
+    u12max, u12min, u12avg = _tri(u12, 1)
+    u23max, u23min, u23avg = _tri(u23, 1)
+    u31max, u31min, u31avg = _tri(u31, 1)
+    i1max, i1min, i1avg = _tri(i1, 2)
+    i2max, i2min, i2avg = _tri(i2, 2)
+    i3max, i3min, i3avg = _tri(i3, 2)
+    dumax, dumin, duavg = _tri(uv_unb, 3)
+    dimax, dimin, diavg = _tri(ua_unb, 3)
+    pfmax, pfmin, pfavg = _tri(pf, 3)
+    pmax, pmin, pavg = _tri(p_k, 2)
+    qmax, qmin, qavg = _tri(q_k, 2)
+    smax, smin, savg = _tri(s_k, 2)
+    thd1max, thd1min, thd1avg = _tri(thd1, 2)
+    thd2max, thd2min, thd2avg = _tri(thd2, 2)
+    thd3max, thd3min, thd3avg = _tri(thd3, 2)
+    tdd1max, tdd1min, tdd1avg = _tri(tdd1, 2)
+    tdd2max, tdd2min, tdd2avg = _tri(tdd2, 2)
+    tdd3max, tdd3min, tdd3avg = _tri(tdd3, 2)
 
     return {
         "name": name,
@@ -567,14 +594,11 @@ def mba_kwargs_from_folder(
     cap_tab_mba: str | None = None,
     nominal_voltage: float | None = None,
 ) -> dict:
-    """Tiện ích: tự tìm INPS + ảnh trong ``folder`` rồi gọi ``mba_kwargs_from_inps``."""
+    """Tiện ích: tự chọn ảnh trong ``folder`` rồi dựng kwargs MBA (tạm thời không đọc INPS)."""
     folder = Path(folder)
-    inps = find_inps_file(folder)
-    if inps is None:
-        raise FileNotFoundError(f"Không tìm thấy file INPSxxxx.KEW trong {folder}")
     images = auto_pick_mba_images(folder)
     return mba_kwargs_from_inps(
-        inps,
+        None,
         name=name,
         cap_fig_mba=cap_fig_mba,
         remarks_mba=remarks_mba,
@@ -655,21 +679,26 @@ def merge_mba_device_docx(
             "merge_mba_device_docx: cần sections hoặc mba_sections/device_sections không rỗng."
         )
 
+    kind_render = {"mba": (mba_tpl, mba), "device": (device_tpl, device)}
+
     with TemporaryDirectory() as td:
         tmp = Path(td)
         rendered: list[Path] = []
         for i, (kind, spec) in enumerate(work):
-            if kind == "mba":
-                tpl = DocxTemplate(str(mba_tpl))
-                tpl.render(mba(tpl, **spec))
-                path = tmp / f"mba_{i}.docx"
-            elif kind == "device":
-                tpl = DocxTemplate(str(device_tpl))
-                tpl.render(device(tpl, **spec))
-                path = tmp / f"device_{i}.docx"
-            else:
-                raise ValueError(f"Loại section không hợp lệ: {kind!r} (chỉ 'mba' hoặc 'device').")
+            try:
+                tpl_path, render_fn = kind_render[kind]
+            except KeyError as e:
+                raise ValueError(
+                    f"Loại section không hợp lệ: {kind!r} (chỉ 'mba' hoặc 'device')."
+                ) from e
+            tpl = DocxTemplate(str(tpl_path))
+            tpl.render(render_fn(tpl, **spec))
+            path = tmp / f"{kind}_{i}.docx"
             tpl.save(str(path))
+            if i < len(work) - 1:
+                doc_pb = Document(str(path))
+                doc_pb.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
+                doc_pb.save(str(path))
             rendered.append(path)
         return merge_rendered_docx(rendered, output_path)
 
@@ -683,8 +712,36 @@ _MBA_NAME_RE = re.compile(r"^(MBA|TR|TBA|T\d|MBT)\b|MÁY BIẾN ÁP|BIẾN ÁP",
 
 
 def _guess_kind(name: str) -> SectionKind:
-    """Đoán loại template từ tên thiết bị."""
+    """Đoán loại template từ tên thiết bị (chỉ khi không có cột ``type`` từ Excel)."""
     return "mba" if _MBA_NAME_RE.search(name or "") else "device"
+
+
+def _resolve_word_section_kind(
+    spec: Mapping,
+    *,
+    name: str,
+    default_kind: SectionKind | None,
+) -> SectionKind:
+    """Chọn ``mba`` / ``device`` cho báo cáo Word.
+
+    * Nếu mục có khóa ``kind`` (luồng ZIP + Excel): **chỉ** ``mba`` khi cột type
+      nhận diện được là MBA; ô trống / không nhận diện / ``device`` → ``device``
+      (không đoán theo tên).
+    * Nếu không có khóa ``kind`` (quét thư mục thuần): ``default_kind`` hoặc
+      :func:`_guess_kind`.
+    """
+    if "kind" in spec:
+        raw = spec["kind"]
+        if raw is not None and not (isinstance(raw, str) and not str(raw).strip()):
+            nk = _norm_kind(raw)
+            if nk == "mba":
+                return "mba"
+            if nk == "device":
+                return "device"
+        return "device"
+    if default_kind in ("mba", "device"):
+        return default_kind
+    return _guess_kind(name)
 
 
 def build_field_word_report(
@@ -701,9 +758,10 @@ def build_field_word_report(
 
     ``devices`` (tuỳ chọn): danh sách ``{name, folder, kind?, nominal_voltage?, remarks?}``.
         * ``folder`` có thể là tên thư mục con trong ``project_root`` hoặc đường dẫn tuyệt đối.
-        * Nếu ``kind`` không có:
-          - dùng ``default_kind`` nếu được chỉ định,
-          - ngược lại đoán theo tên (``MBA…`` → ``mba``, còn lại → ``device``).
+        * Nếu mục có khóa ``kind`` (metadata Excel từ ZIP): chỉ ``mba`` khi cột type
+          nhận diện MBA; không ghi / trống / không nhận diện → ``device`` (không đoán tên).
+        * Nếu mục **không** có khóa ``kind``: dùng ``default_kind`` nếu có, không thì
+          đoán theo tên (``MBA…`` → ``mba``).
     Khi ``devices=None``: tự duyệt mọi thư mục con của ``project_root`` (sort theo tên).
 
     Trả về ``(đường_dẫn_báo_cáo, warnings)``.
@@ -714,7 +772,7 @@ def build_field_word_report(
 
     if devices is None:
         devices = [
-            {"name": d.name, "folder": d}
+            {"name": _nfc(d.name), "folder": d}
             for d in sorted(root.iterdir())
             if d.is_dir() and not d.name.startswith(".") and d.name != "__MACOSX"
         ]
@@ -724,7 +782,7 @@ def build_field_word_report(
     warnings: list[str] = []
     sections: list[tuple[SectionKind, dict]] = []
     for spec in devices:
-        name = str(spec.get("name") or "").strip()
+        name = _nfc(str(spec.get("name") or "").strip())
         folder_raw = spec.get("folder")
         if not name or not folder_raw:
             warnings.append(f"Bỏ qua mục thiếu name/folder: {spec!r}.")
@@ -736,15 +794,11 @@ def build_field_word_report(
             warnings.append(f"«{name}»: không tìm thấy thư mục {folder}.")
             continue
 
-        kind = spec.get("kind") or default_kind or _guess_kind(name)
+        kind = _resolve_word_section_kind(spec, name=name, default_kind=default_kind)
         remarks = str(spec.get("remarks") or "")
         nom_v = spec.get("nominal_voltage", nominal_voltage)
 
         try:
-            if kind == "mba":
-                if find_inps_file(folder) is None:
-                    warnings.append(f"«{name}»: thiếu INPS — chuyển sang template device.")
-                    kind = "device"
             if kind == "mba":
                 kwargs = mba_kwargs_from_folder(
                     folder, name=name, remarks_mba=remarks, nominal_voltage=nom_v,
@@ -782,15 +836,85 @@ def _norm(s: object) -> str:
     return re.sub(r"\s+", " ", t)
 
 
+def _nfc(s: object) -> str:
+    """Chuẩn hoá tên hiển thị (tránh ký tự tổ hợp kiểu Mac / Excel lệch dạng)."""
+    if s is None:
+        return ""
+    return unicodedata.normalize("NFC", str(s).strip())
+
+
 def _norm_kind(value: object) -> SectionKind | None:
-    k = _norm(value)
+    raw = value
+    if raw is None or (isinstance(raw, float) and raw != raw):
+        return None
+    k = _norm(raw)
     if not k:
         return None
-    if k in {"mba", "máy biến áp", "may bien ap", "transformer", "tr", "mbt", "tba"}:
+    if k == "mba":
         return "mba"
-    if k in {"device", "thiết bị", "thiet bi", "tủ", "tu", "khac", "khác"}:
+    if k in _DEVICE_KIND_LABELS:
         return "device"
     return None
+
+
+def _metadata_first_hit(metadata: dict[str, dict], folder_name: str) -> dict | None:
+    for v in (
+        folder_name,
+        unicodedata.normalize("NFC", folder_name),
+        unicodedata.normalize("NFD", folder_name),
+    ):
+        hit = metadata.get(_norm(v))
+        if hit:
+            return hit
+    return None
+
+
+def _metadata_keys_for_excel_name(name: str) -> list[str]:
+    """Các khóa tra cứu metadata cho một dòng Excel (tên gốc + tên thư mục sau sanitize)."""
+    keys: list[str] = [_norm(name)]
+    try:
+        from modules.kew.organize_field_zip import sanitize_device_folder
+
+        san = sanitize_device_folder(name)
+    except (ValueError, ImportError):
+        san = ""
+    if san:
+        for v in (san, unicodedata.normalize("NFC", san), unicodedata.normalize("NFD", san)):
+            nk = _norm(v)
+            if nk not in keys:
+                keys.append(nk)
+    return keys
+
+
+def _lookup_device_metadata(metadata: dict[str, dict], folder_name: str) -> dict:
+    """Ghép dòng Excel với thư mục ``Project_Output/<tên>/`` (NFC/NFD, hậu tố ``_2``…)."""
+    if not metadata:
+        return {}
+    hit = _metadata_first_hit(metadata, folder_name)
+    if hit:
+        return hit
+    m = re.fullmatch(r"(.+)_([1-9]\d*)$", folder_name)
+    if m:
+        base = m.group(1)
+        hit = _metadata_first_hit(metadata, base)
+        if hit:
+            return hit
+    m2 = re.match(r"^\s*([Ss]\d{1,4})\s*[-–—]?\s*", folder_name)
+    if m2:
+        code = m2.group(1).upper()
+        matches: list[dict] = []
+        seen: set[int] = set()
+        for ent in metadata.values():
+            i = id(ent)
+            if i in seen:
+                continue
+            seen.add(i)
+            dn = str(ent.get("name") or "")
+            if re.match(rf"^\s*{re.escape(code)}\s*[-–—]?\s*", dn, re.IGNORECASE):
+                matches.append(ent)
+        if len(matches) == 1:
+            return matches[0]
+    return {}
 
 
 def _norm_voltage(value: object) -> float | None:
@@ -811,6 +935,26 @@ def _norm_voltage(value: object) -> float | None:
     return v if v > 0 else None
 
 
+def _excel_stt(value: object) -> int | None:
+    """Số thứ tự từ cột ``stt`` (số nguyên hoặc chuỗi có chữ số)."""
+    if value is None:
+        return None
+    if isinstance(value, float) and value != value:  # NaN
+        return None
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        if isinstance(value, float) and value.is_integer():
+            return int(value)
+        if isinstance(value, int):
+            return int(value)
+    s = str(value).strip()
+    if not s:
+        return None
+    digits = re.sub(r"\D", "", s)
+    if not digits:
+        return None
+    return int(digits)
+
+
 def _cell_text(row: object, col: str | None) -> str:
     if col is None:
         return ""
@@ -828,12 +972,12 @@ def _cell_text(row: object, col: str | None) -> str:
 def read_device_metadata_from_excel(
     excel_path: str | Path,
 ) -> dict[str, dict]:
-    """Đọc Excel hiện trường → ``{tên_chuẩn_hóa: {name, kind, nominal_voltage, remarks}}``.
+    """Đọc Excel hiện trường → ``{tên_chuẩn_hóa: {name, stt, kind, nominal_voltage, remarks}}``.
 
     Chỉ hỗ trợ bộ cột cố định (xem ``FIELD_XLSX_HEADERS`` trong
-    ``modules.kew.organize_field_zip``): ``type`` → loại section, ``pdm`` → điện áp
-    định mức; ``p``, ``pf``, ``i1``–``i3``, ``di``, ``thd``, ``tdd`` ghép vào
-    ``remarks`` dạng ``P=…; PF=…``.
+    ``modules.kew.organize_field_zip``): ``stt`` → thứ tự thiết bị khi ghép Word;
+    ``type`` → loại section; ``pdm`` → điện áp định mức; ``p``, ``pf``, ``i1``–``i3``,
+    ``di``, ``thd``, ``tdd`` ghép vào ``remarks`` dạng ``P=…; PF=…``.
 
     Nếu thiếu cột hoặc không đọc được file → trả về ``{}`` (báo cáo Word vẫn chạy
     không metadata).
@@ -859,38 +1003,31 @@ def read_device_metadata_from_excel(
     name_col = cm["name"]
     kind_col = cm["type"]
     nom_v_col = cm["pdm"]
-    metric_cols: list[tuple[str, str]] = [
-        ("p", "P"),
-        ("pf", "PF"),
-        ("i1", "I1"),
-        ("i2", "I2"),
-        ("i3", "I3"),
-        ("di", "ΔI"),
-        ("thd", "THD"),
-        ("tdd", "TDD"),
-    ]
 
     out: dict[str, dict] = {}
     for _, row in df.iterrows():
         raw_name = row[name_col]
         if raw_name is None or (isinstance(raw_name, float) and raw_name != raw_name):
             continue
-        name = str(raw_name).strip()
+        name = _nfc(raw_name)
         if not name:
             continue
         extra_parts: list[str] = []
-        for key, label in metric_cols:
+        for key, label in _EXCEL_METRIC_REMARKS:
             t = _cell_text(row, cm[key])
             if t:
                 extra_parts.append(f"{label}={t}")
         remarks = "; ".join(extra_parts)
 
-        out[_norm(name)] = {
+        entry = {
             "name": name,
+            "stt": _excel_stt(row[cm["stt"]]),
             "kind": _norm_kind(row[kind_col]),
             "nominal_voltage": _norm_voltage(row[nom_v_col]),
             "remarks": remarks,
         }
+        for mk in _metadata_keys_for_excel_name(name):
+            out[mk] = entry
     return out
 
 
@@ -931,12 +1068,13 @@ def build_word_report_from_zip(
     """Entry-point cho tab "Tạo báo cáo Word".
 
     Nhận ZIP đã tổ chức (output của "Xử lý file sơ bộ"):
-        ``Project_Output/<Tên thiết bị>/INPSxxxx.KEW + PS-SDxxx.BMP``
+        ``Project_Output/<Tên thiết bị>/a.png + PS-SDxxx.BMP``
 
-    Có thể chấp nhận ZIP không có ``Project_Output/`` (thư mục thiết bị nằm
-    Nếu có Excel kèm theo đủ bộ cột hiện trường (``name``, ``file``, ``img``,
+    Có thể chấp nhận ZIP không có ``Project_Output/`` (các thư mục thiết bị nằm ngay dưới gốc giải nén).
+
+    Nếu có Excel kèm theo đủ bộ cột hiện trường (``stt``, ``name``, ``file``, ``img``,
     ``imgend``, ``type``, ``pdm``, ``p``, ``pf``, ``i1``–``i3``, ``di``, ``thd``,
-    ``tdd``), các giá trị được dùng làm metadata cho từng thiết bị khi ghép Word.
+    ``tdd``), các giá trị được dùng làm metadata; thứ tự section trong Word theo ``stt``.
 
     Trả về ``(đường_dẫn_báo_cáo_word, warnings)``.
     """
@@ -950,31 +1088,51 @@ def build_word_report_from_zip(
     with TemporaryDirectory(prefix="word_report_") as td:
         extract = Path(td) / "in"
         extract.mkdir()
+        bio = io.BytesIO(zip_bytes)
         try:
-            with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zf:
+            try:
+                zf = zipfile.ZipFile(bio, "r", metadata_encoding="utf-8")
+            except TypeError:
+                bio.seek(0)
+                zf = zipfile.ZipFile(bio, "r")
+            with zf:
                 zf.extractall(extract)
         except zipfile.BadZipFile as e:
             raise ValueError(f"File ZIP không hợp lệ: {e}") from e
 
         project_root = _find_project_root(extract)
-        device_dirs = [
-            d for d in sorted(project_root.iterdir())
+        raw_dirs = [
+            d for d in project_root.iterdir()
             if d.is_dir() and not d.name.startswith(".") and d.name != "__MACOSX"
         ]
-        if not device_dirs:
+        if not raw_dirs:
             raise ValueError(
                 "ZIP không chứa thư mục thiết bị nào. Cấu trúc mong đợi: "
-                "Project_Output/<Tên thiết bị>/INPSxxxx.KEW + PS-SDxxx.BMP."
+                "Project_Output/<Tên thiết bị>/ (a.png, PS-SDxxx.BMP)."
             )
 
         excel_path = _find_first_excel(extract)
         metadata = read_device_metadata_from_excel(excel_path) if excel_path else {}
 
+        _stt_fallback = 10**9
+
+        def _device_dir_sort_key(p: Path) -> tuple[int, str]:
+            if not metadata:
+                return (_stt_fallback, p.name.lower())
+            m = _lookup_device_metadata(metadata, p.name)
+            st = m.get("stt")
+            if isinstance(st, int):
+                return (st, p.name.lower())
+            return (_stt_fallback, p.name.lower())
+
+        device_dirs = sorted(raw_dirs, key=_device_dir_sort_key)
+
         devices: list[dict] = []
         for d in device_dirs:
-            meta = metadata.get(_norm(d.name), {})
+            meta = _lookup_device_metadata(metadata, d.name)
+            display = _nfc(meta.get("name") or d.name)
             devices.append({
-                "name": meta.get("name") or d.name,
+                "name": display,
                 "folder": d,
                 "kind": meta.get("kind"),
                 "nominal_voltage": meta.get("nominal_voltage"),

@@ -64,10 +64,10 @@
             <h3 style="margin:0;color:var(--accent2, #10b981)">📦 Xử lý KEW (hồ sơ hiện trường)</h3>
             <p style="font-size:0.76rem;color:var(--text-muted);margin:6px 0 0;max-width:52rem">
               Upload một file <strong>.zip</strong> gồm: file Excel hiện trường <strong>.xlsx</strong> với đúng các cột
-              <code>name</code>, <code>file</code>, <code>img</code>, <code>imgend</code>, <code>type</code>, <code>pdm</code>,
+              <code>stt</code>, <code>name</code>, <code>file</code>, <code>img</code>, <code>imgend</code>, <code>type</code>, <code>pdm</code>,
               <code>p</code>, <code>pf</code>, <code>i1</code>, <code>i2</code>, <code>i3</code>, <code>di</code>, <code>thd</code>, <code>tdd</code>
               (tên cột không phân biệt hoa thường), các thư mục record <code>S0001</code>, <code>S0002</code>, … và ảnh <code>PS-SDxxx.BMP</code>.
-              Bước này chỉ dùng <code>name</code> / <code>file</code> / <code>img</code> / <code>imgend</code>; các cột còn lại phục vụ bước tạo Word.
+              Bước này chỉ dùng <code>name</code> / <code>file</code> / <code>img</code> / <code>imgend</code>; <code>stt</code> và các cột còn lại phục vụ bước tạo Word (thứ tự thiết bị, loại MBA/device, …).
               Hệ thống đổi tên thư mục theo tên thiết bị, chuyển ảnh vào đúng thư mục, kiểm tra thiếu file / trùng dải ảnh, rồi trả về
               <strong>KEW_HoSoDaXuLy.zip</strong> (cấu trúc <code>Project_Output/</code>…).
             </p>
@@ -107,7 +107,7 @@
               <code>INPSxxxx.KEW</code> + ảnh <code>PS-SDxxx.BMP</code>. Hệ thống tổng hợp số liệu từ INPS, dựng báo cáo Word
               (<strong>BaoCao_KEW.docx</strong>).
               Nếu ZIP có kèm Excel <strong>.xlsx</strong> đủ bộ cột hiện trường (cùng mẫu với bước «Xử lý file sơ bộ»), hệ thống đọc
-              <code>type</code>, <code>pdm</code> (điện áp định mức), <code>p</code>, <code>pf</code>, <code>i1</code>–<code>i3</code>, <code>di</code>, <code>thd</code>, <code>tdd</code>
+              <code>stt</code> (thứ tự thiết bị trong báo cáo), <code>type</code>, <code>pdm</code> (điện áp định mức), <code>p</code>, <code>pf</code>, <code>i1</code>–<code>i3</code>, <code>di</code>, <code>thd</code>, <code>tdd</code>
               làm metadata (loại section, điện áp định mức, chuỗi nhận xét ghép từ các chỉ số).
             </p>
           </div>
@@ -402,9 +402,7 @@
               throw new Error(parts.join('\n\n') || ('HTTP ' + r.status));
             });
           }
-          var hdr = r.headers.get('X-KEW-Field-Warnings');
-          if (hdr) { try { hdr = decodeURIComponent(hdr); } catch (e) { } }
-          return r.blob().then(function (blob) { return { blob: blob, warn: hdr }; });
+          return r.blob().then(function (blob) { return { blob: blob }; });
         })
         .then(function (res) {
           var url = URL.createObjectURL(res.blob);
@@ -415,7 +413,6 @@
           a.click();
           setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 400);
           if (st) st.textContent = '✅ Đã tải KEW_HoSoDaXuLy.zip';
-          if (res.warn) setTimeout(function () { alert('Cảnh báo từ server:\n' + res.warn); }, 250);
         })
         .catch(function (err) {
           alert('Lỗi: ' + err.message);
@@ -511,9 +508,7 @@
               throw new Error(parts.join('\n\n') || ('HTTP ' + r.status));
             });
           }
-          var hdr = r.headers.get('X-KEW-Word-Warnings');
-          if (hdr) { try { hdr = decodeURIComponent(hdr); } catch (e) { } }
-          return r.blob().then(function (blob) { return { blob: blob, warn: hdr }; });
+          return r.blob().then(function (blob) { return { blob: blob }; });
         })
         .then(function (res) {
           var url = URL.createObjectURL(res.blob);
@@ -524,7 +519,6 @@
           a.click();
           setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 400);
           if (st) st.textContent = '✅ Đã tải ' + outName;
-          if (res.warn) setTimeout(function () { alert('Cảnh báo từ server:\n' + res.warn); }, 250);
         })
         .catch(function (err) {
           alert('Lỗi: ' + err.message);
