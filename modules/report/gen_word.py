@@ -811,17 +811,37 @@ def _norm_voltage(value: object) -> float | None:
     return v if v > 0 else None
 
 
+def _cell_text(row: object, col: str | None) -> str:
+    if col is None:
+        return ""
+    try:
+        import pandas as pd
+
+        v = row[col]
+        if v is None or (isinstance(v, float) and pd.isna(v)):
+            return ""
+    except Exception:
+        return ""
+    return str(v).strip()
+
+
 def read_device_metadata_from_excel(
     excel_path: str | Path,
 ) -> dict[str, dict]:
     """Đọc Excel hiện trường → ``{tên_chuẩn_hóa: {name, kind, nominal_voltage, remarks}}``.
 
-    Các cột Excel: ``Tên thiết bị`` (bắt buộc); ``Loại``, ``Điện áp định mức``,
-    ``Nhận xét`` (đều tuỳ chọn). Trả về dict rỗng nếu không đọc được hoặc thiếu
-    cột tên — caller tự fallback.
+    Chỉ hỗ trợ bộ cột cố định (xem ``FIELD_XLSX_HEADERS`` trong
+    ``modules.kew.organize_field_zip``): ``type`` → loại section, ``pdm`` → điện áp
+    định mức; ``p``, ``pf``, ``i1``–``i3``, ``di``, ``thd``, ``tdd`` ghép vào
+    ``remarks`` dạng ``P=…; PF=…``.
+
+    Nếu thiếu cột hoặc không đọc được file → trả về ``{}`` (báo cáo Word vẫn chạy
+    không metadata).
     """
     try:
         import pandas as pd
+
+        from modules.kew.organize_field_zip import resolve_field_excel_column_map
     except ImportError:
         return {}
     try:
@@ -831,22 +851,24 @@ def read_device_metadata_from_excel(
     if df.empty:
         return {}
 
-    col_map = {_norm(c): c for c in df.columns}
-
-    def pick(*aliases: str) -> str | None:
-        for a in aliases:
-            v = col_map.get(_norm(a))
-            if v:
-                return v
-        return None
-
-    name_col = pick("tên thiết bị", "ten thiet bi", "thiết bị", "thiet bi", "device")
-    if not name_col:
+    try:
+        cm = resolve_field_excel_column_map(df)
+    except ValueError:
         return {}
-    kind_col = pick("loại", "loai", "kiểu", "kieu", "type")
-    nom_v_col = pick("điện áp định mức", "dien ap dinh muc", "u định mức",
-                     "u dinh muc", "vnom", "u_nom", "u nominal", "nominal voltage")
-    remarks_col = pick("nhận xét", "nhan xet", "ghi chú", "ghi chu", "remarks", "notes")
+
+    name_col = cm["name"]
+    kind_col = cm["type"]
+    nom_v_col = cm["pdm"]
+    metric_cols: list[tuple[str, str]] = [
+        ("p", "P"),
+        ("pf", "PF"),
+        ("i1", "I1"),
+        ("i2", "I2"),
+        ("i3", "I3"),
+        ("di", "ΔI"),
+        ("thd", "THD"),
+        ("tdd", "TDD"),
+    ]
 
     out: dict[str, dict] = {}
     for _, row in df.iterrows():
@@ -856,14 +878,18 @@ def read_device_metadata_from_excel(
         name = str(raw_name).strip()
         if not name:
             continue
+        extra_parts: list[str] = []
+        for key, label in metric_cols:
+            t = _cell_text(row, cm[key])
+            if t:
+                extra_parts.append(f"{label}={t}")
+        remarks = "; ".join(extra_parts)
+
         out[_norm(name)] = {
             "name": name,
-            "kind": _norm_kind(row[kind_col]) if kind_col else None,
-            "nominal_voltage": _norm_voltage(row[nom_v_col]) if nom_v_col else None,
-            "remarks": str(row[remarks_col]).strip()
-            if remarks_col and row[remarks_col] is not None
-            and not (isinstance(row[remarks_col], float) and row[remarks_col] != row[remarks_col])
-            else "",
+            "kind": _norm_kind(row[kind_col]),
+            "nominal_voltage": _norm_voltage(row[nom_v_col]),
+            "remarks": remarks,
         }
     return out
 
@@ -908,9 +934,9 @@ def build_word_report_from_zip(
         ``Project_Output/<Tên thiết bị>/INPSxxxx.KEW + PS-SDxxx.BMP``
 
     Có thể chấp nhận ZIP không có ``Project_Output/`` (thư mục thiết bị nằm
-    ngay ở gốc) — sẽ duyệt từ gốc. Nếu có Excel kèm theo (cùng cấu trúc cột
-    của tab "Xử lý file sơ bộ"), các cột tuỳ chọn ``Loại`` / ``Điện áp định mức``
-    / ``Nhận xét`` sẽ được dùng làm metadata cho từng thiết bị.
+    Nếu có Excel kèm theo đủ bộ cột hiện trường (``name``, ``file``, ``img``,
+    ``imgend``, ``type``, ``pdm``, ``p``, ``pf``, ``i1``–``i3``, ``di``, ``thd``,
+    ``tdd``), các giá trị được dùng làm metadata cho từng thiết bị khi ghép Word.
 
     Trả về ``(đường_dẫn_báo_cáo_word, warnings)``.
     """

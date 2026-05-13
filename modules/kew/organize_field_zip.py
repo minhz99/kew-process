@@ -1,6 +1,11 @@
 """
-Tổ chức hồ sơ đo KEW6315 từ ZIP: đọc Excel hiện trường, đổi tên thư mục Sxxxx,
+Tổ chức hồ sơ đo KEW6315 từ ZIP: đọc Excel hiện trường (.xlsx), đổi tên thư mục Sxxxx,
 chuyển ảnh PS-SDxxx.BMP vào đúng thư mục thiết bị, nén lại Project_Output.zip.
+
+Excel hiện trường chỉ hỗ trợ một bộ cột cố định (tên cột không phân biệt hoa thường):
+``name``, ``file``, ``img``, ``imgend``, ``type``, ``pdm``, ``p``, ``pf``,
+``i1``, ``i2``, ``i3``, ``di``, ``thd``, ``tdd``. Bước tổ chức ZIP chỉ dùng
+``name`` / ``file`` / ``img`` / ``imgend``; các cột còn lại dành cho bước Word.
 """
 from __future__ import annotations
 
@@ -16,6 +21,24 @@ from typing import Any, Optional
 import pandas as pd
 
 _SKIP_DIR_NAMES = {"__MACOSX"}
+
+# Một file Excel hiện trường duy nhất: đủ 14 cột (so khớp sau chuẩn hóa NFKC + chữ thường).
+FIELD_XLSX_HEADERS: tuple[str, ...] = (
+    "name",
+    "file",
+    "img",
+    "imgend",
+    "type",
+    "pdm",
+    "p",
+    "pf",
+    "i1",
+    "i2",
+    "i3",
+    "di",
+    "thd",
+    "tdd",
+)
 
 _BMP_RE = re.compile(r"^PS-SD(\d{1,4})\.BMP$", re.IGNORECASE)
 _S_DIR_RE = re.compile(r"^S(\d{4})$", re.IGNORECASE)
@@ -161,43 +184,39 @@ def _unique_name(base: str, used: set[str]) -> str:
         i += 1
 
 
-def _resolve_columns(df: pd.DataFrame) -> dict[str, str]:
-    """Map internal key -> actual column name."""
-    cols = { _norm_key(c): c for c in df.columns }
-    def pick(*aliases: str) -> Optional[str]:
-        for a in aliases:
-            k = _norm_key(a)
-            if k in cols:
-                return cols[k]
-        for a in aliases:
-            nk = _norm_key(a).replace(" ", "")
-            for ck, orig in cols.items():
-                if ck.replace(" ", "") == nk:
-                    return orig
-        return None
+def resolve_field_excel_column_map(df: pd.DataFrame) -> dict[str, Any]:
+    """Map tên cột logic (chữ thường) → tên cột gốc trong DataFrame.
 
-    device_col = pick("tên thiết bị", "ten thiet bi", "tên thiet bi", "thiết bị", "thiet bi")
-    file_col = pick("file")
-    img_col = pick("img")
-    img_end_col = pick("img end", "img_end", "img end ", "img kết thúc", "img ket thuc")
-
-    missing = []
-    if not device_col:
-        missing.append("Tên thiết bị")
-    if not file_col:
-        missing.append("File")
-    if not img_col:
-        missing.append("IMG")
-    if not img_end_col:
-        missing.append("IMG end")
+    Chỉ chấp nhận đúng :data:`FIELD_XLSX_HEADERS`; thiếu cột hoặc trùng tên sau
+    chuẩn hóa → ``ValueError``.
+    """
+    seen: dict[str, Any] = {}
+    for c in df.columns:
+        k = _norm_key(str(c))
+        if not k:
+            continue
+        if k in seen and seen[k] != c:
+            raise ValueError(
+                f"Hai cột trùng tên sau khi chuẩn hóa ({k!r}): {seen[k]!r} và {c!r}."
+            )
+        if k not in seen:
+            seen[k] = c
+    unknown = sorted(k for k in seen if k not in set(FIELD_XLSX_HEADERS))
+    if unknown:
+        raise ValueError(
+            "File Excel có cột không được hỗ trợ: "
+            + ", ".join(unknown)
+            + ". Chỉ chấp nhận: "
+            + ", ".join(FIELD_XLSX_HEADERS)
+        )
+    missing = [h for h in FIELD_XLSX_HEADERS if h not in seen]
     if missing:
-        raise ValueError("Thiếu cột Excel: " + ", ".join(missing) + f". Các cột hiện có: {list(df.columns)}")
-    return {
-        "device": device_col,
-        "file": file_col,
-        "img": img_col,
-        "img_end": img_end_col,
-    }
+        raise ValueError(
+            "File Excel hiện trường cần đủ các cột: "
+            + ", ".join(FIELD_XLSX_HEADERS)
+            + f". Thiếu: {', '.join(missing)}. Các cột hiện có: {list(df.columns)}"
+        )
+    return {h: seen[h] for h in FIELD_XLSX_HEADERS}
 
 
 @dataclass
@@ -217,22 +236,22 @@ def read_plans_from_excel(excel_path: str) -> tuple[list[RowPlan], list[str]]:
         raise ValueError(f"Không đọc được Excel: {e}") from e
     if df.empty:
         raise ValueError("File Excel không có dữ liệu.")
-    colmap = _resolve_columns(df)
+    colmap = resolve_field_excel_column_map(df)
     used_names: set[str] = set()
     plans: list[RowPlan] = []
     used_s: set[str] = set()
 
     for idx, row in df.iterrows():
         try:
-            dev_raw = row[colmap["device"]]
+            dev_raw = row[colmap["name"]]
             s_name = file_code_to_s_name(row[colmap["file"]])
             i0 = _to_int_img(row[colmap["img"]])
-            i1 = _to_int_img(row[colmap["img_end"]])
+            i1 = _to_int_img(row[colmap["imgend"]])
         except Exception as e:
             warnings.append(f"Dòng {int(idx) + 2}: bỏ qua ({e})")
             continue
         if s_name is None or i0 is None or i1 is None:
-            warnings.append(f"Dòng {int(idx) + 2}: thiếu File/IMG/IMG end — bỏ qua.")
+            warnings.append(f"Dòng {int(idx) + 2}: thiếu file/img/imgend — bỏ qua.")
             continue
         if i1 < i0:
             raise ValueError(f"Dòng {int(idx) + 2}: IMG end ({i1}) nhỏ hơn IMG ({i0}).")

@@ -542,8 +542,9 @@ def export_mba():
 @kew_bp.route("/organize-field-zip", methods=["POST"])
 def organize_field_zip():
     """
-    Nhận một ZIP: Excel hiện trường + thư mục Sxxxx + ảnh PS-SDxxx.BMP.
-    Đổi tên thư mục theo cột «Tên thiết bị», chuyển ảnh vào đúng thư mục, trả về ZIP Project_Output.
+    Nhận một ZIP: Excel hiện trường (đúng bộ cột ``name``, ``file``, ``img``, ``imgend``, …;
+    xem ``FIELD_XLSX_HEADERS``) + thư mục Sxxxx + ảnh PS-SDxxx.BMP.
+    Đổi tên thư mục theo cột ``name``, chuyển ảnh vào đúng thư mục, trả về ZIP Project_Output.
     """
     from modules.kew import organize_field_zip as organize_mod
 
@@ -586,7 +587,7 @@ def organize_field_zip():
 @kew_bp.route("/generate-word-report", methods=["POST"])
 def generate_word_report():
     """
-    Nhận một file ZIP đã được tổ chức (Project_Output/<Tên thiết bị>/...) +
+    Nhận một file ZIP đã được tổ chức (``Project_Output/<tên thiết bị>/`` …) +
     tổng hợp số liệu từ ``INPSxxxx.KEW`` của từng thư mục để xuất 1 file
     Word ``BaoCao_KEW.docx``.
 
