@@ -61,10 +61,13 @@
           <div>
             <h3 style="margin:0;color:var(--accent2, #10b981)">📦 Xử lý KEW (hồ sơ hiện trường)</h3>
             <p style="font-size:0.76rem;color:var(--text-muted);margin:6px 0 0;max-width:52rem">
-              Upload một file <strong>.zip</strong> gồm: file Excel hiện trường (cột <em>Tên thiết bị</em>, <em>File</em>, <em>IMG</em>, <em>IMG end</em>),
+              Upload một file <strong>.zip</strong> gồm: file Excel hiện trường (cột bắt buộc <em>Tên thiết bị</em>, <em>File</em>, <em>IMG</em>, <em>IMG end</em>;
+              tuỳ chọn <em>Loại</em>, <em>Điện áp định mức</em>, <em>Nhận xét</em>),
               các thư mục record dạng <code>S0001</code>, <code>S0002</code>, … và ảnh <code>PS-SDxxx.BMP</code>.
-              Hệ thống đổi tên thư mục theo tên thiết bị, chuyển ảnh vào đúng thư mục tương ứng, kiểm tra thiếu file / trùng dải ảnh, rồi trả về file
-              <strong>KEW_HoSoDaXuLy.zip</strong> (cấu trúc <code>Project_Output/</code>…).
+              Hệ thống đổi tên thư mục theo tên thiết bị, chuyển ảnh vào đúng thư mục tương ứng, kiểm tra thiếu file / trùng dải ảnh,
+              đồng thời đọc file <code>INPSxxxx.KEW</code> trong từng thư mục để tổng hợp số liệu &
+              dựng báo cáo Word <code>BaoCao_KEW.docx</code>. Output trả về file
+              <strong>KEW_HoSoDaXuLy.zip</strong> (cấu trúc <code>Project_Output/</code> chứa các thư mục thiết bị + báo cáo Word).
             </p>
           </div>
         </div>
