@@ -48,11 +48,15 @@ Công cụ tự động hóa việc nhập liệu và xử lý tệp Excel báo 
 - `MAX_UPLOAD_MB`: giới hạn dung lượng upload. Mặc định `256`.
 
 ## ⚙️ Cấu Trúc Dự Án
-- `modules/`: Chứa các Blueprint xử lý Backend (KEW, Excel, Image).
-- `static/js/`: Các module xử lý logic Frontend (KEW charts, Image Editor, Excel Handler).
+- `app.py`: Flask app entry, đăng ký Blueprint.
+- `config.json`: Tham số phân tích dùng chung (Ornstein-Uhlenbeck, ngưỡng đánh giá).
+- `modules/`: Backend (mỗi tool một sub-package).
+  - `modules/kew/`: phân tích / hiệu chỉnh / nội suy KEW, tổ chức hồ sơ hiện trường.
+  - `modules/image/`: chỉnh sửa ảnh BMP máy đo (`image_api.py`, `kew6315_layout.py`).
+  - `modules/excel/`: cập nhật file Excel số điện.
+  - `modules/report/`: sinh báo cáo Word (`gen_word.py` + `context_keys.json` mô tả khoá template).
+- `static/js/`: Frontend logic (KEW charts, Image Editor, Excel Handler).
+- `static/{css,digits,time-digits,excel-template,word-template}/`: tài nguyên tĩnh.
 - `templates/dashboard.html`: Layout tổng (shell) của dashboard.
-- `templates/components/layout/`: Thành phần layout dùng chung (sidebar, ...).
-- `templates/components/workspaces/`: Mỗi tool là một component/template riêng (`kew.html`, `image.html`, `excel.html`).
-- `templates/components/modals/`: Các modal dùng chung.
-- `templates/components/scripts/`: Script điều hướng workspace và bundle script.
-- `utils/`: Các hàm tiện ích dùng chung.
+- `templates/components/{layout,modals,scripts,workspaces}/`: Thành phần dùng chung & mỗi tool là một workspace riêng (`kew.html`, `image.html`, `excel.html`).
+- `utils/`: Các hàm tiện ích dùng chung (file/zip handling).
