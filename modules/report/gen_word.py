@@ -1,20 +1,26 @@
-"""Context docxtpl + sinh báo cáo Word cho luồng "Xử lý file sơ bộ".
+"""Context docxtpl + sinh báo cáo Word cho luồng "Tạo báo cáo Word".
 
 API chính:
 * ``mba(doc, ...)``, ``device(doc, ...)`` — dựng context cho từng template.
 * ``merge_rendered_docx`` / ``merge_mba_device_docx`` — ghép nhiều file đã render.
 * ``mba_kwargs_from_inps`` / ``device_kwargs_from_folder`` — tự tổng hợp số liệu &
   chọn ảnh từ một thư mục thiết bị (INPSxxxx.KEW + PS-SDxxx.BMP).
-* ``build_field_word_report`` — quét toàn bộ ``Project_Output/`` rồi xuất 1 file
-  Word duy nhất gồm nhiều MBA / device.
+* ``build_field_word_report`` — quét một thư mục ``Project_Output/`` rồi xuất
+  1 file Word duy nhất gồm nhiều MBA / device.
+* ``build_word_report_from_zip`` — entry-point cho API: nhận ZIP đã tổ chức
+  (output của "Xử lý file sơ bộ"), tự dò metadata trong Excel kèm (nếu có),
+  trả về đường dẫn báo cáo Word.
 
 Tham số / khóa template — xem ``modules/report/context_keys.json``.
 """
 
 from __future__ import annotations
 
+import io
 import os
 import re
+import unicodedata
+import zipfile
 from pathlib import Path
 from shutil import copy2
 from tempfile import TemporaryDirectory
@@ -33,7 +39,14 @@ __all__ = [
     "mba_kwargs_from_inps",
     "device_kwargs_from_folder",
     "build_field_word_report",
+    "build_word_report_from_zip",
+    "DEFAULT_MBA_TEMPLATE",
+    "DEFAULT_DEVICE_TEMPLATE",
 ]
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_MBA_TEMPLATE = _REPO_ROOT / "static" / "word-template" / "mba.docx"
+DEFAULT_DEVICE_TEMPLATE = _REPO_ROOT / "static" / "word-template" / "device.docx"
 
 WIDTH_LARGE, WIDTH_SMALL, HEIGHT_MBA = Mm(109.6), Mm(53.8), Mm(40.5)
 WIDTH_A, WIDTH_SUB, HEIGHT_A, HEIGHT_SUB = Mm(166.3), Mm(54.3), Mm(60.0), Mm(41.3)
@@ -755,3 +768,202 @@ def build_field_word_report(
         sections=sections,
     )
     return out, warnings
+
+
+# ════════════════════════════════════════════════════════════════════
+#   Đọc Excel metadata (Loại / U định mức / Nhận xét) cho tab Word
+# ════════════════════════════════════════════════════════════════════
+
+
+def _norm(s: object) -> str:
+    if s is None:
+        return ""
+    t = unicodedata.normalize("NFKC", str(s)).strip().lower()
+    return re.sub(r"\s+", " ", t)
+
+
+def _norm_kind(value: object) -> SectionKind | None:
+    k = _norm(value)
+    if not k:
+        return None
+    if k in {"mba", "máy biến áp", "may bien ap", "transformer", "tr", "mbt", "tba"}:
+        return "mba"
+    if k in {"device", "thiết bị", "thiet bi", "tủ", "tu", "khac", "khác"}:
+        return "device"
+    return None
+
+
+def _norm_voltage(value: object) -> float | None:
+    if value is None:
+        return None
+    s = str(value).strip()
+    if not s:
+        return None
+    m = re.search(r"(\d+(?:[.,]\d+)?)", s.replace(",", "."))
+    if not m:
+        return None
+    try:
+        v = float(m.group(1))
+    except ValueError:
+        return None
+    if "kv" in s.lower():
+        v *= 1000.0
+    return v if v > 0 else None
+
+
+def read_device_metadata_from_excel(
+    excel_path: str | Path,
+) -> dict[str, dict]:
+    """Đọc Excel hiện trường → ``{tên_chuẩn_hóa: {name, kind, nominal_voltage, remarks}}``.
+
+    Các cột Excel: ``Tên thiết bị`` (bắt buộc); ``Loại``, ``Điện áp định mức``,
+    ``Nhận xét`` (đều tuỳ chọn). Trả về dict rỗng nếu không đọc được hoặc thiếu
+    cột tên — caller tự fallback.
+    """
+    try:
+        import pandas as pd
+    except ImportError:
+        return {}
+    try:
+        df = pd.read_excel(str(excel_path), header=0, engine="openpyxl")
+    except Exception:
+        return {}
+    if df.empty:
+        return {}
+
+    col_map = {_norm(c): c for c in df.columns}
+
+    def pick(*aliases: str) -> str | None:
+        for a in aliases:
+            v = col_map.get(_norm(a))
+            if v:
+                return v
+        return None
+
+    name_col = pick("tên thiết bị", "ten thiet bi", "thiết bị", "thiet bi", "device")
+    if not name_col:
+        return {}
+    kind_col = pick("loại", "loai", "kiểu", "kieu", "type")
+    nom_v_col = pick("điện áp định mức", "dien ap dinh muc", "u định mức",
+                     "u dinh muc", "vnom", "u_nom", "u nominal", "nominal voltage")
+    remarks_col = pick("nhận xét", "nhan xet", "ghi chú", "ghi chu", "remarks", "notes")
+
+    out: dict[str, dict] = {}
+    for _, row in df.iterrows():
+        raw_name = row[name_col]
+        if raw_name is None or (isinstance(raw_name, float) and raw_name != raw_name):
+            continue
+        name = str(raw_name).strip()
+        if not name:
+            continue
+        out[_norm(name)] = {
+            "name": name,
+            "kind": _norm_kind(row[kind_col]) if kind_col else None,
+            "nominal_voltage": _norm_voltage(row[nom_v_col]) if nom_v_col else None,
+            "remarks": str(row[remarks_col]).strip()
+            if remarks_col and row[remarks_col] is not None
+            and not (isinstance(row[remarks_col], float) and row[remarks_col] != row[remarks_col])
+            else "",
+        }
+    return out
+
+
+def _find_first_excel(root: Path) -> Path | None:
+    for p in sorted(root.rglob("*")):
+        if not p.is_file():
+            continue
+        parts = [pp.lower() for pp in p.parts]
+        if any(pp == "__macosx" for pp in parts) or p.name.startswith("._"):
+            continue
+        if p.suffix.lower() in {".xlsx", ".xlsm", ".xls"}:
+            return p
+    return None
+
+
+def _find_project_root(extract_root: Path) -> Path:
+    """Tìm thư mục chứa các thư mục thiết bị.
+
+    Ưu tiên một thư mục có tên ``Project_Output``; nếu không, dùng chính
+    ``extract_root``.
+    """
+    direct = extract_root / "Project_Output"
+    if direct.is_dir():
+        return direct
+    for p in extract_root.rglob("Project_Output"):
+        if p.is_dir():
+            return p
+    return extract_root
+
+
+def build_word_report_from_zip(
+    zip_bytes: bytes,
+    output_docx: str | Path,
+    *,
+    mba_template: str | Path | None = None,
+    device_template: str | Path | None = None,
+) -> tuple[Path, list[str]]:
+    """Entry-point cho tab "Tạo báo cáo Word".
+
+    Nhận ZIP đã tổ chức (output của "Xử lý file sơ bộ"):
+        ``Project_Output/<Tên thiết bị>/INPSxxxx.KEW + PS-SDxxx.BMP``
+
+    Có thể chấp nhận ZIP không có ``Project_Output/`` (thư mục thiết bị nằm
+    ngay ở gốc) — sẽ duyệt từ gốc. Nếu có Excel kèm theo (cùng cấu trúc cột
+    của tab "Xử lý file sơ bộ"), các cột tuỳ chọn ``Loại`` / ``Điện áp định mức``
+    / ``Nhận xét`` sẽ được dùng làm metadata cho từng thiết bị.
+
+    Trả về ``(đường_dẫn_báo_cáo_word, warnings)``.
+    """
+    mba_template = Path(mba_template or DEFAULT_MBA_TEMPLATE)
+    device_template = Path(device_template or DEFAULT_DEVICE_TEMPLATE)
+    if not mba_template.is_file():
+        raise FileNotFoundError(f"Thiếu template Word MBA: {mba_template}")
+    if not device_template.is_file():
+        raise FileNotFoundError(f"Thiếu template Word device: {device_template}")
+
+    with TemporaryDirectory(prefix="word_report_") as td:
+        extract = Path(td) / "in"
+        extract.mkdir()
+        try:
+            with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zf:
+                zf.extractall(extract)
+        except zipfile.BadZipFile as e:
+            raise ValueError(f"File ZIP không hợp lệ: {e}") from e
+
+        project_root = _find_project_root(extract)
+        device_dirs = [
+            d for d in sorted(project_root.iterdir())
+            if d.is_dir() and not d.name.startswith(".") and d.name != "__MACOSX"
+        ]
+        if not device_dirs:
+            raise ValueError(
+                "ZIP không chứa thư mục thiết bị nào. Cấu trúc mong đợi: "
+                "Project_Output/<Tên thiết bị>/INPSxxxx.KEW + PS-SDxxx.BMP."
+            )
+
+        excel_path = _find_first_excel(extract)
+        metadata = read_device_metadata_from_excel(excel_path) if excel_path else {}
+
+        devices: list[dict] = []
+        for d in device_dirs:
+            meta = metadata.get(_norm(d.name), {})
+            devices.append({
+                "name": meta.get("name") or d.name,
+                "folder": d,
+                "kind": meta.get("kind"),
+                "nominal_voltage": meta.get("nominal_voltage"),
+                "remarks": meta.get("remarks", ""),
+            })
+
+        out = Path(output_docx)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        path, warnings = build_field_word_report(
+            project_root,
+            out,
+            mba_template=mba_template,
+            device_template=device_template,
+            devices=devices,
+        )
+        if excel_path:
+            warnings.insert(0, f"Đã dùng metadata Excel: {excel_path.name}.")
+        return path, warnings

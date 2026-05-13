@@ -161,8 +161,8 @@ def _unique_name(base: str, used: set[str]) -> str:
         i += 1
 
 
-def _resolve_columns(df: pd.DataFrame) -> dict[str, Optional[str]]:
-    """Map internal key -> actual column name (một số cột là tuỳ chọn → ``None``)."""
+def _resolve_columns(df: pd.DataFrame) -> dict[str, str]:
+    """Map internal key -> actual column name."""
     cols = { _norm_key(c): c for c in df.columns }
     def pick(*aliases: str) -> Optional[str]:
         for a in aliases:
@@ -180,10 +180,6 @@ def _resolve_columns(df: pd.DataFrame) -> dict[str, Optional[str]]:
     file_col = pick("file")
     img_col = pick("img")
     img_end_col = pick("img end", "img_end", "img end ", "img kết thúc", "img ket thuc")
-    kind_col = pick("loại", "loai", "kiểu", "kieu", "type")
-    nominal_v_col = pick("điện áp định mức", "dien ap dinh muc", "u định mức", "u dinh muc",
-                        "vnom", "u_nom", "u nominal", "nominal voltage")
-    remarks_col = pick("nhận xét", "nhan xet", "ghi chú", "ghi chu", "remarks", "notes")
 
     missing = []
     if not device_col:
@@ -201,9 +197,6 @@ def _resolve_columns(df: pd.DataFrame) -> dict[str, Optional[str]]:
         "file": file_col,
         "img": img_col,
         "img_end": img_end_col,
-        "kind": kind_col,
-        "nominal_voltage": nominal_v_col,
-        "remarks": remarks_col,
     }
 
 
@@ -214,9 +207,6 @@ class RowPlan:
     s_key: str
     img_start: int
     img_end: int
-    kind: Optional[str] = None
-    nominal_voltage: Optional[float] = None
-    remarks: str = ""
 
 
 def read_plans_from_excel(excel_path: str) -> tuple[list[RowPlan], list[str]]:
@@ -254,29 +244,6 @@ def read_plans_from_excel(excel_path: str) -> tuple[list[RowPlan], list[str]]:
         except ValueError as e:
             raise ValueError(f"Dòng {int(idx) + 2}: {e}") from e
         folder = _unique_name(folder, used_names)
-        kind_raw = row[colmap["kind"]] if colmap.get("kind") else None
-        kind = None
-        if kind_raw is not None and not (isinstance(kind_raw, float) and pd.isna(kind_raw)):
-            k = _norm_key(kind_raw)
-            if k in {"mba", "máy biến áp", "may bien ap", "transformer", "tr"}:
-                kind = "mba"
-            elif k in {"device", "thiết bị", "thiet bi"}:
-                kind = "device"
-        nom_v = None
-        if colmap.get("nominal_voltage"):
-            nv_raw = row[colmap["nominal_voltage"]]
-            if nv_raw is not None and not (isinstance(nv_raw, float) and pd.isna(nv_raw)):
-                try:
-                    nom_v = float(re.sub(r"[^0-9.]", "", str(nv_raw)) or "nan")
-                    if nom_v != nom_v:
-                        nom_v = None
-                except Exception:
-                    nom_v = None
-        remarks = ""
-        if colmap.get("remarks"):
-            r_raw = row[colmap["remarks"]]
-            if r_raw is not None and not (isinstance(r_raw, float) and pd.isna(r_raw)):
-                remarks = str(r_raw).strip()
         plans.append(
             RowPlan(
                 device_raw=str(dev_raw).strip(),
@@ -284,9 +251,6 @@ def read_plans_from_excel(excel_path: str) -> tuple[list[RowPlan], list[str]]:
                 s_key=s_name,
                 img_start=i0,
                 img_end=i1,
-                kind=kind,
-                nominal_voltage=nom_v,
-                remarks=remarks,
             )
         )
     if not plans:
@@ -373,73 +337,11 @@ def zip_directory(folder: str, zip_path: str) -> None:
                 zf.write(fp, arcname=arc)
 
 
-_MBA_TEMPLATE_DOCX = os.path.normpath(
-    os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                 "..", "..", "static", "word-template", "mba.docx")
-)
-_DEVICE_TEMPLATE_DOCX = os.path.normpath(
-    os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                 "..", "..", "static", "word-template", "device.docx")
-)
-
-
-def _generate_field_word_report(
-    project_out_dir: str,
-    plans: list[RowPlan],
-    output_docx: str,
-) -> list[str]:
-    """Sinh file Word tổng hợp tại ``output_docx`` từ ``Project_Output/``.
-
-    Trả về danh sách cảnh báo. Nếu không thể tạo (thiếu template, không có
-    plan hợp lệ, lỗi import…) → trả ``["..."]`` và **không** ném exception
-    để pipeline chính vẫn tiếp tục.
-    """
-    warnings: list[str] = []
-    if not plans:
-        return ["Không có thiết bị nào để dựng báo cáo Word."]
-    if not os.path.isfile(_MBA_TEMPLATE_DOCX):
-        return [f"Thiếu template Word MBA: {_MBA_TEMPLATE_DOCX}"]
-    if not os.path.isfile(_DEVICE_TEMPLATE_DOCX):
-        return [f"Thiếu template Word device: {_DEVICE_TEMPLATE_DOCX}"]
-
-    try:
-        from modules.report.gen_word import build_field_word_report
-    except Exception as e:
-        return [f"Không thể import modules.report.gen_word: {e}"]
-
-    devices = [
-        {
-            "name": p.device_raw or p.folder_name,
-            "folder": p.folder_name,
-            "kind": p.kind,
-            "nominal_voltage": p.nominal_voltage,
-            "remarks": p.remarks,
-        }
-        for p in plans
-    ]
-    try:
-        _, w = build_field_word_report(
-            project_out_dir,
-            output_docx,
-            mba_template=_MBA_TEMPLATE_DOCX,
-            device_template=_DEVICE_TEMPLATE_DOCX,
-            devices=devices,
-        )
-        warnings.extend(w)
-    except Exception as e:
-        warnings.append(f"Không sinh được báo cáo Word: {e}")
-    return warnings
-
-
 def process_field_zip_bytes(zip_bytes: bytes, work_dir: str) -> tuple[str, list[str], list[str]]:
     """
     Giải nén zip_bytes vào work_dir, xử lý, tạo file ZIP kết quả trong work_dir.
     Trả về (đường_dẫn_zip_kết_quả, warnings, errors_fatal).
     errors_fatal rỗng nếu thành công.
-
-    Ngoài việc tổ chức ảnh + thư mục, bước này còn sinh thêm
-    ``Project_Output/BaoCao_KEW.docx`` tổng hợp số liệu từ file INPS của
-    từng thiết bị (nếu có).
     """
     warnings: list[str] = []
     extract = os.path.join(work_dir, "in")
@@ -469,13 +371,9 @@ def process_field_zip_bytes(zip_bytes: bytes, work_dir: str) -> tuple[str, list[
 
     staging = os.path.join(work_dir, "staging")
     os.makedirs(staging, exist_ok=True)
-    proj = os.path.join(staging, "Project_Output")
     build_project_output(extract, staging, plans, s_map, bmp_map)
 
-    # Sinh báo cáo Word tổng hợp (không chặn pipeline nếu lỗi).
-    report_path = os.path.join(proj, "BaoCao_KEW.docx")
-    warnings.extend(_generate_field_word_report(proj, plans, report_path))
-
     out_zip = os.path.join(work_dir, "KEW_HoSoDaXuLy.zip")
+    proj = os.path.join(staging, "Project_Output")
     zip_directory(proj, out_zip)
     return out_zip, warnings, []

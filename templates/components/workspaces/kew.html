@@ -5,6 +5,8 @@
       style="display:flex;gap:8px;padding:0.75rem 1rem 0;flex-wrap:wrap;align-items:center;border-bottom:1px solid var(--border)">
       <button type="button" class="btn" id="kew-subtab-field-btn" onclick="window.switchKewSubtab && window.switchKewSubtab('field')"
       style="font-size:0.85rem;border-color:var(--border)">Xử lý file sơ bộ</button>
+      <button type="button" class="btn" id="kew-subtab-word-btn" onclick="window.switchKewSubtab && window.switchKewSubtab('word')"
+      style="font-size:0.85rem;border-color:var(--border)">Tạo báo cáo Word</button>
       <button type="button" class="btn" id="kew-subtab-mba-btn" onclick="window.switchKewSubtab && window.switchKewSubtab('mba')"
         style="font-size:0.85rem;font-weight:600;border-color:var(--accent3);color:var(--accent3)">Xuất Excel MBA</button>
     </div>
@@ -61,13 +63,10 @@
           <div>
             <h3 style="margin:0;color:var(--accent2, #10b981)">📦 Xử lý KEW (hồ sơ hiện trường)</h3>
             <p style="font-size:0.76rem;color:var(--text-muted);margin:6px 0 0;max-width:52rem">
-              Upload một file <strong>.zip</strong> gồm: file Excel hiện trường (cột bắt buộc <em>Tên thiết bị</em>, <em>File</em>, <em>IMG</em>, <em>IMG end</em>;
-              tuỳ chọn <em>Loại</em>, <em>Điện áp định mức</em>, <em>Nhận xét</em>),
+              Upload một file <strong>.zip</strong> gồm: file Excel hiện trường (cột <em>Tên thiết bị</em>, <em>File</em>, <em>IMG</em>, <em>IMG end</em>),
               các thư mục record dạng <code>S0001</code>, <code>S0002</code>, … và ảnh <code>PS-SDxxx.BMP</code>.
-              Hệ thống đổi tên thư mục theo tên thiết bị, chuyển ảnh vào đúng thư mục tương ứng, kiểm tra thiếu file / trùng dải ảnh,
-              đồng thời đọc file <code>INPSxxxx.KEW</code> trong từng thư mục để tổng hợp số liệu &
-              dựng báo cáo Word <code>BaoCao_KEW.docx</code>. Output trả về file
-              <strong>KEW_HoSoDaXuLy.zip</strong> (cấu trúc <code>Project_Output/</code> chứa các thư mục thiết bị + báo cáo Word).
+              Hệ thống đổi tên thư mục theo tên thiết bị, chuyển ảnh vào đúng thư mục tương ứng, kiểm tra thiếu file / trùng dải ảnh, rồi trả về file
+              <strong>KEW_HoSoDaXuLy.zip</strong> (cấu trúc <code>Project_Output/</code>…).
             </p>
           </div>
         </div>
@@ -95,37 +94,81 @@
       </div>
     </div>
 
+    <div id="kew-panel-word" class="kew-subpanel" style="display:none;padding:1rem;">
+      <div class="chart-card" style="border-color:rgba(139,92,246,0.35)">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem;flex-wrap:wrap;gap:12px">
+          <div>
+            <h3 style="margin:0;color:#8b5cf6">📝 Tạo báo cáo Word</h3>
+            <p style="font-size:0.76rem;color:var(--text-muted);margin:6px 0 0;max-width:52rem">
+              Upload file <strong>KEW_HoSoDaXuLy.zip</strong> (output của bước "Xử lý file sơ bộ"), hoặc một ZIP chứa các thư mục thiết bị có
+              <code>INPSxxxx.KEW</code> + ảnh <code>PS-SDxxx.BMP</code>. Hệ thống tổng hợp số liệu (U, I, P, Q, S, PF, THD, TDD…),
+              dựng báo cáo từ template MBA / device và trả về <strong>BaoCao_KEW.docx</strong>.
+              Nếu ZIP có kèm Excel với các cột tuỳ chọn <em>Loại</em>, <em>Điện áp định mức</em>, <em>Nhận xét</em> thì các giá trị này được dùng làm metadata.
+            </p>
+          </div>
+        </div>
+
+        <input type="file" id="kew-word-zip-input" accept=".zip,application/zip" style="display:none">
+
+        <div id="kew-word-drop" onclick="document.getElementById('kew-word-zip-input').click()"
+          style="border:2px dashed rgba(139,92,246,0.45);border-radius:12px;padding:1.75rem 1rem;text-align:center;cursor:pointer;margin-bottom:1rem;background:var(--surface2)">
+          <div style="font-size:2rem;margin-bottom:0.35rem">📄</div>
+          <div style="font-weight:500;color:var(--text)">Chọn hoặc kéo thả ZIP đã tổ chức (Project_Output/…)</div>
+          <div style="font-size:0.82rem;color:var(--text-muted);margin-top:6px">Mỗi thư mục con phải có INPSxxxx.KEW + ảnh BMP</div>
+        </div>
+
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:0.5rem">
+          <input type="text" id="kew-word-out-filename" class="btn"
+            style="width:220px;padding:5px 10px;font-size:0.8rem"
+            placeholder="Tên file xuất (VD: BaoCao_KEW.docx)" value="BaoCao_KEW.docx">
+          <button type="button" class="btn" id="btn-kew-word-process"
+            style="border-color:#8b5cf6;color:#8b5cf6;font-weight:600"
+            onclick="window.kewWordProcessZip && window.kewWordProcessZip()" disabled>
+            <span id="kew-word-spinner"
+              style="display:none;width:12px;height:12px;border:2px solid rgba(0,0,0,0.15);border-radius:50%;border-top-color:#8b5cf6;animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:6px"></span>
+            Sinh và tải Word
+          </button>
+          <span id="kew-word-file-label" style="font-size:0.8rem;color:var(--text-muted)">Chưa chọn file</span>
+          <span id="kew-word-status" style="font-size:0.78rem;color:var(--text-muted);margin-left:auto"></span>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 
 <script>
-  window.switchKewSubtab = function (which) {
-    var mba = document.getElementById('kew-panel-mba');
-    var field = document.getElementById('kew-panel-field');
-    var bMba = document.getElementById('kew-subtab-mba-btn');
-    var bField = document.getElementById('kew-subtab-field-btn');
-    if (!mba || !field) return;
-    var isMba = which !== 'field';
-    mba.style.display = isMba ? 'block' : 'none';
-    field.style.display = isMba ? 'none' : 'block';
-    if (bMba) {
-      bMba.style.fontWeight = isMba ? '600' : '400';
-      bMba.style.borderColor = isMba ? 'var(--accent3)' : 'var(--border)';
-      bMba.style.color = isMba ? 'var(--accent3)' : 'inherit';
-    }
-    if (bField) {
-      bField.style.fontWeight = !isMba ? '600' : '400';
-      bField.style.borderColor = !isMba ? 'var(--accent2, #10b981)' : 'var(--border)';
-      bField.style.color = !isMba ? 'var(--accent2, #10b981)' : 'inherit';
-    }
-    try { localStorage.setItem('plt_kew_subtab', isMba ? 'mba' : 'field'); } catch (e) { }
-  };
-  document.addEventListener('DOMContentLoaded', function () {
-    try {
-      var s = localStorage.getItem('plt_kew_subtab');
-      if (s === 'field') window.switchKewSubtab('field');
-    } catch (e) { }
-  });
+  (function () {
+    var TABS = {
+      mba:   { panel: 'kew-panel-mba',   btn: 'kew-subtab-mba-btn',   color: 'var(--accent3)' },
+      field: { panel: 'kew-panel-field', btn: 'kew-subtab-field-btn', color: 'var(--accent2, #10b981)' },
+      word:  { panel: 'kew-panel-word',  btn: 'kew-subtab-word-btn',  color: '#8b5cf6' }
+    };
+
+    window.switchKewSubtab = function (which) {
+      if (!TABS[which]) which = 'mba';
+      Object.keys(TABS).forEach(function (key) {
+        var cfg = TABS[key];
+        var panel = document.getElementById(cfg.panel);
+        var btn = document.getElementById(cfg.btn);
+        var active = key === which;
+        if (panel) panel.style.display = active ? 'block' : 'none';
+        if (btn) {
+          btn.style.fontWeight = active ? '600' : '400';
+          btn.style.borderColor = active ? cfg.color : 'var(--border)';
+          btn.style.color = active ? cfg.color : 'inherit';
+        }
+      });
+      try { localStorage.setItem('plt_kew_subtab', which); } catch (e) { }
+    };
+
+    document.addEventListener('DOMContentLoaded', function () {
+      try {
+        var s = localStorage.getItem('plt_kew_subtab');
+        if (s && TABS[s]) window.switchKewSubtab(s);
+      } catch (e) { }
+    });
+  })();
 </script>
 
 <script>
@@ -375,6 +418,115 @@
         })
         .finally(function () {
           if (btn) btn.disabled = !_kewFieldFile;
+          if (spin) spin.style.display = 'none';
+        });
+    };
+
+    _setBtnState();
+  })();
+</script>
+
+<script>
+  (function () {
+    var _kewWordFile = null;
+
+    function _setBtnState() {
+      var btn = document.getElementById('btn-kew-word-process');
+      if (btn) btn.disabled = !_kewWordFile;
+    }
+
+    function _label(name) {
+      var el = document.getElementById('kew-word-file-label');
+      if (el) el.textContent = name ? ('Đã chọn: ' + name) : 'Chưa chọn file';
+    }
+
+    setTimeout(function () {
+      var inp = document.getElementById('kew-word-zip-input');
+      var drop = document.getElementById('kew-word-drop');
+      if (inp) {
+        inp.addEventListener('change', function () {
+          var f = inp.files && inp.files[0];
+          _kewWordFile = f || null;
+          _label(f ? f.name : '');
+          _setBtnState();
+          inp.value = '';
+        });
+      }
+      if (drop) {
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(function (ev) {
+          drop.addEventListener(ev, function (e) { e.preventDefault(); e.stopPropagation(); }, false);
+        });
+        ['dragenter', 'dragover'].forEach(function (ev) {
+          drop.addEventListener(ev, function () { drop.style.borderColor = '#8b5cf6'; });
+        });
+        ['dragleave', 'drop'].forEach(function (ev) {
+          drop.addEventListener(ev, function () { drop.style.borderColor = 'rgba(139,92,246,0.45)'; });
+        });
+        drop.addEventListener('drop', function (e) {
+          var files = e.dataTransfer && e.dataTransfer.files;
+          if (!files || !files.length) return;
+          var f = files[0];
+          if (!f.name.toLowerCase().endsWith('.zip')) {
+            alert('Vui lòng chọn file .zip');
+            return;
+          }
+          _kewWordFile = f;
+          _label(f.name);
+          _setBtnState();
+        });
+      }
+    }, 0);
+
+    window.kewWordProcessZip = function () {
+      if (!_kewWordFile) {
+        alert('Chưa chọn file ZIP.');
+        return;
+      }
+      var btn = document.getElementById('btn-kew-word-process');
+      var spin = document.getElementById('kew-word-spinner');
+      var st = document.getElementById('kew-word-status');
+      if (btn) btn.disabled = true;
+      if (spin) spin.style.display = 'inline-block';
+      if (st) st.textContent = 'Đang xử lý…';
+
+      var outName = (document.getElementById('kew-word-out-filename').value || '').trim() || 'BaoCao_KEW.docx';
+      if (!outName.toLowerCase().endsWith('.docx')) outName += '.docx';
+
+      var fd = new FormData();
+      fd.append('zip', _kewWordFile, _kewWordFile.name);
+      fd.append('filename', outName);
+
+      fetch('/api/kew/generate-word-report', { method: 'POST', body: fd })
+        .then(function (r) {
+          if (!r.ok) {
+            return r.json().then(function (j) {
+              var parts = [];
+              if (j.errors && j.errors.length) parts.push(j.errors.join('\n'));
+              if (j.error) parts.push(j.error);
+              throw new Error(parts.join('\n\n') || ('HTTP ' + r.status));
+            });
+          }
+          var hdr = r.headers.get('X-KEW-Word-Warnings');
+          if (hdr) { try { hdr = decodeURIComponent(hdr); } catch (e) { } }
+          return r.blob().then(function (blob) { return { blob: blob, warn: hdr }; });
+        })
+        .then(function (res) {
+          var url = URL.createObjectURL(res.blob);
+          var a = document.createElement('a');
+          a.href = url;
+          a.download = outName;
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 400);
+          if (st) st.textContent = '✅ Đã tải ' + outName;
+          if (res.warn) setTimeout(function () { alert('Cảnh báo từ server:\n' + res.warn); }, 250);
+        })
+        .catch(function (err) {
+          alert('Lỗi: ' + err.message);
+          if (st) st.textContent = '❌ Sinh báo cáo thất bại';
+        })
+        .finally(function () {
+          if (btn) btn.disabled = !_kewWordFile;
           if (spin) spin.style.display = 'none';
         });
     };
