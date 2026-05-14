@@ -75,7 +75,8 @@ _V_DEV_LIMIT_PCT = 5.0
 _PF_LIMIT = 0.9
 _THDV_LIMIT_PCT = 8.0
 _TDD_LIMIT_PCT = 12.0
-_STANDARD_VOLTAGES = (110, 127, 220, 230, 240, 380, 400, 415, 440, 480, 600, 690, 1000)
+# Điện áp danh định cho cột đánh giá lệch % U12: -5% ≤ δ ≤ +5% (so với 400 V), không lấy từ Excel/metadata.
+_MBA_NOMINAL_VOLTAGE_V = 400.0
 # Ảnh theo dải Excel / organize_field_zip: PS-SD641.BMP …
 _BMP_RE = re.compile(r"^PS-SD(\d+)\.BMP$", re.IGNORECASE)
 
@@ -317,22 +318,8 @@ def _scale(d: Mapping[str, float] | None, k: float) -> dict:
     }
 
 
-def _nearest_nominal(v_measured: float | None, hint: float | None = None) -> float:
-    """Chọn điện áp định mức gần nhất từ giá trị đo (hoặc gợi ý nếu có)."""
-    if hint is not None:
-        try:
-            h = float(hint)
-            if h > 0:
-                return h
-        except (TypeError, ValueError):
-            pass
-    if v_measured is None or v_measured <= 0:
-        return 400.0
-    return min(_STANDARD_VOLTAGES, key=lambda sv: abs(sv - v_measured))
-
-
 def _eval_voltage(u_max, u_min, vref: float) -> tuple[str, float, float, float]:
-    """Trả về (đánh giá, δmax, δmin, δavg) cho dải điện áp."""
+    """Trả về (đánh giá, δmax, δmin, δavg) cho dải điện áp so với ``vref`` (±5%)."""
     if u_max is None or u_min is None or vref <= 0:
         return "—", None, None, None
     dmax = (u_max - vref) / vref * 100
@@ -470,12 +457,14 @@ def mba_kwargs_from_inps(
     cap_fig_mba: str | None = None,
     remarks_mba: str = "",
     cap_tab_mba: str | None = None,
-    nominal_voltage: float | None = None,
 ) -> dict:
     """Đọc INPS (nếu có), tổng hợp số liệu, trả về ``kwargs`` cho :func:`mba`.
 
     Khi ``inps_path`` là ``None`` hoặc không đọc được file, bảng số liệu dùng
     ``"—"`` (vẫn render template MBA — ví dụ thiếu INPS nhưng Excel ghi loại MBA).
+
+    Đánh giá lệch điện áp U12: cố định so với **400 V** (mỗi lệch % tại Umax/Umin nằm trong ±5%),
+    không dùng cột điện áp định mức từ Excel.
 
     ``imga, img1, img2, img4, img6`` là đường dẫn ảnh (đã tự chọn từ thư mục
     hoặc do người dùng chỉ định).
@@ -498,8 +487,7 @@ def mba_kwargs_from_inps(
         k = 3 ** 0.5
         u12, u23, u31 = _scale(v1, k), _scale(v2, k), _scale(v3, k)
 
-    v_avg_meas = u12.get("avg") if u12 else None
-    vref = _nearest_nominal(v_avg_meas, nominal_voltage)
+    vref = _MBA_NOMINAL_VOLTAGE_V
     u12eval, _, _, _ = _eval_voltage(u12.get("max"), u12.get("min"), vref)
 
     # ─── Dòng điện I1, I2, I3 ─────────────────────────────────────
@@ -594,7 +582,6 @@ def mba_kwargs_from_folder(
     cap_fig_mba: str | None = None,
     remarks_mba: str = "",
     cap_tab_mba: str | None = None,
-    nominal_voltage: float | None = None,
 ) -> dict:
     """Tự chọn ảnh trong ``folder``, tìm ``INPS*.KEW`` rồi dựng kwargs MBA (giống cơ sở dữ liệu Excel MBA)."""
     folder = Path(folder)
@@ -608,7 +595,6 @@ def mba_kwargs_from_folder(
         cap_fig_mba=cap_fig_mba,
         remarks_mba=remarks_mba,
         cap_tab_mba=cap_tab_mba,
-        nominal_voltage=nominal_voltage,
         **images,
     )
 
@@ -757,11 +743,10 @@ def build_field_word_report(
     device_template: str | Path,
     devices: Sequence[Mapping] | None = None,
     default_kind: SectionKind | None = None,
-    nominal_voltage: float | None = None,
 ) -> tuple[Path, list[str]]:
     """Quét ``project_root`` (= ``Project_Output/``) → xuất 1 file Word tổng hợp.
 
-    ``devices`` (tuỳ chọn): danh sách ``{name, folder, kind?, nominal_voltage?, remarks?}``.
+    ``devices`` (tuỳ chọn): danh sách ``{name, folder, kind?, remarks?}``.
         * ``folder`` có thể là tên thư mục con trong ``project_root`` hoặc đường dẫn tuyệt đối.
         * Nếu mục có khóa ``kind`` (metadata Excel từ ZIP): chỉ ``mba`` khi cột type
           nhận diện MBA; không ghi / trống / không nhận diện → ``device`` (không đoán tên).
@@ -801,12 +786,11 @@ def build_field_word_report(
 
         kind = _resolve_word_section_kind(spec, name=name, default_kind=default_kind)
         remarks = str(spec.get("remarks") or "")
-        nom_v = spec.get("nominal_voltage", nominal_voltage)
 
         try:
             if kind == "mba":
                 kwargs = mba_kwargs_from_folder(
-                    folder, name=name, remarks_mba=remarks, nominal_voltage=nom_v,
+                    folder, name=name, remarks_mba=remarks,
                 )
             else:
                 kwargs = device_kwargs_from_folder(folder, name=name, remarks_device=remarks)
@@ -981,7 +965,8 @@ def read_device_metadata_from_excel(
 
     Chỉ hỗ trợ bộ cột cố định (xem ``FIELD_XLSX_HEADERS`` trong
     ``modules.kew.organize_field_zip``): ``stt`` → thứ tự thiết bị khi ghép Word;
-    ``type`` → loại section; ``pdm`` → điện áp định mức; ``p``, ``pf``, ``i1``–``i3``,
+    ``type`` → loại section; ``pdm`` → ``nominal_voltage`` (chỉ lưu trong metadata,
+    không dùng cho đánh giá lệch % điện áp MBA — MBA luôn so với 400 V); ``p``, ``pf``, ``i1``–``i3``,
     ``di``, ``thd``, ``tdd`` ghép vào ``remarks`` dạng ``P=…; PF=…``.
 
     Nếu thiếu cột hoặc không đọc được file → trả về ``{}`` (báo cáo Word vẫn chạy
@@ -1140,7 +1125,6 @@ def build_word_report_from_zip(
                 "name": display,
                 "folder": d,
                 "kind": meta.get("kind"),
-                "nominal_voltage": meta.get("nominal_voltage"),
                 "remarks": meta.get("remarks", ""),
             })
 
