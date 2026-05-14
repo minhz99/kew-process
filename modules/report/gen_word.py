@@ -3,9 +3,10 @@
 API chính:
 * ``mba(doc, ...)``, ``device(doc, ...)`` — dựng context cho từng template.
 * ``merge_rendered_docx`` / ``merge_mba_device_docx`` — ghép nhiều file đã render.
-* ``mba_kwargs_from_inps`` / ``device_kwargs_from_folder`` — tự chọn ảnh từ thư mục
-  thiết bị (**bắt buộc** ``a.png`` + PS-SDxxx.BMP). **Tạm thời không** tổng hợp số liệu từ INPS;
-  bảng MBA render với ô ``"—"``.
+* ``mba_kwargs_from_inps`` / ``mba_kwargs_from_folder`` / ``device_kwargs_from_folder`` —
+  tự chọn ảnh từ thư mục thiết bị (**bắt buộc** ``a.png`` + PS-SDxxx.BMP). Với MBA,
+  ``mba_kwargs_from_folder`` tự tìm ``INPS*.KEW`` (cùng quy ước ``find_file`` như phân tích KEW
+  và như luồng Excel MBA) rồi gọi ``mba_kwargs_from_inps``; thiếu INPS thì bảng dùng ``"—"``.
 * ``build_field_word_report`` — quét một thư mục ``Project_Output/`` rồi xuất
   1 file Word duy nhất gồm nhiều MBA / device.
 * ``build_word_report_from_zip`` — entry-point cho API: nhận ZIP đã tổ chức
@@ -38,6 +39,7 @@ __all__ = [
     "merge_rendered_docx",
     "merge_mba_device_docx",
     "mba_kwargs_from_inps",
+    "mba_kwargs_from_folder",
     "device_kwargs_from_folder",
     "build_field_word_report",
     "build_word_report_from_zip",
@@ -542,15 +544,15 @@ def mba_kwargs_from_inps(
     u12max, u12min, u12avg = _tri(u12, 1)
     u23max, u23min, u23avg = _tri(u23, 1)
     u31max, u31min, u31avg = _tri(u31, 1)
-    i1max, i1min, i1avg = _tri(i1, 2)
-    i2max, i2min, i2avg = _tri(i2, 2)
-    i3max, i3min, i3avg = _tri(i3, 2)
+    i1max, i1min, i1avg = _tri(i1, 0)
+    i2max, i2min, i2avg = _tri(i2, 0)
+    i3max, i3min, i3avg = _tri(i3, 0)
     dumax, dumin, duavg = _tri(uv_unb, 3)
     dimax, dimin, diavg = _tri(ua_unb, 3)
     pfmax, pfmin, pfavg = _tri(pf, 3)
-    pmax, pmin, pavg = _tri(p_k, 2)
-    qmax, qmin, qavg = _tri(q_k, 2)
-    smax, smin, savg = _tri(s_k, 2)
+    pmax, pmin, pavg = _tri(p_k, 1)
+    qmax, qmin, qavg = _tri(q_k, 1)
+    smax, smin, savg = _tri(s_k, 1)
     thd1max, thd1min, thd1avg = _tri(thd1, 2)
     thd2max, thd2min, thd2avg = _tri(thd2, 2)
     thd3max, thd3min, thd3avg = _tri(thd3, 2)
@@ -594,11 +596,14 @@ def mba_kwargs_from_folder(
     cap_tab_mba: str | None = None,
     nominal_voltage: float | None = None,
 ) -> dict:
-    """Tiện ích: tự chọn ảnh trong ``folder`` rồi dựng kwargs MBA (tạm thời không đọc INPS)."""
+    """Tự chọn ảnh trong ``folder``, tìm ``INPS*.KEW`` rồi dựng kwargs MBA (giống cơ sở dữ liệu Excel MBA)."""
     folder = Path(folder)
+    from modules.kew.analyse_kew import find_file  # type: ignore
+
+    inps_path = find_file(str(folder), "INPS")
     images = auto_pick_mba_images(folder)
     return mba_kwargs_from_inps(
-        None,
+        inps_path,
         name=name,
         cap_fig_mba=cap_fig_mba,
         remarks_mba=remarks_mba,
