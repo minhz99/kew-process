@@ -83,8 +83,8 @@ _FIELD_PARAM_COLS: tuple[str, ...] = (
 # Ký tự sánh an toàn trong XML / docxtpl (thoát trước khi nạp vào Word template).
 # Các chuỗi nhận xét dùng hằng này để biểu diễn "nhỏ hơn" / "lớn hơn" mà không bị
 # trình phân tích XML của python-docx / docxtpl hiểu nhầm là thẻ XML.
-_LT = "\u003c"  # <
-_GT = "\u003e"  # >
+_LT = "&lt;"  # <
+_GT = "&gt;"  # >
 _V_DEV_LIMIT_PCT = 5.0
 _PF_LIMIT = 0.9
 _THDV_LIMIT_PCT = 8.0
@@ -517,32 +517,32 @@ def _compose_remarks_from_excel_fields(
     elif du_num is None:
         unbalance_sent = (
             f"Độ lệch pha dòng điện ở mức {'thấp' if di_pass else 'cao'} "
-            f"(ΔI = {di_s}% {'<' if di_pass else '>'} 10,0%)."
+            f"(ΔI = {di_s}% {_LT if di_pass else _GT} 10,0%)."
         )
     elif di_num is None:
         unbalance_sent = (
             f"Độ lệch pha điện áp ở mức {'thấp' if du_pass else 'cao'} "
-            f"(ΔU = {du_s}% {'<' if du_pass else '>'} 5,0%)."
+            f"(ΔU = {du_s}% {_LT if du_pass else _GT} 5,0%)."
         )
     elif du_pass and di_pass:
         unbalance_sent = (
             f"Độ lệch pha điện áp và dòng điện đều ở mức thấp "
-            f"(ΔU = {du_s}% < 5,0%; ΔI = {di_s}% < 10,0%)."
+            f"(ΔU = {du_s}% {_LT} 5,0%; ΔI = {di_s}% {_LT} 10,0%)."
         )
     elif du_pass and not di_pass:
         unbalance_sent = (
-            f"Độ lệch pha điện áp ở mức thấp (ΔU = {du_s}% < 5,0%); "
-            f"tuy nhiên, độ lệch pha dòng điện vượt mức cho phép (ΔI = {di_s}% > 10,0%)."
+            f"Độ lệch pha điện áp ở mức thấp (ΔU = {du_s}% {_LT} 5,0%); "
+            f"tuy nhiên, độ lệch pha dòng điện vượt mức cho phép (ΔI = {di_s}% {_GT} 10,0%)."
         )
     elif not du_pass and di_pass:
         unbalance_sent = (
-            f"Độ lệch dòng điện ở mức thấp (ΔI = {di_s}% < 10,0%); "
-            f"tuy nhiên, độ lệch pha điện áp vượt mức cho phép (ΔU = {du_s}% > 5,0%)."
+            f"Độ lệch dòng điện ở mức thấp (ΔI = {di_s}% {_LT} 10,0%); "
+            f"tuy nhiên, độ lệch pha điện áp vượt mức cho phép (ΔU = {du_s}% {_GT} 5,0%)."
         )
     else:
         unbalance_sent = (
             f"Độ lệch pha điện áp và dòng điện đều vượt mức cho phép "
-            f"(ΔU = {du_s}% > 5,0%; ΔI = {di_s}% > 10,0%)."
+            f"(ΔU = {du_s}% {_GT} 5,0%; ΔI = {di_s}% {_GT} 10,0%)."
         )
 
     # ── Câu Sóng hài THD / TDD (Mẫu 2) ──────────────────────────────────
@@ -556,24 +556,24 @@ def _compose_remarks_from_excel_fields(
     elif thd_ok and tdd_ok:
         harm_sent = (
             f"Tổng biến dạng sóng hài điện áp và dòng điện đều ở mức cho phép "
-            f"(THDmax = {th_s}% < 8,0%, TDDmax = {td_s}% < {lim_s}%)."
+            f"(THDmax = {th_s}% {_LT} 8,0%, TDDmax = {td_s}% {_LT} {lim_s}%)."
         )
     elif thd_ok and not tdd_ok:
         harm_sent = (
-            f"Tổng biến dạng sóng hài điện áp ở mức cho phép (THDmax = {th_s}% < 8,0%); "
+            f"Tổng biến dạng sóng hài điện áp ở mức cho phép (THDmax = {th_s}% {_LT} 8,0%); "
             f"tuy nhiên, tổng biến dạng sóng hài dòng điện vượt mức cho phép "
-            f"(TDDmax = {td_s}% > {lim_s}%)."
+            f"(TDDmax = {td_s}% {_GT} {lim_s}%)."
         )
     elif not thd_ok and tdd_ok:
         harm_sent = (
-            f"Tổng biến dạng sóng hài dòng điện ở mức cho phép (TDDmax = {td_s}% < {lim_s}%); "
+            f"Tổng biến dạng sóng hài dòng điện ở mức cho phép (TDDmax = {td_s}% {_LT} {lim_s}%); "
             f"tuy nhiên, tổng biến dạng sóng hài điện áp vượt mức cho phép "
-            f"(THDmax = {th_s}% > 8,0%)."
+            f"(THDmax = {th_s}% {_GT} 8,0%)."
         )
     else:
         harm_sent = (
             f"Tổng biến dạng sóng hài điện áp và tổng biến dạng sóng hài dòng điện "
-            f"đều vượt mức cho phép (THDmax = {th_s}% > 8,0%, TDDmax = {td_s}% > {lim_s}%)."
+            f"đều vượt mức cho phép (THDmax = {th_s}% {_GT} 8,0%, TDDmax = {td_s}% {_GT} {lim_s}%)."
         )
 
     # ── MBA: đầy đủ các câu (% tải → biểu đồ → cosφ → ΔU/ΔI → THD/TDD → đánh giá + dẫn bảng) ──
