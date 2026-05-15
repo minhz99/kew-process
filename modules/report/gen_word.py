@@ -608,7 +608,7 @@ def _compose_remarks_from_excel_fields(
         verdict = "đạt tiêu chuẩn (-5,0% ≤ δ ≤ 5,0%)" if both_in else "vượt giới hạn cho phép (-5,0% ≤ δ ≤ 5,0%)"
         volt_sent = (
             f"Điện áp dao động từ {umin_s} ÷ {umax_s} V, "
-            f"độ lệch chuẩn của điện áp δU = {dlo_s}% ÷ {dhi_s}%, {verdict}."
+            f"độ lệch chuẩn của điện áp δU (= {dlo_s}% ÷ {dhi_s}%), {verdict}."
         )
     elif u_min is not None and u_max is not None:
         volt_sent = f"Điện áp dao động từ {umin_s} ÷ {umax_s} V."
