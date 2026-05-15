@@ -38,29 +38,29 @@ import pandas as pd
 
 _SKIP_DIR_NAMES = {"__MACOSX"}
 
-# Một file Excel hiện trường duy nhất: đủ 20 cột (so khớp sau chuẩn hóa NFKC + chữ thường).
+# Một file Excel hiện trường duy nhất: đủ 18 cột (so khớp sau chuẩn hóa NFKC + chữ thường).
 FIELD_XLSX_HEADERS: tuple[str, ...] = (
-    "stt",
-    "name",
-    "file",
-    "img",
-    "imgend",
-    "imgomit",
-    "type",
-    "pdm",
-    "p",
-    "pf",          # Hệ số công suất (cosφ) — tái dùng cho sinh nhận xét
-    "i1",
-    "i2",
-    "i3",
-    "di",          # Độ lệch pha dòng điện lớn nhất (%) — tái dùng cho sinh nhận xét
-    "thd",         # THD điện áp lớn nhất (%) — tái dùng cho sinh nhận xét
-    "tdd",         # TDD dòng điện lớn nhất (%) — tái dùng cho sinh nhận xét
-    # ── Cột mới: sinh nhận xét từ hiện trường ───────────────────────────
-    "current_char",  # Đặc tính dòng điện (Ổn định / Dao động nhẹ / Biến đổi liên tục / Chu kỳ Load-Unload)
-    "u_min",         # Điện áp đo thấp nhất (V)
-    "u_max",         # Điện áp đo cao nhất (V)
+    # ── Tổ chức file (bước xử lý sơ bộ ZIP) ────────────────────────────
+    "stt",           # Số thứ tự (thứ tự trong báo cáo Word)
+    "name",          # Tên thiết bị (hiển thị trong báo cáo)
+    "file",          # Mã thư mục KEW (Sxxxx)
+    "img",           # Chỉ số ảnh đầu dải (PS-SDxxx)
+    "imgend",        # Chỉ số ảnh cuối dải
+    "imgomit",       # Chỉ số ảnh bỏ qua trong dải (tuỳ chọn)
+    # ── Phân loại & thông tin chung ────────────────────────────────────
+    "type",          # Loại section: MBA / device (thiết bị)
+    "pdm",           # Công suất định mức (kVA) — dùng tính % tải MBA
+    # ── Thông số đo lường hiện trường (dùng sinh nhận xét Word) ────────
+    "current_char",  # Đặc tính dòng điện: Ổn định / Dao động nhẹ / Biến đổi liên tục / Chu kỳ Load-Unload
+    "u_min",         # Điện áp đo thấp nhất (V) — tool tự tính δU_min
+    "u_max",         # Điện áp đo cao nhất (V) — tool tự tính δU_max
+    "i_max",         # Dòng điện lớn nhất đo được (A)
     "delta_u",       # Độ lệch pha (mất cân bằng) điện áp lớn nhất (%)
+    "delta_i",       # Độ lệch pha (mất cân bằng) dòng điện lớn nhất (%)
+    "p",             # Công suất tác dụng trung bình (kW) — dùng tính % tải MBA
+    "cos_phi",       # Hệ số công suất trung bình (cosφ)
+    "thd",           # Tổng biến dạng sóng hài điện áp lớn nhất (%)
+    "tdd",           # Tổng biến dạng sóng hài dòng điện lớn nhất (%)
 )
 
 _BMP_RE = re.compile(r"^PS-SD(\d{1,4})\.BMP$", re.IGNORECASE)

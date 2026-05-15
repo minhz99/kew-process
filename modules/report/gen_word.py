@@ -75,9 +75,9 @@ _EXCEL_METRIC_REMARKS: tuple[tuple[str, str], ...] = (
 )
 # Các cột đặc tính hiện trường dùng để sinh nhận xét (thay thế INPS).
 _FIELD_PARAM_COLS: tuple[str, ...] = (
-    "current_char", "u_min", "u_max",
-    "delta_u", "delta_i", "cos_phi",
-    "thd_max", "tdd_max",
+    "current_char", "u_min", "u_max", "i_max",
+    "delta_u", "delta_i", "p", "cos_phi",
+    "thd", "tdd", "pdm",
 )
 
 # Giới hạn / tiêu chuẩn dùng cho cột "Đánh giá" trong báo cáo MBA.
@@ -927,11 +927,14 @@ def _compose_remarks_from_excel_fields(
     current_char: str | None,
     u_min: float | None,
     u_max: float | None,
+    i_max: float | None = None,
     delta_u: float | None,
     delta_i: float | None,
+    p_kw: float | None = None,
     cos_phi: float | None,
     thd_max: float | None,
     tdd_max: float | None,
+    pdm_kva: float | None = None,
     nominal_voltage: float | None,
 ) -> str:
     """Sinh đoạn «Nhận xét:» hoàn toàn từ các trường Excel hiện trường.
@@ -1045,10 +1048,16 @@ def _compose_remarks_from_excel_fields(
         quality = "Chưa tốt"
 
     if kind == "mba":
-        # MBA: 4 ý tóm tắt (không có ý điện áp range và ý chất lượng riêng)
         du_rhetorical = "thấp" if (du_num is not None and du_num < 0.1) else "cao"
+        # Tính % tải: S_đo = P / cosφ (kVA); % tải = S_đo / Pđm * 100
+        load_seg = ""
+        if p_kw is not None and cos_phi is not None and abs(cos_phi) > 0.01 and pdm_kva is not None and pdm_kva > 0:
+            s_kva = p_kw / abs(cos_phi)
+            load_pct = s_kva / pdm_kva * 100.0
+            load_seg = f"Công suất tiêu thụ của {name} đạt {_pct(load_pct, 2)}% công suất thiết kế. "
         return (
-            f"Nhận xét: Biểu đồ dòng điện tiêu thụ tại thời điểm đo kiểm {wave}, "
+            f"Nhận xét: {load_seg}"
+            f"Biểu đồ dòng điện tiêu thụ tại thời điểm đo kiểm {wave}, "
             f"độ lệch pha điện áp ở mức {du_rhetorical}, "
             f"hệ số công suất cosφ ở mức {pf_txt}. "
             f"Chất lượng điện đo tại {name} ở mức {quality}. "
@@ -1101,18 +1110,20 @@ def _resolve_remarks_field(
     current_char = params.get("current_char")
     u_min = _parse_float_field(params.get("u_min"))
     u_max = _parse_float_field(params.get("u_max"))
+    i_max = _parse_float_field(params.get("i_max"))
     delta_u = _parse_float_field(params.get("delta_u"))
     delta_i = _parse_float_field(params.get("delta_i"))
+    p_kw = _parse_float_field(params.get("p"))
     cos_phi = _parse_float_field(params.get("cos_phi"))
-    thd_max = _parse_float_field(params.get("thd_max"))
-    tdd_max_v = _parse_float_field(params.get("tdd_max"))
+    thd_max = _parse_float_field(params.get("thd"))
+    tdd_max_v = _parse_float_field(params.get("tdd"))
+    pdm_kva = _parse_float_field(params.get("pdm"))
 
-    # Nếu không có bất kỳ trường nào → trả về chuỗi rỗng (bảng vẫn render)
     has_data = any(v is not None for v in [
         current_char, u_min, u_max, delta_u, delta_i, cos_phi, thd_max, tdd_max_v
     ])
     if not has_data:
-        return raw  # raw có thể là ghi chú ngắn, hoặc rỗng
+        return raw
 
     auto = _compose_remarks_from_excel_fields(
         name=name,
@@ -1120,11 +1131,14 @@ def _resolve_remarks_field(
         current_char=current_char,
         u_min=u_min,
         u_max=u_max,
+        i_max=i_max,
         delta_u=delta_u,
         delta_i=delta_i,
+        p_kw=p_kw,
         cos_phi=cos_phi,
         thd_max=thd_max,
         tdd_max=tdd_max_v,
+        pdm_kva=pdm_kva,
         nominal_voltage=nominal_voltage,
     )
     return _merge_auto_and_excel_notes(auto, raw)
@@ -1828,14 +1842,9 @@ def read_device_metadata_from_excel(
         if not name:
             continue
 
-        # ── Ghi chú văn bản (cột p, i1-i3 — các cột không dùng làm số trong sinh nhận xét) ──
-        note_cols: tuple[tuple[str, str], ...] = (("p", "P"), ("i1", "I1"), ("i2", "I2"), ("i3", "I3"))
-        extra_parts: list[str] = []
-        for key, label in note_cols:
-            t = _cell_text(row, cm.get(key))
-            if t:
-                extra_parts.append(f"{label}={t}")
-        remarks = "; ".join(extra_parts)
+        # ── Ghi chú phụ (không dùng làm số trong sinh nhận xét) ──
+        # Chỉ ghi lại những trường không có ý nghĩa số học rõ ràng
+        remarks = ""
 
         # ── Thông số đo lường hiện trường — dùng để sinh nhận xét (không dùng INPS) ──
         def _cell_val(col_key: str) -> object:
@@ -1859,16 +1868,17 @@ def read_device_metadata_from_excel(
             return s if s else None
 
         excel_params = {
-            # 4 cột mới
             "current_char": _cell_str("current_char"),
             "u_min":        _cell_val("u_min"),
             "u_max":        _cell_val("u_max"),
+            "i_max":        _cell_val("i_max"),
             "delta_u":      _cell_val("delta_u"),
-            # 4 cột đã có sẵn, ánh xạ sang tên ngưởa để dùng trong _compose_remarks_from_excel_fields
-            "delta_i":      _cell_val("di"),
-            "cos_phi":      _cell_val("pf"),
-            "thd_max":      _cell_val("thd"),
-            "tdd_max":      _cell_val("tdd"),
+            "delta_i":      _cell_val("delta_i"),
+            "p":            _cell_val("p"),
+            "cos_phi":      _cell_val("cos_phi"),
+            "thd":          _cell_val("thd"),
+            "tdd":          _cell_val("tdd"),
+            "pdm":          _cell_val("pdm"),
         }
 
         entry = {
