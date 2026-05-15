@@ -64,10 +64,10 @@
             <h3 style="margin:0;color:var(--accent2, #10b981)">📦 Xử lý KEW (hồ sơ hiện trường)</h3>
             <p style="font-size:0.76rem;color:var(--text-muted);margin:6px 0 0;max-width:52rem">
               Upload một file <strong>.zip</strong> gồm: file Excel hiện trường <strong>.xlsx</strong> với đúng các cột
-              <code>stt</code>, <code>name</code>, <code>file</code>, <code>img</code>, <code>imgend</code>, <code>type</code>, <code>pdm</code>,
+              <code>stt</code>, <code>name</code>, <code>file</code>, <code>img</code>, <code>imgend</code>, <code>imgomit</code>, <code>type</code>, <code>pdm</code>,
               <code>p</code>, <code>pf</code>, <code>i1</code>, <code>i2</code>, <code>i3</code>, <code>di</code>, <code>thd</code>, <code>tdd</code>
               (tên cột không phân biệt hoa thường), các thư mục record <code>S0001</code>, <code>S0002</code>, … và ảnh <code>PS-SDxxx.BMP</code>.
-              Bước này chỉ dùng <code>name</code> / <code>file</code> / <code>img</code> / <code>imgend</code>; <code>stt</code> và các cột còn lại phục vụ bước tạo Word (thứ tự thiết bị, loại MBA/device, …).
+              Bước này dùng <code>name</code> / <code>file</code> / <code>img</code> / <code>imgend</code> / <code>imgomit</code> (tuỳ chọn: liệt kê chỉ số ảnh trong dải bị loại, vd <code>944,945</code>); <code>stt</code> và các cột còn lại phục vụ bước tạo Word (thứ tự thiết bị, loại MBA/device, …).
               Hệ thống đổi tên thư mục theo tên thiết bị, chuyển ảnh vào đúng thư mục, kiểm tra thiếu file / trùng dải ảnh, rồi trả về
               <strong>KEW_HoSoDaXuLy.zip</strong> (cấu trúc <code>Project_Output/</code>…).
             </p>

@@ -964,7 +964,8 @@ def read_device_metadata_from_excel(
     """Đọc Excel hiện trường → ``{tên_chuẩn_hóa: {name, stt, kind, nominal_voltage, remarks}}``.
 
     Chỉ hỗ trợ bộ cột cố định (xem ``FIELD_XLSX_HEADERS`` trong
-    ``modules.kew.organize_field_zip``): ``stt`` → thứ tự thiết bị khi ghép Word;
+    ``modules.kew.organize_field_zip``), gồm ``imgomit`` (chỉ dùng bước ZIP, Word bỏ qua):
+    ``stt`` → thứ tự thiết bị khi ghép Word;
     ``type`` → loại section; ``pdm`` → ``nominal_voltage`` (chỉ lưu trong metadata,
     không dùng cho đánh giá lệch % điện áp MBA — MBA luôn so với 400 V); ``p``, ``pf``, ``i1``–``i3``,
     ``di``, ``thd``, ``tdd`` ghép vào ``remarks`` dạng ``P=…; PF=…``.
@@ -1063,7 +1064,7 @@ def build_word_report_from_zip(
     Có thể chấp nhận ZIP không có ``Project_Output/`` (các thư mục thiết bị nằm ngay dưới gốc giải nén).
 
     Nếu có Excel kèm theo đủ bộ cột hiện trường (``stt``, ``name``, ``file``, ``img``,
-    ``imgend``, ``type``, ``pdm``, ``p``, ``pf``, ``i1``–``i3``, ``di``, ``thd``,
+    ``imgend``, ``imgomit``, ``type``, ``pdm``, ``p``, ``pf``, ``i1``–``i3``, ``di``, ``thd``,
     ``tdd``), các giá trị được dùng làm metadata; thứ tự section trong Word theo ``stt``.
 
     Trả về ``(đường_dẫn_báo_cáo_word, warnings)``.

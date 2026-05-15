@@ -3,9 +3,10 @@ Tổ chức hồ sơ đo KEW6315 từ ZIP: đọc Excel hiện trường (.xlsx)
 chuyển ảnh PS-SDxxx.BMP vào đúng thư mục thiết bị, nén lại Project_Output.zip.
 
 Excel hiện trường chỉ hỗ trợ một bộ cột cố định (tên cột không phân biệt hoa thường):
-``stt``, ``name``, ``file``, ``img``, ``imgend``, ``type``, ``pdm``, ``p``, ``pf``,
-``i1``, ``i2``, ``i3``, ``di``, ``thd``, ``tdd``. Bước tổ chức ZIP chỉ dùng
-``name`` / ``file`` / ``img`` / ``imgend``; ``stt`` và các cột còn lại dành cho bước Word (thứ tự thiết bị, metadata).
+``stt``, ``name``, ``file``, ``img``, ``imgend``, ``imgomit``, ``type``, ``pdm``, ``p``, ``pf``,
+``i1``, ``i2``, ``i3``, ``di``, ``thd``, ``tdd``. Bước tổ chức ZIP dùng
+``name`` / ``file`` / ``img`` / ``imgend`` / ``imgomit`` (tuỳ chọn điền: chỉ số ảnh trong dải bị loại,
+vd ``944, 945`` hoặc ``PS-SD944``); ``stt`` và các cột còn lại dành cho bước Word (thứ tự thiết bị, metadata).
 """
 from __future__ import annotations
 
@@ -22,13 +23,14 @@ import pandas as pd
 
 _SKIP_DIR_NAMES = {"__MACOSX"}
 
-# Một file Excel hiện trường duy nhất: đủ 15 cột (so khớp sau chuẩn hóa NFKC + chữ thường).
+# Một file Excel hiện trường duy nhất: đủ 16 cột (so khớp sau chuẩn hóa NFKC + chữ thường).
 FIELD_XLSX_HEADERS: tuple[str, ...] = (
     "stt",
     "name",
     "file",
     "img",
     "imgend",
+    "imgomit",
     "type",
     "pdm",
     "p",
@@ -151,6 +153,41 @@ def _to_int_img(v: Any) -> Optional[int]:
     return int(digits)
 
 
+def _parse_img_omit(raw: Any) -> tuple[frozenset[int], list[str]]:
+    """Đọc cột ``imgomit``: danh sách chỉ số ``PS-SDxxx`` cần bỏ qua trong dải ``img``–``imgend``.
+
+    Hỗ trợ: ``944``, ``944,945``, ``944+945``, ``PS-SD944``, ``PS-SD944.BMP``, số nguyên trong ô Excel.
+    """
+    warnings: list[str] = []
+    if raw is None or (isinstance(raw, float) and pd.isna(raw)):
+        return frozenset(), warnings
+    if isinstance(raw, (int, float)) and not isinstance(raw, bool):
+        if isinstance(raw, float):
+            if not raw.is_integer():
+                warnings.append("imgomit: ô chứa số thập phân — chỉ dùng chỉ số ảnh nguyên, bỏ qua giá trị này.")
+                return frozenset(), warnings
+            return frozenset({int(raw)}), warnings
+        return frozenset({raw}), warnings
+    s = str(raw).strip()
+    if not s:
+        return frozenset(), warnings
+    out: set[int] = set()
+    for tok in re.split(r"[,;+/\s|]+", s):
+        tok = tok.strip()
+        if not tok:
+            continue
+        tm = re.search(r"PS-SD(\d{1,4})(?:\.BMP)?", tok, re.IGNORECASE)
+        if tm:
+            out.add(int(tm.group(1)))
+            continue
+        dm = re.fullmatch(r"(\d{1,4})", re.sub(r"\s+", "", tok))
+        if dm:
+            out.add(int(dm.group(1)))
+            continue
+        warnings.append(f"imgomit: không hiểu mục «{tok}» — bỏ qua token.")
+    return frozenset(out), warnings
+
+
 def bmp_basename_for_index(n: int) -> str:
     return f"PS-SD{n:03d}.BMP"
 
@@ -228,6 +265,7 @@ class RowPlan:
     s_key: str
     img_start: int
     img_end: int
+    img_omit: frozenset[int]
 
 
 def read_plans_from_excel(excel_path: str) -> tuple[list[RowPlan], list[str]]:
@@ -260,6 +298,15 @@ def read_plans_from_excel(excel_path: str) -> tuple[list[RowPlan], list[str]]:
         if s_name in used_s:
             raise ValueError(f"Dòng {int(idx) + 2}: mã thư mục {s_name} bị lặp trong Excel.")
         used_s.add(s_name)
+        omit_all, w_omit = _parse_img_omit(row[colmap["imgomit"]])
+        warnings.extend(w_omit)
+        omit_eff = frozenset(n for n in omit_all if i0 <= n <= i1)
+        outs = sorted(n for n in omit_all if n < i0 or n > i1)
+        if outs:
+            warnings.append(
+                f"Dòng {int(idx) + 2}: imgomit có chỉ số ngoài dải {i0}–{i1}: "
+                f"{', '.join(str(x) for x in outs)} (bỏ qua các mục ngoài dải)."
+            )
         try:
             folder = sanitize_device_folder(dev_raw)
         except ValueError as e:
@@ -272,6 +319,7 @@ def read_plans_from_excel(excel_path: str) -> tuple[list[RowPlan], list[str]]:
                 s_key=s_name,
                 img_start=i0,
                 img_end=i1,
+                img_omit=omit_eff,
             )
         )
     if not plans:
@@ -292,7 +340,12 @@ def validate_plans_against_fs(
     for p in plans:
         if p.s_key not in s_map:
             errors.append(f"Thiết bị «{p.device_raw}»: không có thư mục {p.s_key} trong ZIP.")
-        for n in range(p.img_start, p.img_end + 1):
+        kept = [n for n in range(p.img_start, p.img_end + 1) if n not in p.img_omit]
+        if not kept:
+            errors.append(
+                f"Thiết bị «{p.device_raw}»: imgomit loại hết dải ảnh {p.img_start}–{p.img_end}."
+            )
+        for n in kept:
             if n not in bmp_map:
                 errors.append(
                     f"Thiết bị «{p.device_raw}»: thiếu ảnh {bmp_basename_for_index(n)}."
@@ -327,6 +380,8 @@ def build_project_output(
         shutil.copytree(src_dir, dest_dir)
 
         for n in range(p.img_start, p.img_end + 1):
+            if n in p.img_omit:
+                continue
             src_bmp = bmp_map[n]
             norm_src = os.path.normpath(src_bmp)
             base = bmp_basename_for_index(n)

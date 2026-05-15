@@ -284,7 +284,7 @@ def export_mba():
 @kew_bp.route("/organize-field-zip", methods=["POST"])
 def organize_field_zip():
     """
-    Nhận một ZIP: Excel hiện trường (đúng bộ cột ``name``, ``file``, ``img``, ``imgend``, …;
+    Nhận một ZIP: Excel hiện trường (đúng bộ cột ``name``, ``file``, ``img``, ``imgend``, ``imgomit``, …;
     xem ``FIELD_XLSX_HEADERS``) + thư mục Sxxxx + ảnh PS-SDxxx.BMP.
     Đổi tên thư mục theo cột ``name``, chuyển ảnh vào đúng thư mục, trả về ZIP Project_Output.
     """
