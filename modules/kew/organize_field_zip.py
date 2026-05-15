@@ -3,10 +3,25 @@ Tổ chức hồ sơ đo KEW6315 từ ZIP: đọc Excel hiện trường (.xlsx)
 chuyển ảnh PS-SDxxx.BMP vào đúng thư mục thiết bị, nén lại Project_Output.zip.
 
 Excel hiện trường chỉ hỗ trợ một bộ cột cố định (tên cột không phân biệt hoa thường):
-``stt``, ``name``, ``file``, ``img``, ``imgend``, ``imgomit``, ``type``, ``pdm``, ``p``, ``pf``,
-``i1``, ``i2``, ``i3``, ``di``, ``thd``, ``tdd``. Bước tổ chức ZIP dùng
-``name`` / ``file`` / ``img`` / ``imgend`` / ``imgomit`` (tuỳ chọn điền: chỉ số ảnh trong dải bị loại,
-vd ``944, 945`` hoặc ``PS-SD944``); ``stt`` và các cột còn lại dành cho bước Word (thứ tự thiết bị, metadata).
+``stt``, ``name``, ``file``, ``img``, ``imgend``, ``imgomit``, ``type``, ``pdm``,
+``p``, ``pf``, ``i1``, ``i2``, ``i3``, ``di``, ``thd``, ``tdd``,
+``current_char``, ``u_min``, ``u_max``, ``delta_u``.
+
+Bước tổ chức ZIP dùng ``name`` / ``file`` / ``img`` / ``imgend`` / ``imgomit``
+(tuỳ chọn điền: chỉ số ảnh trong dải bị loại, vd ``944, 945`` hoặc ``PS-SD944``);
+``stt`` và các cột còn lại dành cho bước Word (thứ tự thiết bị, metadata).
+
+Các cột đã có sẵn từ trước, được tái dùng để sinh nhận xét (không dùng INPS):
+- ``pf``: Hệ số công suất trung bình (cosφ).
+- ``di``: Độ lệch pha (mất cân bằng) dòng điện lớn nhất (%).
+- ``thd``: THD điện áp lớn nhất (%).
+- ``tdd``: TDD dòng điện lớn nhất (%).
+
+Các cột mới thêm để sinh nhận xét:
+- ``current_char``: Đặc tính dòng điện — một trong: "Ổn định" / "Dao động nhẹ" /
+  "Biến đổi liên tục" / "Chu kỳ Load-Unload".
+- ``u_min``, ``u_max``: Điện áp đo được thấp nhất / cao nhất (V); tool tự tính δU.
+- ``delta_u``: Độ lệch pha (mất cân bằng) điện áp lớn nhất (%).
 """
 from __future__ import annotations
 
@@ -23,7 +38,7 @@ import pandas as pd
 
 _SKIP_DIR_NAMES = {"__MACOSX"}
 
-# Một file Excel hiện trường duy nhất: đủ 16 cột (so khớp sau chuẩn hóa NFKC + chữ thường).
+# Một file Excel hiện trường duy nhất: đủ 20 cột (so khớp sau chuẩn hóa NFKC + chữ thường).
 FIELD_XLSX_HEADERS: tuple[str, ...] = (
     "stt",
     "name",
@@ -34,13 +49,18 @@ FIELD_XLSX_HEADERS: tuple[str, ...] = (
     "type",
     "pdm",
     "p",
-    "pf",
+    "pf",          # Hệ số công suất (cosφ) — tái dùng cho sinh nhận xét
     "i1",
     "i2",
     "i3",
-    "di",
-    "thd",
-    "tdd",
+    "di",          # Độ lệch pha dòng điện lớn nhất (%) — tái dùng cho sinh nhận xét
+    "thd",         # THD điện áp lớn nhất (%) — tái dùng cho sinh nhận xét
+    "tdd",         # TDD dòng điện lớn nhất (%) — tái dùng cho sinh nhận xét
+    # ── Cột mới: sinh nhận xét từ hiện trường ───────────────────────────
+    "current_char",  # Đặc tính dòng điện (Ổn định / Dao động nhẹ / Biến đổi liên tục / Chu kỳ Load-Unload)
+    "u_min",         # Điện áp đo thấp nhất (V)
+    "u_max",         # Điện áp đo cao nhất (V)
+    "delta_u",       # Độ lệch pha (mất cân bằng) điện áp lớn nhất (%)
 )
 
 _BMP_RE = re.compile(r"^PS-SD(\d{1,4})\.BMP$", re.IGNORECASE)
