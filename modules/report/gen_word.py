@@ -593,7 +593,7 @@ def _compose_remarks_from_excel_fields(
         if harm_sent:
             mba_parts.append(harm_sent)
         mba_parts.append(
-            f"Chất lượng điện đo tại {name} ở mức {quality}. "
+            f"Kết quả chất lượng điện đo được ở mức {quality}. "
             f"Dưới đây là bảng tổng hợp thông số hoạt động của {name}:"
         )
         return " ".join(mba_parts)
