@@ -468,6 +468,7 @@ def _compose_remarks_from_excel_fields(
     """
     vref = float(nominal_voltage) if nominal_voltage and nominal_voltage > 0 else _MBA_NOMINAL_VOLTAGE_V
     wave = _wave_phrase_from_char(current_char)
+    name_mid = name[0].lower() + name[1:] if name else ""
 
     # ── Định dạng helper ─────────────────────────────────────────────────
     def _pct(v: float | None, d: int = 2) -> str:
@@ -587,7 +588,7 @@ def _compose_remarks_from_excel_fields(
         if p_kw is not None and cos_phi is not None and abs(cos_phi) > 0.01 and pdm_kva is not None and pdm_kva > 0:
             s_kva = p_kw / abs(cos_phi)
             load_pct = s_kva / pdm_kva * 100.0
-            load_seg = f"Công suất tiêu thụ của {name} đạt {_pct(load_pct, 2)}% công suất thiết kế."
+            load_seg = f"Công suất tiêu thụ của {name_mid} đạt {_pct(load_pct, 2)}% công suất thiết kế."
         mba_parts: list[str] = []
         if load_seg:
             mba_parts.append(load_seg)
@@ -599,7 +600,7 @@ def _compose_remarks_from_excel_fields(
             mba_parts.append(harm_sent)
         mba_parts.append(
             f"Kết quả chất lượng điện đo được ở mức {quality}. "
-            f"Dưới đây là bảng tổng hợp thông số hoạt động của {name}:"
+            f"Dưới đây là bảng tổng hợp thông số hoạt động của {name_mid}:"
         )
         return " ".join(mba_parts)
 
@@ -620,7 +621,7 @@ def _compose_remarks_from_excel_fields(
         volt_sent = ""
 
     parts: list[str] = [
-        f"Chất lượng điện cấp cho {name} ở mức {quality}.",
+        f"Chất lượng điện cấp cho {name_mid} ở mức {quality}.",
         f"Biểu đồ dòng điện tiêu thụ {wave} trong thời gian đo kiểm.",
         f"Hệ số công suất cosφ ở mức {pf_txt}.",
     ]
