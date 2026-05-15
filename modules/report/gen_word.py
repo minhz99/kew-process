@@ -87,9 +87,9 @@ _FIELD_PARAM_COLS: tuple[str, ...] = (
 # Ký tự sánh an toàn trong XML / docxtpl (thoát trước khi nạp vào Word template).
 # Các chuỗi nhận xét dùng hằng này để biểu diễn "nhỏ hơn" / "lớn hơn" mà không bị
 # trình phân tích XML của python-docx / docxtpl hiểu nhầm là thẻ XML.
-_LT = "&lt;"   # <
-_GT = "&gt;"   # >
-_AMP = "&amp;"  # &
+_LT = "<"
+_GT = ">"
+_AMP = "&"
 _V_DEV_LIMIT_PCT = 5.0
 _PF_LIMIT = 0.9
 _THDV_LIMIT_PCT = 8.0
@@ -1034,7 +1034,7 @@ def merge_mba_device_docx(
                     f"Loại section không hợp lệ: {kind!r} (chỉ 'mba' hoặc 'device')."
                 ) from e
             tpl = DocxTemplate(str(tpl_path))
-            tpl.render(render_fn(tpl, **spec))
+            tpl.render(render_fn(tpl, **spec), autoescape=True)
             path = tmp / f"{kind}_{i}.docx"
             tpl.save(str(path))
             if i < len(work) - 1:
@@ -1630,7 +1630,7 @@ def generate_table6_docx(
             "nhan_xet": nhan_xet,
         })
 
-    doc.render({"ds_thiet_bi": danh_sach})
+    doc.render({"ds_thiet_bi": danh_sach}, autoescape=True)
     out = Path(output_path)
     out.parent.mkdir(parents=True, exist_ok=True)
     doc.save(str(out))
