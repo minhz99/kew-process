@@ -637,9 +637,7 @@ def _resolve_remarks_field(
     nominal_voltage: float | None,
     excel_params: dict | None = None,
 ) -> str:
-    """Sinh nhận xét từ các trường Excel hiện trường. Nếu người dùng ghi đoạn
-    thủ công đầy đủ (bắt đầu bằng «Nhận xét:»), dùng nguyên văn.
-    INPS không còn được tham chiếu ở đây nữa.
+    """Sinh nhận xét từ các trường Excel hiện trường.
     """
     raw = (user_remarks or "").strip()
     if _is_full_manual_remarks(raw):
@@ -1256,23 +1254,6 @@ def _lookup_device_metadata(metadata: dict[str, dict], folder_name: str) -> dict
             return matches[0]
     return {}
 
-def _norm_voltage(value: object) -> float | None:
-    if value is None:
-        return None
-    s = str(value).strip()
-    if not s:
-        return None
-    m = re.search(r"(\d+(?:[.,]\d+)?)", s.replace(",", "."))
-    if not m:
-        return None
-    try:
-        v = float(m.group(1))
-    except ValueError:
-        return None
-    if "kv" in s.lower():
-        v *= 1000.0
-    return v if v > 0 else None
-
 def _excel_stt(value: object) -> int | None:
     """Số thứ tự từ cột ``stt`` (số nguyên hoặc chuỗi có chữ số)."""
     if value is None:
@@ -1340,7 +1321,6 @@ def read_device_metadata_from_excel(
 
     name_col = cm["name"]
     kind_col = cm["type"]
-    nom_v_col = cm["pdm"]
 
     out: dict[str, dict] = {}
     for _, row in df.iterrows():
@@ -1394,7 +1374,7 @@ def read_device_metadata_from_excel(
             "name": name,
             "stt": _excel_stt(row[cm["stt"]]),
             "kind": _norm_kind(row[kind_col]),
-            "nominal_voltage": _norm_voltage(row[nom_v_col]),
+            "nominal_voltage": None,
             "remarks": remarks,
             "excel_params": excel_params,
         }
