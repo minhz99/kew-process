@@ -83,8 +83,9 @@ _FIELD_PARAM_COLS: tuple[str, ...] = (
 # Ký tự sánh an toàn trong XML / docxtpl (thoát trước khi nạp vào Word template).
 # Các chuỗi nhận xét dùng hằng này để biểu diễn "nhỏ hơn" / "lớn hơn" mà không bị
 # trình phân tích XML của python-docx / docxtpl hiểu nhầm là thẻ XML.
-_LT = "&lt;"  # <
-_GT = "&gt;"  # >
+_LT = "&lt;"   # <
+_GT = "&gt;"   # >
+_AMP = "&amp;"  # &
 _V_DEV_LIMIT_PCT = 5.0
 _PF_LIMIT = 0.9
 _THDV_LIMIT_PCT = 8.0
@@ -527,7 +528,7 @@ def _compose_remarks_from_excel_fields(
     elif du_pass and di_pass:
         unbalance_sent = (
             f"Độ lệch pha điện áp và dòng điện đều ở mức thấp "
-            f"(ΔU = {du_s}% {_LT} 5,0%; ΔI = {di_s}% {_LT} 10,0%)."
+            f"(ΔU = {du_s}% {_LT} 5,0% {_AMP} ΔI = {di_s}% {_LT} 10,0%)."
         )
     elif du_pass and not di_pass:
         unbalance_sent = (
@@ -542,7 +543,7 @@ def _compose_remarks_from_excel_fields(
     else:
         unbalance_sent = (
             f"Độ lệch pha điện áp và dòng điện đều vượt mức cho phép "
-            f"(ΔU = {du_s}% {_GT} 5,0%; ΔI = {di_s}% {_GT} 10,0%)."
+            f"(ΔU = {du_s}% {_GT} 5,0% {_AMP} ΔI = {di_s}% {_GT} 10,0%)."
         )
 
     # ── Câu Sóng hài THD / TDD (Mẫu 2) ──────────────────────────────────
@@ -556,7 +557,7 @@ def _compose_remarks_from_excel_fields(
     elif thd_ok and tdd_ok:
         harm_sent = (
             f"Tổng biến dạng sóng hài điện áp và dòng điện đều ở mức cho phép "
-            f"(THDmax = {th_s}% {_LT} 8,0%, TDDmax = {td_s}% {_LT} {lim_s}%)."
+            f"(THDmax = {th_s}% {_LT} 8,0% {_AMP} TDDmax = {td_s}% {_LT} {lim_s}%)."
         )
     elif thd_ok and not tdd_ok:
         harm_sent = (
@@ -573,7 +574,7 @@ def _compose_remarks_from_excel_fields(
     else:
         harm_sent = (
             f"Tổng biến dạng sóng hài điện áp và tổng biến dạng sóng hài dòng điện "
-            f"đều vượt mức cho phép (THDmax = {th_s}% {_GT} 8,0%, TDDmax = {td_s}% {_GT} {lim_s}%)."
+            f"đều vượt mức cho phép (THDmax = {th_s}% {_GT} 8,0% {_AMP} TDDmax = {td_s}% {_GT} {lim_s}%)."
         )
 
     # ── MBA: đầy đủ các câu (% tải → biểu đồ → cosφ → ΔU/ΔI → THD/TDD → đánh giá + dẫn bảng) ──
