@@ -97,15 +97,12 @@ _I_SPREAD_MODERATE_PCT = 50.0
 # Ảnh theo dải Excel / organize_field_zip: PS-SD641.BMP …
 _BMP_RE = re.compile(r"^PS-SD(\d+)\.BMP$", re.IGNORECASE)
 
-
 # ════════════════════════════════════════════════════════════════════
 #                     Context builders (template)
 # ════════════════════════════════════════════════════════════════════
 
-
 def _inline(doc: DocxTemplate, path: str, height, width) -> InlineImage:
     return InlineImage(doc, path, height=height, width=width)
-
 
 def mba(
     doc: DocxTemplate,
@@ -215,7 +212,6 @@ def mba(
         "tdd3max": tdd3max, "tdd3min": tdd3min, "tdd3avg": tdd3avg,
     }
 
-
 def device(
     doc: DocxTemplate,
     *,
@@ -243,11 +239,9 @@ def device(
         "remarks": remarks_device,
     }
 
-
 # ════════════════════════════════════════════════════════════════════
 #                            Format helpers
 # ════════════════════════════════════════════════════════════════════
-
 
 def _f(v, d: int = 1) -> str:
     """Định dạng số kiểu Việt (dấu phẩy thập phân). Trả ``"—"`` nếu thiếu."""
@@ -261,16 +255,13 @@ def _f(v, d: int = 1) -> str:
         return "—"
     return f"{x:.{d}f}".replace(".", ",")
 
-
 def _tri(d: Mapping, dec: int = 1) -> tuple[str, str, str]:
     """min / max / avg → ba chuỗi định dạng ``_f``."""
     return _f(d.get("max"), dec), _f(d.get("min"), dec), _f(d.get("avg"), dec)
 
-
 # ════════════════════════════════════════════════════════════════════
 #                       INPS aggregation helpers
 # ════════════════════════════════════════════════════════════════════
-
 
 def _parse_inps(inps_path: str | Path) -> dict[str, dict]:
     """Đọc một file INPS .KEW và trả về ``{cột_avg: {min, max, avg}}``.
@@ -301,7 +292,6 @@ def _parse_inps(inps_path: str | Path) -> dict[str, dict]:
         }
     return out
 
-
 def _pick(stats: Mapping[str, dict], *keys: str) -> dict:
     """Trả về stat của khóa khớp đầu tiên trong ``stats`` (case-insensitive)."""
     upper = {k.upper(): v for k, v in stats.items()}
@@ -310,7 +300,6 @@ def _pick(stats: Mapping[str, dict], *keys: str) -> dict:
         if v:
             return v
     return {}
-
 
 def _pick_total(stats: Mapping[str, dict], prefix: str, unit_substr: str) -> dict:
     """Lấy stat của cột tổng ``AVG_<prefix>[<unit>]`` (không có chỉ số pha)."""
@@ -324,7 +313,6 @@ def _pick_total(stats: Mapping[str, dict], prefix: str, unit_substr: str) -> dic
         return d
     return {}
 
-
 def _scale(d: Mapping[str, float] | None, k: float) -> dict:
     if not d:
         return {}
@@ -333,7 +321,6 @@ def _scale(d: Mapping[str, float] | None, k: float) -> dict:
         "min": d.get("min") * k if d.get("min") is not None else None,
         "max": d.get("max") * k if d.get("max") is not None else None,
     }
-
 
 def _eval_voltage(u_max, u_min, vref: float) -> tuple[str, float, float, float]:
     """Trả về (đánh giá, δmax, δmin, δavg) cho dải điện áp so với ``vref`` (±5%)."""
@@ -346,12 +333,10 @@ def _eval_voltage(u_max, u_min, vref: float) -> tuple[str, float, float, float]:
     dabs_min = min(abs(dmax), abs(dmin))
     return ("Đạt" if ok else "Không đạt"), dabs_max, dabs_min, (dabs_max + dabs_min) / 2
 
-
 def _eval_pf(pf_avg) -> str:
     if pf_avg is None:
         return "—"
     return "Đạt" if abs(pf_avg) >= _PF_LIMIT else "Không đạt"
-
 
 def _eval_thd(values: Iterable[float | None], limit: float) -> str:
     vals = [v for v in values if v is not None]
@@ -359,18 +344,15 @@ def _eval_thd(values: Iterable[float | None], limit: float) -> str:
         return "—"
     return "Đạt" if max(vals) < limit else "Không đạt"
 
-
 def _fmt_remark_pct(v: float | None, decimals: int = 2) -> str:
     if v is None or v != v:  # NaN
         return "—"
     return f"{v:.{decimals}f}".replace(".", ",")
 
-
 def _fmt_remark_voltage(v: float | None, decimals: int = 1) -> str:
     if v is None or v != v:
         return "—"
     return f"{v:.{decimals}f}".replace(".", ",")
-
 
 def _is_full_manual_remarks(text: str) -> bool:
     """Người dùng dán cả đoạn nhận xét (không ghép với sinh tự động)."""
@@ -383,7 +365,6 @@ def _is_full_manual_remarks(text: str) -> bool:
         return True
     return False
 
-
 def _merge_auto_and_excel_notes(auto: str, excel_bits: str) -> str:
     auto = (auto or "").strip()
     bits = (excel_bits or "").strip()
@@ -393,41 +374,11 @@ def _merge_auto_and_excel_notes(auto: str, excel_bits: str) -> str:
         return bits
     return f"{auto}\n\nGhi chú hiện trường (Excel): {bits}"
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 def _device_tdd_limit_from_name(name: str) -> float:
     n = _norm(name)
     if any(k in n for k in ("nén", "nen", "nghiền", "nghien", "máy ép", "may ep", "băng tải", "bang tai")):
         return 12.0
     return 20.0
-
-
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Sinh nhận xét từ các trường Excel hiện trường (KHÔNG dùng INPS)
@@ -447,7 +398,6 @@ _CURRENT_CHAR_MAP: dict[str, str] = {
     "load/unload": "biến đổi theo chu kỳ Load/Unload",
 }
 
-
 def _parse_float_field(v: object) -> float | None:
     if v is None:
         return None
@@ -465,7 +415,6 @@ def _parse_float_field(v: object) -> float | None:
     except (ValueError, TypeError):
         return None
 
-
 def _wave_phrase_from_char(current_char: str | None) -> str:
     """Chuyển giá trị cột current_char → cụm từ tiêu chuẩn."""
     if not current_char:
@@ -475,7 +424,6 @@ def _wave_phrase_from_char(current_char: str | None) -> str:
         if k in key:
             return v
     return str(current_char).strip()
-
 
 def _pf_phrase(cos_phi: float | None) -> str:
     if cos_phi is None or cos_phi != cos_phi:
@@ -488,7 +436,6 @@ def _pf_phrase(cos_phi: float | None) -> str:
     if p >= 0.5:
         return "trung bình (dưới 0,8)"
     return "thấp (dưới 0,8)"
-
 
 def _compose_remarks_from_excel_fields(
     *,
@@ -680,7 +627,6 @@ def _compose_remarks_from_excel_fields(
         parts.append(harm_sent)
     return " ".join(parts)
 
-
 def _resolve_remarks_field(
     *,
     kind: SectionKind,
@@ -735,11 +681,9 @@ def _resolve_remarks_field(
     )
     return _merge_auto_and_excel_notes(auto, raw)
 
-
 # ════════════════════════════════════════════════════════════════════
 #                       Image discovery helpers
 # ════════════════════════════════════════════════════════════════════
-
 
 def list_bmp_in_folder(folder: str | Path) -> list[Path]:
     """Trả về danh sách ``PS-SDxxx.BMP`` trong ``folder``, sắp theo số trong tên (641→642→…).
@@ -767,7 +711,6 @@ def list_bmp_in_folder(folder: str | Path) -> list[Path]:
         bmps = extra
     return [pp for _, pp in bmps]
 
-
 def find_overview_png(folder: str | Path) -> Path | None:
     """Ảnh tổng quan ``a.png`` / ``A.png`` (stem ``a``) trong thư mục thiết bị, nếu có."""
     p = Path(folder)
@@ -779,7 +722,6 @@ def find_overview_png(folder: str | Path) -> Path | None:
         if f.suffix.lower() == ".png" and f.stem.lower() == "a":
             return f
     return None
-
 
 def _require_overview_png_and_bmps(folder: str | Path) -> tuple[Path, list[Path]]:
     """Trả về ``(a.png, danh_sách_PS-SD_BMP)`` hoặc ném lỗi nếu thiếu."""
@@ -795,10 +737,8 @@ def _require_overview_png_and_bmps(folder: str | Path) -> tuple[Path, list[Path]
         raise FileNotFoundError(f"Không tìm thấy PS-SD*.BMP trong {p!s}.")
     return overview, bmps
 
-
 def _take(lst: list[Path], idx: int, fallback: Path | None) -> Path | None:
     return lst[idx] if 0 <= idx < len(lst) else fallback
-
 
 def auto_pick_mba_images(folder: str | Path) -> dict[str, str]:
     """Chọn ảnh cho template MBA (``imga`` + ``img1, img2, img4, img6``).
@@ -817,7 +757,6 @@ def auto_pick_mba_images(folder: str | Path) -> dict[str, str]:
         "img6": str(_take(bmps, 3, fb)),
     }
 
-
 def auto_pick_device_images(folder: str | Path) -> dict[str, str]:
     """Chọn ảnh cho template device (``imga`` + ``img1``…``img6``).
 
@@ -832,11 +771,9 @@ def auto_pick_device_images(folder: str | Path) -> dict[str, str]:
         **{f"img{i}": str(_take(bmps, i - 1, fb)) for i in range(1, 7)},
     }
 
-
 # ════════════════════════════════════════════════════════════════════
 #                  Kwargs builders từ thư mục thiết bị
 # ════════════════════════════════════════════════════════════════════
-
 
 def mba_kwargs_from_inps(
     inps_path: str | Path | None,
@@ -967,7 +904,6 @@ def mba_kwargs_from_inps(
         "tdd3max": tdd3max, "tdd3min": tdd3min, "tdd3avg": tdd3avg,
     }
 
-
 def mba_kwargs_from_folder(
     folder: str | Path,
     *,
@@ -1004,7 +940,6 @@ def mba_kwargs_from_folder(
     )
     return kw
 
-
 def device_kwargs_from_folder(
     folder: str | Path,
     *,
@@ -1030,11 +965,9 @@ def device_kwargs_from_folder(
         **images,
     }
 
-
 # ════════════════════════════════════════════════════════════════════
 #                         Render & merge
 # ════════════════════════════════════════════════════════════════════
-
 
 def merge_rendered_docx(
     docx_paths: Sequence[str | Path],
@@ -1054,7 +987,6 @@ def merge_rendered_docx(
         composer.append(Document(str(p)))
     composer.save(str(out))
     return out
-
 
 def merge_mba_device_docx(
     output_path: str | Path,
@@ -1108,19 +1040,15 @@ def merge_mba_device_docx(
             rendered.append(path)
         return merge_rendered_docx(rendered, output_path)
 
-
 # ════════════════════════════════════════════════════════════════════
 #                Pipeline cho luồng "Xử lý file sơ bộ"
 # ════════════════════════════════════════════════════════════════════
 
-
 _MBA_NAME_RE = re.compile(r"^(MBA|TR|TBA|T\d|MBT)\b|MÁY BIẾN ÁP|BIẾN ÁP", re.IGNORECASE)
-
 
 def _guess_kind(name: str) -> SectionKind:
     """Đoán loại template từ tên thiết bị (chỉ khi không có cột ``type`` từ Excel)."""
     return "mba" if _MBA_NAME_RE.search(name or "") else "device"
-
 
 def _resolve_word_section_kind(
     spec: Mapping,
@@ -1148,7 +1076,6 @@ def _resolve_word_section_kind(
     if default_kind in ("mba", "device"):
         return default_kind
     return _guess_kind(name)
-
 
 def build_field_word_report(
     project_root: str | Path,
@@ -1242,11 +1169,9 @@ def build_field_word_report(
     )
     return out, warnings
 
-
 # ════════════════════════════════════════════════════════════════════
 #   Đọc Excel metadata (Loại / U định mức / Nhận xét) cho tab Word
 # ════════════════════════════════════════════════════════════════════
-
 
 def _norm(s: object) -> str:
     if s is None:
@@ -1254,13 +1179,11 @@ def _norm(s: object) -> str:
     t = unicodedata.normalize("NFKC", str(s)).strip().lower()
     return re.sub(r"\s+", " ", t)
 
-
 def _nfc(s: object) -> str:
     """Chuẩn hoá tên hiển thị (tránh ký tự tổ hợp kiểu Mac / Excel lệch dạng)."""
     if s is None:
         return ""
     return unicodedata.normalize("NFC", str(s).strip())
-
 
 def _norm_kind(value: object) -> SectionKind | None:
     raw = value
@@ -1275,7 +1198,6 @@ def _norm_kind(value: object) -> SectionKind | None:
         return "device"
     return None
 
-
 def _metadata_first_hit(metadata: dict[str, dict], folder_name: str) -> dict | None:
     for v in (
         folder_name,
@@ -1286,7 +1208,6 @@ def _metadata_first_hit(metadata: dict[str, dict], folder_name: str) -> dict | N
         if hit:
             return hit
     return None
-
 
 def _metadata_keys_for_excel_name(name: str) -> list[str]:
     """Các khóa tra cứu metadata cho một dòng Excel (tên gốc + tên thư mục sau sanitize)."""
@@ -1303,7 +1224,6 @@ def _metadata_keys_for_excel_name(name: str) -> list[str]:
             if nk not in keys:
                 keys.append(nk)
     return keys
-
 
 def _lookup_device_metadata(metadata: dict[str, dict], folder_name: str) -> dict:
     """Ghép dòng Excel với thư mục ``Project_Output/<tên>/`` (NFC/NFD, hậu tố ``_2``…)."""
@@ -1335,7 +1255,6 @@ def _lookup_device_metadata(metadata: dict[str, dict], folder_name: str) -> dict
             return matches[0]
     return {}
 
-
 def _norm_voltage(value: object) -> float | None:
     if value is None:
         return None
@@ -1352,7 +1271,6 @@ def _norm_voltage(value: object) -> float | None:
     if "kv" in s.lower():
         v *= 1000.0
     return v if v > 0 else None
-
 
 def _excel_stt(value: object) -> int | None:
     """Số thứ tự từ cột ``stt`` (số nguyên hoặc chuỗi có chữ số)."""
@@ -1373,7 +1291,6 @@ def _excel_stt(value: object) -> int | None:
         return None
     return int(digits)
 
-
 def _cell_text(row: object, col: str | None) -> str:
     if col is None:
         return ""
@@ -1386,7 +1303,6 @@ def _cell_text(row: object, col: str | None) -> str:
     except Exception:
         return ""
     return str(v).strip()
-
 
 def read_device_metadata_from_excel(
     excel_path: str | Path,
@@ -1485,7 +1401,6 @@ def read_device_metadata_from_excel(
             out[mk] = entry
     return out
 
-
 def _find_first_excel(root: Path) -> Path | None:
     for p in sorted(root.rglob("*")):
         if not p.is_file():
@@ -1496,7 +1411,6 @@ def _find_first_excel(root: Path) -> Path | None:
         if p.suffix.lower() in {".xlsx", ".xlsm", ".xls"}:
             return p
     return None
-
 
 def _find_project_root(extract_root: Path) -> Path:
     """Tìm thư mục chứa các thư mục thiết bị.
@@ -1511,7 +1425,6 @@ def _find_project_root(extract_root: Path) -> Path:
         if p.is_dir():
             return p
     return extract_root
-
 
 def build_word_report_from_zip(
     zip_bytes: bytes,
