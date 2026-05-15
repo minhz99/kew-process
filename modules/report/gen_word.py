@@ -1622,10 +1622,10 @@ def generate_table6_docx(
         danh_sach.append({
             "tt":       idx,
             "ten":      str(thiet_bi.get("ten") or "").strip(),
-            "I":        _t6_fmt(thiet_bi.get("I"), 1),
+            "I":        _t6_fmt(thiet_bi.get("I"), 0),
             "delta_I":  _t6_fmt(thiet_bi.get("delta_I"), 1),
             "cos_phi":  _t6_fmt(thiet_bi.get("cos_phi"), 3),
-            "P":        _t6_fmt(thiet_bi.get("P"), 1),
+            "P":        _t6_fmt(thiet_bi.get("P"), 0),
             "tdd":      _t6_fmt(thiet_bi.get("tdd"), 2),
             "nhan_xet": nhan_xet,
         })
