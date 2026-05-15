@@ -3,72 +3,86 @@
   <div id="app-container">
     <div
       style="display:flex;gap:8px;padding:0.75rem 1rem 0;flex-wrap:wrap;align-items:center;border-bottom:1px solid var(--border)">
-      <button type="button" class="btn" id="kew-subtab-field-btn" onclick="window.switchKewSubtab && window.switchKewSubtab('field')"
-      style="font-size:0.85rem;border-color:var(--border)">Xử lý file sơ bộ</button>
-      <button type="button" class="btn" id="kew-subtab-word-btn" onclick="window.switchKewSubtab && window.switchKewSubtab('word')"
-      style="font-size:0.85rem;border-color:var(--border)">Tạo báo cáo Word</button>
-      <button type="button" class="btn" id="kew-subtab-mba-btn" onclick="window.switchKewSubtab && window.switchKewSubtab('mba')"
-        style="font-size:0.85rem;font-weight:600;border-color:var(--accent3);color:var(--accent3)">Xuất Excel MBA</button>
+      <button type="button" class="btn" id="kew-subtab-field-btn"
+        onclick="window.switchKewSubtab && window.switchKewSubtab('field')"
+        style="font-size:0.85rem;border-color:var(--border)">Xử lý file sơ bộ</button>
+      <button type="button" class="btn" id="kew-subtab-word-btn"
+        onclick="window.switchKewSubtab && window.switchKewSubtab('word')"
+        style="font-size:0.85rem;border-color:var(--border)">Tạo báo cáo Word</button>
+      <button type="button" class="btn" id="kew-subtab-mba-btn"
+        onclick="window.switchKewSubtab && window.switchKewSubtab('mba')"
+        style="font-size:0.85rem;font-weight:600;border-color:var(--accent3);color:var(--accent3)">Xuất Excel
+        MBA</button>
     </div>
 
     <div id="kew-panel-mba" class="kew-subpanel" style="display:block">
-    <div class="content active" id="tab-mba" style="padding-top: 1rem;">
-      <div class="chart-card" id="mba-manager-panel" style="border-color:var(--accent3)40">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:10px">
-          <div>
-            <h3 style="margin:0;color:var(--accent3)">📊 Xuất Excel máy biến áp</h3>
-            <p style="font-size:0.76rem;color:var(--text-muted);margin:4px 0 0">Thêm từng file INPS và đặt tên sheet →
-              xuất 1 file Excel nhiều sheet.</p>
+      <div class="content active" id="tab-mba" style="padding-top: 1rem;">
+        <div class="chart-card" id="mba-manager-panel" style="border-color:var(--accent3)40">
+          <div
+            style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:10px">
+            <div>
+              <h3 style="margin:0;color:var(--accent3)">📊 Xuất Excel máy biến áp</h3>
+              <p style="font-size:0.76rem;color:var(--text-muted);margin:4px 0 0">Thêm từng file INPS và đặt tên sheet →
+                xuất 1 file Excel nhiều sheet.</p>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <input type="text" id="mba-out-filename" class="btn" style="width:200px;padding:5px 10px;font-size:0.8rem"
+                placeholder="Tên file xuất (VD: MBA_NhaMay.xlsx)" value="NX-MBA.xlsm">
+              <button class="btn" id="btn-mba-export-all"
+                style="border-color:var(--accent3);color:var(--accent3);font-weight:600" onclick="exportMbaAll()">
+                <span id="mba-all-spinner"
+                  style="display:none;width:12px;height:12px;border:2px solid rgba(0,0,0,0.2);border-radius:50%;border-top-color:var(--accent3);animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:4px"></span>
+                📥 Xuất tất cả
+              </button>
+            </div>
           </div>
+
+          <input type="file" id="mba-file-picker" multiple accept=".KEW,.kew,.ZIP,.zip" style="display:none">
+
+          <div id="mba-drop-area" onclick="document.getElementById('mba-file-picker').click()"
+            style="border: 2px dashed rgba(59, 130, 246, 0.4); border-radius: 12px; padding: 2rem 1rem; text-align: center; cursor: pointer; transition: all 0.2s; margin-bottom: 1.5rem; background: var(--surface2);">
+            <div style="font-size: 2.5rem; margin-bottom: 0.5rem; opacity: 0.8;">📥</div>
+            <div style="font-size: 1.05rem; font-weight: 500; color: var(--text);">Kéo thả file INPSxxxx.KEW vào khung
+              này
+            </div>
+            <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 5px;">hoặc click để duyệt file trên
+              máy
+            </div>
+          </div>
+
+          <div id="mba-entries-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:1rem">
+          </div>
+
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <input type="text" id="mba-out-filename" class="btn" style="width:200px;padding:5px 10px;font-size:0.8rem"
-              placeholder="Tên file xuất (VD: MBA_NhaMay.xlsx)" value="NX-MBA.xlsm">
-            <button class="btn" id="btn-mba-export-all"
-              style="border-color:var(--accent3);color:var(--accent3);font-weight:600" onclick="exportMbaAll()">
-              <span id="mba-all-spinner"
-                style="display:none;width:12px;height:12px;border:2px solid rgba(0,0,0,0.2);border-radius:50%;border-top-color:var(--accent3);animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:4px"></span>
-              📥 Xuất tất cả
+            <button class="btn" style="border-color: var(--border); font-size: 0.82rem;" type="button"
+              onclick="window._mbaClearList && window._mbaClearList()">
+              🗑 Xóa danh sách
             </button>
+            <span id="mba-status-msg" style="font-size:0.76rem;color:var(--text-muted);margin-left:auto;"></span>
           </div>
-        </div>
-
-        <input type="file" id="mba-file-picker" multiple accept=".KEW,.kew,.ZIP,.zip" style="display:none">
-
-        <div id="mba-drop-area" onclick="document.getElementById('mba-file-picker').click()"
-          style="border: 2px dashed rgba(59, 130, 246, 0.4); border-radius: 12px; padding: 2rem 1rem; text-align: center; cursor: pointer; transition: all 0.2s; margin-bottom: 1.5rem; background: var(--surface2);">
-          <div style="font-size: 2.5rem; margin-bottom: 0.5rem; opacity: 0.8;">📥</div>
-          <div style="font-size: 1.05rem; font-weight: 500; color: var(--text);">Kéo thả file INPSxxxx.KEW vào khung này
-          </div>
-          <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 5px;">hoặc click để duyệt file trên máy
-          </div>
-        </div>
-
-        <div id="mba-entries-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:1rem">
-        </div>
-
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <button class="btn" style="border-color: var(--border); font-size: 0.82rem;" type="button"
-            onclick="window._mbaClearList && window._mbaClearList()">
-            🗑 Xóa danh sách
-          </button>
-          <span id="mba-status-msg" style="font-size:0.76rem;color:var(--text-muted);margin-left:auto;"></span>
         </div>
       </div>
-    </div>
     </div>
 
     <div id="kew-panel-field" class="kew-subpanel" style="display:none;padding:1rem;">
       <div class="chart-card" style="border-color:rgba(16,185,129,0.35)">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem;flex-wrap:wrap;gap:12px">
+        <div
+          style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem;flex-wrap:wrap;gap:12px">
           <div>
             <h3 style="margin:0;color:var(--accent2, #10b981)">📦 Xử lý KEW (hồ sơ hiện trường)</h3>
             <p style="font-size:0.76rem;color:var(--text-muted);margin:6px 0 0;max-width:52rem">
               Upload một file <strong>.zip</strong> gồm: file Excel hiện trường <strong>.xlsx</strong> với đúng các cột
-              <code>stt</code>, <code>name</code>, <code>file</code>, <code>img</code>, <code>imgend</code>, <code>imgomit</code>, <code>type</code>, <code>pdm</code>,
-              <code>p</code>, <code>pf</code>, <code>i1</code>, <code>i2</code>, <code>i3</code>, <code>di</code>, <code>thd</code>, <code>tdd</code>
-              (tên cột không phân biệt hoa thường), các thư mục record <code>S0001</code>, <code>S0002</code>, … và ảnh <code>PS-SDxxx.BMP</code>.
-              Bước này dùng <code>name</code> / <code>file</code> / <code>img</code> / <code>imgend</code> / <code>imgomit</code> (tuỳ chọn: liệt kê chỉ số ảnh trong dải bị loại, vd <code>944,945</code>); <code>stt</code> và các cột còn lại phục vụ bước tạo Word (thứ tự thiết bị, loại MBA/device, …).
-              Hệ thống đổi tên thư mục theo tên thiết bị, chuyển ảnh vào đúng thư mục, kiểm tra thiếu file / trùng dải ảnh, rồi trả về
+              <code>stt</code>, <code>name</code>, <code>file</code>, <code>img</code>, <code>imgend</code>,
+              <code>imgomit</code>, <code>type</code>, <code>pdm</code>,
+              <code>p</code>, <code>pf</code>, <code>i1</code>, <code>i2</code>, <code>i3</code>, <code>di</code>,
+              <code>thd</code>, <code>tdd</code>
+              (tên cột không phân biệt hoa thường), các thư mục record <code>S0001</code>, <code>S0002</code>, … và ảnh
+              <code>PS-SDxxx.BMP</code>.
+              Bước này dùng <code>name</code> / <code>file</code> / <code>img</code> / <code>imgend</code> /
+              <code>imgomit</code> (tuỳ chọn: liệt kê chỉ số ảnh trong dải bị loại, vd <code>944,945</code>);
+              <code>stt</code> và các cột còn lại phục vụ bước tạo Word (thứ tự thiết bị, loại MBA/device, …).
+              Hệ thống đổi tên thư mục theo tên thiết bị, chuyển ảnh vào đúng thư mục, kiểm tra thiếu file / trùng dải
+              ảnh, rồi trả về
               <strong>KEW_HoSoDaXuLy.zip</strong> (cấu trúc <code>Project_Output/</code>…).
             </p>
           </div>
@@ -80,7 +94,8 @@
           style="border:2px dashed rgba(16,185,129,0.45);border-radius:12px;padding:1.75rem 1rem;text-align:center;cursor:pointer;margin-bottom:1rem;background:var(--surface2)">
           <div style="font-size:2rem;margin-bottom:0.35rem">📁</div>
           <div style="font-weight:500;color:var(--text)">Chọn hoặc kéo thả file ZIP hồ sơ KEW6315</div>
-          <div style="font-size:0.82rem;color:var(--text-muted);margin-top:6px">Excel .xlsx/.xlsm + thư mục Sxxxx + ảnh BMP</div>
+          <div style="font-size:0.82rem;color:var(--text-muted);margin-top:6px">Excel .xlsx/.xlsm + thư mục Sxxxx + ảnh
+            BMP</div>
         </div>
 
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
@@ -99,15 +114,21 @@
 
     <div id="kew-panel-word" class="kew-subpanel" style="display:none;padding:1rem;">
       <div class="chart-card" style="border-color:rgba(139,92,246,0.35)">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem;flex-wrap:wrap;gap:12px">
+        <div
+          style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem;flex-wrap:wrap;gap:12px">
           <div>
             <h3 style="margin:0;color:#8b5cf6">📝 Tạo báo cáo Word</h3>
             <p style="font-size:0.76rem;color:var(--text-muted);margin:6px 0 0;max-width:52rem">
-              Upload file <strong>KEW_HoSoDaXuLy.zip</strong> (output của bước "Xử lý file sơ bộ"), hoặc ZIP chứa các thư mục thiết bị có
-              <code>INPSxxxx.KEW</code> + ảnh <code>PS-SDxxx.BMP</code>. Hệ thống tổng hợp số liệu từ INPS, dựng báo cáo Word
+              Upload file <strong>KEW_HoSoDaXuLy.zip</strong> (output của bước "Xử lý file sơ bộ"), hoặc ZIP chứa các
+              thư mục thiết bị có
+              <code>INPSxxxx.KEW</code> + ảnh <code>PS-SDxxx.BMP</code>. Hệ thống tổng hợp số liệu từ INPS, dựng báo cáo
+              Word
               (<strong>BaoCao_KEW.docx</strong>).
-              Nếu ZIP có kèm Excel <strong>.xlsx</strong> đủ bộ cột hiện trường (cùng mẫu với bước «Xử lý file sơ bộ»), hệ thống đọc
-              <code>stt</code> (thứ tự thiết bị trong báo cáo), <code>type</code>, <code>pdm</code> (điện áp định mức), <code>p</code>, <code>pf</code>, <code>i1</code>–<code>i3</code>, <code>di</code>, <code>thd</code>, <code>tdd</code>
+              Nếu ZIP có kèm Excel <strong>.xlsx</strong> đủ bộ cột hiện trường (cùng mẫu với bước «Xử lý file sơ bộ»),
+              hệ thống đọc
+              <code>stt</code> (thứ tự thiết bị trong báo cáo), <code>type</code>, <code>pdm</code> (điện áp định mức),
+              <code>p</code>, <code>pf</code>, <code>i1</code>–<code>i3</code>, <code>di</code>, <code>thd</code>,
+              <code>tdd</code>
               làm metadata (loại section, điện áp định mức, chuỗi nhận xét ghép từ các chỉ số).
             </p>
           </div>
@@ -119,19 +140,27 @@
           style="border:2px dashed rgba(139,92,246,0.45);border-radius:12px;padding:1.75rem 1rem;text-align:center;cursor:pointer;margin-bottom:1rem;background:var(--surface2)">
           <div style="font-size:2rem;margin-bottom:0.35rem">📄</div>
           <div style="font-weight:500;color:var(--text)">Chọn hoặc kéo thả ZIP đã tổ chức (Project_Output/…)</div>
-          <div style="font-size:0.82rem;color:var(--text-muted);margin-top:6px">Mỗi thư mục con phải có INPSxxxx.KEW + ảnh BMP</div>
+          <div style="font-size:0.82rem;color:var(--text-muted);margin-top:6px">Mỗi thư mục con phải có INPSxxxx.KEW +
+            ảnh BMP</div>
         </div>
 
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:0.5rem">
           <input type="text" id="kew-word-out-filename" class="btn"
-            style="width:220px;padding:5px 10px;font-size:0.8rem"
-            placeholder="Tên file xuất (VD: BaoCao_KEW.docx)" value="BaoCao_KEW.docx">
+            style="width:220px;padding:5px 10px;font-size:0.8rem" placeholder="Tên dự án (VD: NhaMayA)"
+            value="NhaMayA">
           <button type="button" class="btn" id="btn-kew-word-process"
             style="border-color:#8b5cf6;color:#8b5cf6;font-weight:600"
             onclick="window.kewWordProcessZip && window.kewWordProcessZip()" disabled>
             <span id="kew-word-spinner"
               style="display:none;width:12px;height:12px;border:2px solid rgba(0,0,0,0.15);border-radius:50%;border-top-color:#8b5cf6;animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:6px"></span>
-            Sinh và tải Word
+            Tạo Chương 4+5
+          </button>
+          <button type="button" class="btn" id="btn-kew-table6-process"
+            style="border-color:#f59e0b;color:#f59e0b;font-weight:600"
+            onclick="window.kewTable6ProcessZip && window.kewTable6ProcessZip()" disabled>
+            <span id="kew-table6-spinner"
+              style="display:none;width:12px;height:12px;border:2px solid rgba(0,0,0,0.15);border-radius:50%;border-top-color:#f59e0b;animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:6px"></span>
+            Tạo Bảng 6.3
           </button>
           <span id="kew-word-file-label" style="font-size:0.8rem;color:var(--text-muted)">Chưa chọn file</span>
           <span id="kew-word-status" style="font-size:0.78rem;color:var(--text-muted);margin-left:auto"></span>
@@ -145,9 +174,9 @@
 <script>
   (function () {
     var TABS = {
-      mba:   { panel: 'kew-panel-mba',   btn: 'kew-subtab-mba-btn',   color: 'var(--accent3)' },
+      mba: { panel: 'kew-panel-mba', btn: 'kew-subtab-mba-btn', color: 'var(--accent3)' },
       field: { panel: 'kew-panel-field', btn: 'kew-subtab-field-btn', color: 'var(--accent2, #10b981)' },
-      word:  { panel: 'kew-panel-word',  btn: 'kew-subtab-word-btn',  color: '#8b5cf6' }
+      word: { panel: 'kew-panel-word', btn: 'kew-subtab-word-btn', color: '#8b5cf6' }
     };
 
     window.switchKewSubtab = function (which) {
@@ -433,8 +462,10 @@
     var _kewWordFile = null;
 
     function _setBtnState() {
-      var btn = document.getElementById('btn-kew-word-process');
-      if (btn) btn.disabled = !_kewWordFile;
+      var btn1 = document.getElementById('btn-kew-word-process');
+      var btn2 = document.getElementById('btn-kew-table6-process');
+      if (btn1) btn1.disabled = !_kewWordFile;
+      if (btn2) btn2.disabled = !_kewWordFile;
     }
 
     function _label(name) {
@@ -491,8 +522,11 @@
       if (spin) spin.style.display = 'inline-block';
       if (st) st.textContent = 'Đang xử lý…';
 
-      var outName = (document.getElementById('kew-word-out-filename').value || '').trim() || 'BaoCao_KEW.docx';
-      if (!outName.toLowerCase().endsWith('.docx')) outName += '.docx';
+      var baseName = (document.getElementById('kew-word-out-filename').value || '').trim() || 'DuAn';
+      var outName = baseName.toLowerCase().endsWith('.docx') ? baseName : baseName + '.docx';
+      if (!outName.startsWith('Chương 4+5')) {
+        outName = 'Chương 4+5 ' + outName;
+      }
 
       var fd = new FormData();
       fd.append('zip', _kewWordFile, _kewWordFile.name);
@@ -522,14 +556,70 @@
         })
         .catch(function (err) {
           alert('Lỗi: ' + err.message);
-          if (st) st.textContent = '❌ Sinh báo cáo thất bại';
+          if (st) st.textContent = '❌ Tạo báo cáo thất bại';
         })
         .finally(function () {
-          if (btn) btn.disabled = !_kewWordFile;
+          _setBtnState();
           if (spin) spin.style.display = 'none';
         });
     };
 
-    _setBtnState();
-  })();
+  window.kewTable6ProcessZip = function () {
+    if (!_kewWordFile) {
+      alert('Chưa chọn file ZIP.');
+      return;
+    }
+    var btn1 = document.getElementById('btn-kew-word-process');
+    var btn2 = document.getElementById('btn-kew-table6-process');
+    var spin = document.getElementById('kew-table6-spinner');
+    var st = document.getElementById('kew-word-status');
+
+    if (btn1) btn1.disabled = true;
+    if (btn2) btn2.disabled = true;
+    if (spin) spin.style.display = 'inline-block';
+    if (st) st.textContent = 'Đang tạo Bảng 6.3…';
+
+    var baseName = (document.getElementById('kew-word-out-filename').value || '').trim() || 'DuAn';
+    var outName = baseName.toLowerCase().endsWith('.docx') ? baseName : baseName + '.docx';
+    if (!outName.startsWith('Bảng 6.3')) {
+      outName = 'Bảng 6.3 ' + outName;
+    }
+
+    var fd = new FormData();
+    fd.append('zip', _kewWordFile, _kewWordFile.name);
+
+    fetch('/api/kew/generate-table6', { method: 'POST', body: fd })
+      .then(function (r) {
+        if (!r.ok) {
+          return r.json().then(function (j) {
+            var parts = [];
+            if (j.errors && j.errors.length) parts.push(j.errors.join('\n'));
+            if (j.error) parts.push(j.error);
+            throw new Error(parts.join('\n\n') || ('HTTP ' + r.status));
+          });
+        }
+        return r.blob().then(function (blob) { return { blob: blob }; });
+      })
+      .then(function (res) {
+        var url = URL.createObjectURL(res.blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = outName;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 400);
+        if (st) st.textContent = '✅ Đã tải Bảng 6.3';
+      })
+      .catch(function (err) {
+        alert('Lỗi: ' + err.message);
+        if (st) st.textContent = '❌ tạo Bảng 6.3 thất bại';
+      })
+      .finally(function () {
+        _setBtnState();
+        if (spin) spin.style.display = 'none';
+      });
+  };
+
+  _setBtnState();
+  }) ();
 </script>

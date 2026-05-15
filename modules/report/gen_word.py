@@ -48,11 +48,15 @@ __all__ = [
     "build_word_report_from_zip",
     "DEFAULT_MBA_TEMPLATE",
     "DEFAULT_DEVICE_TEMPLATE",
+    "DEFAULT_TABLE6_TEMPLATE",
+    "generate_table6_docx",
+    "generate_table6_from_zip",
 ]
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_MBA_TEMPLATE = _REPO_ROOT / "static" / "word-template" / "mba.docx"
 DEFAULT_DEVICE_TEMPLATE = _REPO_ROOT / "static" / "word-template" / "device.docx"
+DEFAULT_TABLE6_TEMPLATE = _REPO_ROOT / "static" / "word-template" / "table6.docx"
 
 WIDTH_LARGE, WIDTH_SMALL, HEIGHT_MBA = Mm(109.6), Mm(53.8), Mm(40.5)
 WIDTH_A, WIDTH_SUB, HEIGHT_A, HEIGHT_SUB = Mm(166.3), Mm(54.3), Mm(60.0), Mm(41.3)
@@ -1502,3 +1506,240 @@ def build_word_report_from_zip(
         if excel_path:
             warnings.insert(0, f"Đã dùng metadata Excel: {excel_path.name}.")
         return path, warnings
+
+
+# ════════════════════════════════════════════════════════════════════
+#   Bảng tổng hợp kết quả đo kiểm (Table 6 — table6.docx)
+# ════════════════════════════════════════════════════════════════════
+
+# Ngưỡng đánh giá cho bảng tổng hợp (theo quy tắc trong temp-ex.py)
+_T6_COSPHI_LOW = 0.75
+_T6_COSPHI_MID = 0.85
+_T6_DELTA_I_HIGH = 10.0
+_T6_TDD_HIGH = 12.0
+
+
+def _t6_auto_nhan_xet(delta_I: object, cos_phi: object, tdd: object) -> str:
+    """Tự động sinh cột nhận xét theo bộ quy tắc Table6.
+
+    Ngưỡng:
+    - Cosφ < 0.75 → "Hệ số Cosφ còn thấp"
+    - ΔI ≥ 10 % → "Độ lệch pha dòng điện còn cao"
+    - TDD ≥ 12 % → "Tổng biến dạng sóng hài dòng điện còn cao"
+    - Không vi phạm → "Thiết bị vận hành ổn định"
+    """
+    vi_pham: list[str] = []
+
+    def _to_float(v: object) -> float | None:
+        if v is None:
+            return None
+        try:
+            import pandas as _pd
+            if isinstance(v, float) and _pd.isna(v):
+                return None
+        except Exception:
+            pass
+        try:
+            return float(str(v).strip().replace(",", "."))
+        except (ValueError, TypeError):
+            return None
+
+    val_cos = _to_float(cos_phi)
+    val_di = _to_float(delta_I)
+    val_tdd = _to_float(tdd)
+
+    if val_cos is not None and abs(val_cos) < _T6_COSPHI_LOW:
+        vi_pham.append("Hệ số Cosφ còn thấp")
+    if val_di is not None and val_di >= _T6_DELTA_I_HIGH:
+        vi_pham.append("Độ lệch pha dòng điện còn cao")
+    if val_tdd is not None and val_tdd >= _T6_TDD_HIGH:
+        vi_pham.append("Tổng biến dạng sóng hài dòng điện còn cao")
+
+    if not vi_pham:
+        return "Thiết bị vận hành ổn định"
+    return ", ".join(vi_pham)
+
+
+def _t6_fmt(v: object, decimals: int = 2) -> str:
+    """Định dạng số cho ô bảng Table6 (dấu phẩy thập phân, trả '—' nếu thiếu)."""
+    if v is None:
+        return "—"
+    try:
+        import pandas as _pd
+        if isinstance(v, float) and _pd.isna(v):
+            return "—"
+    except Exception:
+        pass
+    try:
+        x = float(str(v).strip().replace(",", "."))
+    except (ValueError, TypeError):
+        return str(v).strip() if str(v).strip() else "—"
+    if x != x:  # NaN
+        return "—"
+    return f"{x:.{decimals}f}".replace(".", ",")
+
+
+def generate_table6_docx(
+    devices: list[dict],
+    output_path: str | Path,
+    *,
+    template_path: str | Path | None = None,
+) -> Path:
+    """Sinh file Word bảng tổng hợp kết quả đo kiểm (Table 6).
+
+    Mỗi phần tử ``devices`` là một dict với các khóa:
+        - ``ten``       : tên khu vực / thiết bị (bắt buộc)
+        - ``I``         : dòng điện trung bình (A)
+        - ``delta_I``   : độ lệch pha dòng điện (%)
+        - ``cos_phi``   : hệ số công suất
+        - ``P``         : công suất tác dụng (kW)
+        - ``tdd``       : tổng biến dạng sóng hài dòng điện (%)
+        - ``nhan_xet``  : (tuỳ chọn) nhận xét thủ công; nếu để trống hàm tự sinh
+
+    Template phải có vòng lặp Jinja2:
+        ``{% tr for item in ds_thiet_bi %}…{% endtr %}``
+    với các biến: ``item.tt``, ``item.ten``, ``item.I``, ``item.delta_I``,
+    ``item.cos_phi``, ``item.P``, ``item.tdd``, ``item.nhan_xet``.
+
+    Trả về ``Path`` đến file đã lưu.
+    """
+    tpl_path = Path(template_path or DEFAULT_TABLE6_TEMPLATE)
+    if not tpl_path.is_file():
+        raise FileNotFoundError(f"Thiếu template Table6: {tpl_path}")
+
+    doc = DocxTemplate(str(tpl_path))
+
+    danh_sach: list[dict] = []
+    for idx, thiet_bi in enumerate(devices, start=1):
+        nhan_xet = str(thiet_bi.get("nhan_xet") or "").strip()
+        if not nhan_xet:
+            nhan_xet = _t6_auto_nhan_xet(
+                thiet_bi.get("delta_I"),
+                thiet_bi.get("cos_phi"),
+                thiet_bi.get("tdd"),
+            )
+        danh_sach.append({
+            "tt":       idx,
+            "ten":      str(thiet_bi.get("ten") or "").strip(),
+            "I":        _t6_fmt(thiet_bi.get("I"), 1),
+            "delta_I":  _t6_fmt(thiet_bi.get("delta_I"), 1),
+            "cos_phi":  _t6_fmt(thiet_bi.get("cos_phi"), 3),
+            "P":        _t6_fmt(thiet_bi.get("P"), 1),
+            "tdd":      _t6_fmt(thiet_bi.get("tdd"), 2),
+            "nhan_xet": nhan_xet,
+        })
+
+    doc.render({"ds_thiet_bi": danh_sach})
+    out = Path(output_path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    doc.save(str(out))
+    return out
+
+
+def generate_table6_from_zip(
+    zip_bytes: bytes,
+    output_path: str | Path,
+    *,
+    template_path: str | Path | None = None,
+) -> tuple[Path, list[str]]:
+    """Entry-point cho API: đọc ZIP (có thể kèm Excel hiện trường) → sinh Table6.
+
+    Dữ liệu mỗi thiết bị lấy từ các cột Excel:
+        ``name`` → ``ten``,  ``i_max`` → ``I``,  ``delta_i`` → ``delta_I``,
+        ``cos_phi`` → ``cos_phi``,  ``p`` → ``P``,  ``tdd`` → ``tdd``.
+
+    Thứ tự theo cột ``stt`` (nếu có); thiếu Excel hoặc thiếu cột → trả cảnh báo
+    và bảng rỗng (vẫn tạo file).
+
+    Trả về ``(đường_dẫn, warnings)``.
+    """
+    warnings: list[str] = []
+
+    with TemporaryDirectory(prefix="table6_") as td:
+        extract = Path(td) / "in"
+        extract.mkdir()
+        bio = io.BytesIO(zip_bytes)
+        try:
+            try:
+                zf = zipfile.ZipFile(bio, "r", metadata_encoding="utf-8")
+            except TypeError:
+                bio.seek(0)
+                zf = zipfile.ZipFile(bio, "r")
+            with zf:
+                zf.extractall(extract)
+        except zipfile.BadZipFile as e:
+            raise ValueError(f"File ZIP không hợp lệ: {e}") from e
+
+        excel_path = _find_first_excel(extract)
+        devices: list[dict] = []
+
+        if excel_path is None:
+            warnings.append(
+                "Không tìm thấy file Excel trong ZIP — bảng tổng hợp sẽ được tạo rỗng."
+            )
+        else:
+            try:
+                import pandas as _pd
+                from modules.kew.organize_field_zip import resolve_field_excel_column_map
+
+                df = _pd.read_excel(str(excel_path), header=0, engine="openpyxl")
+                if df.empty:
+                    warnings.append("File Excel không có dữ liệu.")
+                else:
+                    try:
+                        cm = resolve_field_excel_column_map(df)
+                    except ValueError as e:
+                        cm = None
+                        warnings.append(f"Không đọc được cấu trúc Excel: {e}")
+
+                    if cm is not None:
+                        rows: list[tuple[int, dict]] = []
+                        for _, row in df.iterrows():
+                            raw_name = row[cm["name"]]
+                            if raw_name is None or (
+                                isinstance(raw_name, float) and _pd.isna(raw_name)
+                            ):
+                                continue
+                            name = _nfc(str(raw_name).strip())
+                            if not name:
+                                continue
+
+                            def _cv(col_key: str) -> object:
+                                col = cm.get(col_key)
+                                if col is None:
+                                    return None
+                                try:
+                                    v = row[col]
+                                    if v is None or (
+                                        isinstance(v, float) and _pd.isna(v)
+                                    ):
+                                        return None
+                                    return v
+                                except Exception:
+                                    return None
+
+                            stt_raw = _excel_stt(row[cm["stt"]])
+                            stt_val = stt_raw if isinstance(stt_raw, int) else 10 ** 9
+                            rows.append((stt_val, {
+                                "ten":     name,
+                                "I":       _cv("i_max"),
+                                "delta_I": _cv("delta_i"),
+                                "cos_phi": _cv("cos_phi"),
+                                "P":       _cv("p"),
+                                "tdd":     _cv("tdd"),
+                            }))
+
+                        rows.sort(key=lambda x: x[0])
+                        devices = [r[1] for r in rows]
+                        warnings.insert(0, f"Đã đọc metadata Excel: {excel_path.name}.")
+            except ImportError:
+                warnings.append("Thiếu pandas/openpyxl — không đọc được Excel.")
+            except Exception as e:
+                warnings.append(f"Lỗi đọc Excel: {e}")
+
+        out = generate_table6_docx(
+            devices,
+            output_path,
+            template_path=template_path,
+        )
+        return out, warnings
