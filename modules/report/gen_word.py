@@ -333,14 +333,14 @@ def _eval_voltage(u_max, u_min, vref: float) -> tuple[str, float, float, float]:
 def _eval_pf(pf_avg) -> str:
     if pf_avg is None:
         return "—"
-    return "Đã đạt" if abs(pf_avg) >= _PF_LIMIT else "Cần lắp bù"
+    return "Đạt" if abs(pf_avg) >= _PF_LIMIT else "Không đạt"
 
 
 def _eval_thd(values: Iterable[float | None], limit: float) -> str:
     vals = [v for v in values if v is not None]
     if not vals:
         return "—"
-    return "Đạt" if max(vals) < limit else "Chưa đạt"
+    return "Đạt" if max(vals) < limit else "Không đạt"
 
 
 # ════════════════════════════════════════════════════════════════════
