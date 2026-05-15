@@ -235,8 +235,8 @@ def device(
         "img4": _inline(doc, img4, HEIGHT_SUB, WIDTH_SUB),
         "img5": _inline(doc, img5, HEIGHT_SUB, WIDTH_SUB),
         "img6": _inline(doc, img6, HEIGHT_SUB, WIDTH_SUB),
-        "cap_device": cap_device,
-        "remarks_device": remarks_device,
+        "cap1": cap_device,
+        "remarks": remarks_device,
     }
 
 
@@ -937,156 +937,170 @@ def _compose_remarks_from_excel_fields(
     pdm_kva: float | None = None,
     nominal_voltage: float | None,
 ) -> str:
-    """Sinh đoạn «Nhận xét:» hoàn toàn từ các trường Excel hiện trường.
+    """Sinh đoạn nhận xét từ các trường Excel hiện trường.
 
-    Theo quy-tac-2.md — 6 ý cho device, 4 ý tóm tắt cho MBA.
-    δU_min / δU_max được tính tự động từ u_min / u_max so với điện áp danh định.
+    - Không có tiền tố "Nhận xét: " (template Word tự thêm nếu cần).
+    - Thuật toán Loi_Dem: delta_u vi phạm cộng 2, các vi phạm khác cộng 1.
+    - Device: 6 câu theo thứ tự spec.
+    - MBA: 3 câu (% tải, biểu đồ dòng, đánh giá tổng + dẫn bảng).
     """
     vref = float(nominal_voltage) if nominal_voltage and nominal_voltage > 0 else _MBA_NOMINAL_VOLTAGE_V
     wave = _wave_phrase_from_char(current_char)
-    pf_txt = _pf_phrase(cos_phi)
 
-    # ── δU tính từ u_min / u_max ────────────────────────────────────────
+    # ── Định dạng helper ─────────────────────────────────────────────────
+    def _pct(v: float | None, d: int = 2) -> str:
+        return "—" if v is None else f"{v:.{d}f}".replace(".", ",")
+
+    def _volt(v: float | None, d: int = 1) -> str:
+        return "—" if v is None else f"{v:.{d}f}".replace(".", ",")
+
+    # ── δU lệch so với điện áp danh định (từ u_min / u_max) ─────────────
     du_lo: float | None = None
     du_hi: float | None = None
-    delta_u_ok = False
     if u_min is not None and u_max is not None and vref > 0:
         du_lo = (u_min - vref) / vref * 100.0
         du_hi = (u_max - vref) / vref * 100.0
-        delta_u_ok = abs(du_lo) <= _V_DEV_LIMIT_PCT and abs(du_hi) <= _V_DEV_LIMIT_PCT
-    elif delta_u is not None:
-        # fallback: dùng trực tiếp delta_u nếu không có u_min/u_max
-        delta_u_ok = delta_u < _V_DEV_LIMIT_PCT
 
-    # ── Đánh giá ΔU / ΔI ────────────────────────────────────────────────
+    # ── Thuật toán "Cờ báo lỗi" (Loi_Dem) ───────────────────────────────
+    tdd_lim = _TDD_LIMIT_PCT if kind == "mba" else _device_tdd_limit_from_name(name)
+    loi_dem = 0
+
+    if cos_phi is not None and abs(cos_phi) < _PF_LIMIT:
+        loi_dem += 1
+    if du_lo is not None and du_hi is not None:
+        if du_lo < -_V_DEV_LIMIT_PCT or du_hi > _V_DEV_LIMIT_PCT:
+            loi_dem += 1
+    if delta_i is not None and delta_i > 10.0:
+        loi_dem += 1
+    if thd_max is not None and thd_max > _THDV_LIMIT_PCT:
+        loi_dem += 1
+    if tdd_max is not None and tdd_max > tdd_lim:
+        loi_dem += 1
+    if delta_u is not None and delta_u > _V_DEV_LIMIT_PCT:
+        loi_dem += 2  # Mất cân bằng điện áp — lỗi nghiêm trọng, cộng 2
+
+    # ── Đánh giá chất lượng tổng quan ────────────────────────────────────
+    if kind == "mba":
+        quality = "Tốt" if loi_dem == 0 else ("Tương đối tốt" if loi_dem == 1 else "Chưa thực sự tốt")
+    else:
+        quality = "Tốt" if loi_dem == 0 else ("Tương đối tốt" if loi_dem == 1 else "Chưa tốt")
+
+    # ── Câu Hệ số công suất ───────────────────────────────────────────────
+    pf_txt = _pf_phrase(cos_phi)
+
+    # ── Câu Độ lệch pha ΔU / ΔI (Mẫu 1) ─────────────────────────────────
     du_num = float(delta_u) if delta_u is not None else None
     di_num = float(delta_i) if delta_i is not None else None
-    du_pass = du_num is not None and du_num < _V_DEV_LIMIT_PCT
-    di_pass = di_num is not None and di_num < 10.0
+    du_pass = du_num is not None and du_num <= _V_DEV_LIMIT_PCT
+    di_pass = di_num is not None and di_num <= 10.0
+    du_s, di_s = _pct(du_num), _pct(di_num)
 
-    # ── Định dạng helper ────────────────────────────────────────────────
-    def _pct(v: float | None, d: int = 2) -> str:
-        if v is None:
-            return "—"
-        return f"{v:.{d}f}".replace(".", ",")
-
-    def _volt(v: float | None, d: int = 1) -> str:
-        if v is None:
-            return "—"
-        return f"{v:.{d}f}".replace(".", ",")
-
-    # ── Ý 5: Độ lệch pha ΔU / ΔI ────────────────────────────────────────
-    du_s = _pct(du_num)
-    di_s = _pct(di_num)
-    if du_num is None or di_num is None:
-        di_part = "chưa xác định đủ dữ liệu độ lệch pha để đánh giá."
+    if du_num is None and di_num is None:
+        unbalance_sent = ""
+    elif du_num is None:
+        unbalance_sent = (
+            f"Độ lệch pha dòng điện ở mức {'thấp' if di_pass else 'cao'} "
+            f"(ΔI = {di_s}% {'<' if di_pass else '>'} 10,0%)."
+        )
+    elif di_num is None:
+        unbalance_sent = (
+            f"Độ lệch pha điện áp ở mức {'thấp' if du_pass else 'cao'} "
+            f"(ΔU = {du_s}% {'<' if du_pass else '>'} 5,0%)."
+        )
     elif du_pass and di_pass:
-        di_part = f"đều ở mức thấp (ΔU = {du_s}% < 5,0%, ΔI = {di_s}% < 10,0%)."
+        unbalance_sent = (
+            f"Độ lệch pha điện áp và dòng điện đều ở mức thấp "
+            f"(ΔU = {du_s}% < 5,0%; ΔI = {di_s}% < 10,0%)."
+        )
     elif du_pass and not di_pass:
-        di_part = (
-            f"điện áp ở mức thấp (ΔU = {du_s}% < 5,0%); tuy nhiên, "
-            f"độ lệch pha dòng điện ở mức cao (ΔI = {di_s}% > 10,0%)."
+        unbalance_sent = (
+            f"Độ lệch pha điện áp ở mức thấp (ΔU = {du_s}% < 5,0%); "
+            f"tuy nhiên, độ lệch pha dòng điện vượt mức cho phép (ΔI = {di_s}% > 10,0%)."
         )
     elif not du_pass and di_pass:
-        di_part = (
-            f"độ lệch pha dòng điện ở mức thấp (ΔI = {di_s}% < 10,0%); tuy nhiên, "
-            f"độ lệch pha điện áp vượt mức cho phép (ΔU = {du_s}% > 5,0%)."
+        unbalance_sent = (
+            f"Độ lệch dòng điện ở mức thấp (ΔI = {di_s}% < 10,0%); "
+            f"tuy nhiên, độ lệch pha điện áp vượt mức cho phép (ΔU = {du_s}% > 5,0%)."
         )
     else:
-        di_part = (
-            f"điện áp và dòng điện đều cần chú ý (ΔU = {du_s}% > 5,0%, ΔI = {di_s}% > 10,0%)."
+        unbalance_sent = (
+            f"Độ lệch pha điện áp và dòng điện đều vượt mức cho phép "
+            f"(ΔU = {du_s}% > 5,0%; ΔI = {di_s}% > 10,0%)."
         )
 
-    # ── Ý 6: THD / TDD ───────────────────────────────────────────────────
-    tdd_lim = _TDD_LIMIT_PCT if kind == "mba" else _device_tdd_limit_from_name(name)
+    # ── Câu Sóng hài THD / TDD (Mẫu 2) ──────────────────────────────────
     lim_s = _pct(tdd_lim, 1)
-    th_s = _pct(thd_max)
-    td_s = _pct(tdd_max)
-    thd_ok = thd_max is not None and thd_max < _THDV_LIMIT_PCT
-    tdd_ok = tdd_max is not None and tdd_max < tdd_lim
+    th_s, td_s = _pct(thd_max), _pct(tdd_max)
+    thd_ok = thd_max is not None and thd_max <= _THDV_LIMIT_PCT
+    tdd_ok = tdd_max is not None and tdd_max <= tdd_lim
 
-    if thd_ok and tdd_ok:
-        harm = (
+    if thd_max is None and tdd_max is None:
+        harm_sent = ""
+    elif thd_ok and tdd_ok:
+        harm_sent = (
             f"Tổng biến dạng sóng hài điện áp và dòng điện đều ở mức cho phép "
-            f"(THDmax = {th_s}% < 8,0% & TDDmax = {td_s}% < {lim_s}%)."
+            f"(THDmax = {th_s}% < 8,0%, TDDmax = {td_s}% < {lim_s}%)."
         )
     elif thd_ok and not tdd_ok:
-        harm = (
+        harm_sent = (
             f"Tổng biến dạng sóng hài điện áp ở mức cho phép (THDmax = {th_s}% < 8,0%); "
-            f"tuy nhiên, tổng biến dạng sóng hài dòng điện cao hơn mức cho phép "
+            f"tuy nhiên, tổng biến dạng sóng hài dòng điện vượt mức cho phép "
             f"(TDDmax = {td_s}% > {lim_s}%)."
         )
     elif not thd_ok and tdd_ok:
-        harm = (
+        harm_sent = (
             f"Tổng biến dạng sóng hài dòng điện ở mức cho phép (TDDmax = {td_s}% < {lim_s}%); "
-            f"tuy nhiên, tổng biến dạng sóng hài điện áp cao hơn mức cho phép "
+            f"tuy nhiên, tổng biến dạng sóng hài điện áp vượt mức cho phép "
             f"(THDmax = {th_s}% > 8,0%)."
         )
-    elif thd_max is None and tdd_max is None:
-        harm = "Chưa xác định dữ liệu sóng hài."
     else:
-        harm = (
-            f"Tổng biến dạng sóng hài điện áp và dòng điện đều cao hơn mức cho phép "
-            f"(THDmax = {th_s}% > 8,0% & TDDmax = {td_s}% > {lim_s}%)."
+        harm_sent = (
+            f"Tổng biến dạng sóng hài điện áp và tổng biến dạng sóng hài dòng điện "
+            f"đều vượt mức cho phép (THDmax = {th_s}% > 8,0%, TDDmax = {td_s}% > {lim_s}%)."
         )
 
-    # ── Ý 1: Chất lượng tổng quát ───────────────────────────────────────
-    score = sum([
-        du_pass,
-        di_pass,
-        thd_ok,
-        tdd_ok,
-        cos_phi is not None and abs(cos_phi) >= 0.8,
-    ])
-    if score >= 5:
-        quality = "Tốt"
-    elif score == 4:
-        quality = "Khá tốt"
-    elif score >= 2:
-        quality = "Tương đối tốt"
-    else:
-        quality = "Chưa tốt"
-
+    # ── MBA: 3 câu (% tải → biểu đồ dòng → đánh giá + dẫn bảng) ────────
     if kind == "mba":
-        du_rhetorical = "thấp" if (du_num is not None and du_num < 0.1) else "cao"
-        # Tính % tải: S_đo = P / cosφ (kVA); % tải = S_đo / Pđm * 100
         load_seg = ""
         if p_kw is not None and cos_phi is not None and abs(cos_phi) > 0.01 and pdm_kva is not None and pdm_kva > 0:
             s_kva = p_kw / abs(cos_phi)
             load_pct = s_kva / pdm_kva * 100.0
             load_seg = f"Công suất tiêu thụ của {name} đạt {_pct(load_pct, 2)}% công suất thiết kế. "
         return (
-            f"Nhận xét: {load_seg}"
-            f"Biểu đồ dòng điện tiêu thụ tại thời điểm đo kiểm {wave}, "
-            f"độ lệch pha điện áp ở mức {du_rhetorical}, "
-            f"hệ số công suất cosφ ở mức {pf_txt}. "
+            f"{load_seg}"
+            f"Biểu đồ dòng điện tiêu thụ tại thời điểm đo kiểm {wave}. "
             f"Chất lượng điện đo tại {name} ở mức {quality}. "
             f"Dưới đây là bảng tổng hợp thông số hoạt động của {name}:"
         )
 
-    # Device: 6 ý đầy đủ
-    umin_s = _volt(u_min)
-    umax_s = _volt(u_max)
-    dlo_s = _pct(du_lo) if du_lo is not None else _pct(du_num)
-    dhi_s = _pct(du_hi) if du_hi is not None else _pct(du_num)
+    # ── Device: 6 câu theo thứ tự spec ───────────────────────────────────
+    # Câu 4: Điện áp dao động + δU so danh định
+    umin_s, umax_s = _volt(u_min), _volt(u_max)
+    dlo_s, dhi_s = _pct(du_lo), _pct(du_hi)
     if du_lo is not None and du_hi is not None:
-        volt_clause = (
-            f"Điện áp dao động từ {umin_s} ÷ {umax_s} V, độ lệch chuẩn của điện áp δU "
-            f"(= {dlo_s}% ÷ {dhi_s}%) đạt tiêu chuẩn (-5,0% ≤ δ ≤ 5,0%)."
+        both_in = abs(du_lo) <= _V_DEV_LIMIT_PCT and abs(du_hi) <= _V_DEV_LIMIT_PCT
+        verdict = "đạt tiêu chuẩn (-5,0% ≤ δ ≤ 5,0%)" if both_in else "vượt giới hạn cho phép (-5,0% ≤ δ ≤ 5,0%)"
+        volt_sent = (
+            f"Điện áp dao động từ {umin_s} ÷ {umax_s} V, "
+            f"độ lệch so với điện áp danh định δU = {dlo_s}% ÷ {dhi_s}%, {verdict}."
         )
     elif u_min is not None and u_max is not None:
-        volt_clause = f"Điện áp dao động từ {umin_s} ÷ {umax_s} V."
+        volt_sent = f"Điện áp dao động từ {umin_s} ÷ {umax_s} V."
     else:
-        volt_clause = "Điện áp: chưa ghi nhận."
+        volt_sent = ""
 
-    return (
-        f"Nhận xét: Chất lượng điện cấp cho {name} ở mức {quality}. "
-        f"Biểu đồ dòng điện tiêu thụ tại {name} {wave} trong thời gian đo kiểm. "
-        f"Hệ số công suất cosφ ở mức {pf_txt}. "
-        f"{volt_clause} "
-        f"Độ lệch pha điện áp và dòng điện {di_part} "
-        f"{harm}"
-    )
+    parts: list[str] = [
+        f"Chất lượng điện cấp cho {name} ở mức {quality}.",
+        f"Biểu đồ dòng điện tiêu thụ tại {name} {wave} trong thời gian đo kiểm.",
+        f"Hệ số công suất cosφ ở mức {pf_txt}.",
+    ]
+    if volt_sent:
+        parts.append(volt_sent)
+    if unbalance_sent:
+        parts.append(unbalance_sent)
+    if harm_sent:
+        parts.append(harm_sent)
+    return " ".join(parts)
 
 
 def _resolve_remarks_field(
