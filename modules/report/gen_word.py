@@ -80,7 +80,11 @@ _FIELD_PARAM_COLS: tuple[str, ...] = (
     "thd", "tdd", "pdm",
 )
 
-# Giới hạn / tiêu chuẩn dùng cho cột "Đánh giá" trong báo cáo MBA.
+# Ký tự sánh an toàn trong XML / docxtpl (thoát trước khi nạp vào Word template).
+# Các chuỗi nhận xét dùng hằng này để biểu diễn "nhỏ hơn" / "lớn hơn" mà không bị
+# trình phân tích XML của python-docx / docxtpl hiểu nhầm là thẻ XML.
+_LT = "\u003c"  # <
+_GT = "\u003e"  # >
 _V_DEV_LIMIT_PCT = 5.0
 _PF_LIMIT = 0.9
 _THDV_LIMIT_PCT = 8.0
@@ -390,350 +394,30 @@ def _merge_auto_and_excel_notes(auto: str, excel_bits: str) -> str:
     return f"{auto}\n\nGhi chú hiện trường (Excel): {bits}"
 
 
-def _rated_kva_from_inis_folder(folder: str | Path | None) -> float | None:
-    """Công suất định mức (kVA) từ INIS nếu đọc được."""
-    if folder is None:
-        return None
-    try:
-        from modules.kew.analyse_kew import find_file, parse_inis
-    except ImportError:
-        return None
-    fp = find_file(str(folder), "INIS")
-    if not fp:
-        return None
-    meta = parse_inis(fp)
-    if not meta:
-        return None
-
-    def _one_val(text: str) -> float | None:
-        t = str(text).strip().upper().replace(",", ".")
-        m = re.search(r"(\d+(?:\.\d+)?)\s*(KVA|MVA|VA)?", t)
-        if not m:
-            return None
-        num = float(m.group(1))
-        unit = (m.group(2) or "").upper()
-        if unit == "MVA":
-            return num * 1000.0
-        if unit == "VA":
-            return num / 1000.0 if num > 500 else num
-        if not unit and num > 2500:
-            return num / 1000.0
-        return num
-
-    best: float | None = None
-    for k, v in meta.items():
-        ks = str(k).upper()
-        if not any(
-            x in ks
-            for x in ("KVA", "MVA", "RATING", "CAPACITY", "POWER", "APPARENT", "S[RATED")
-        ):
-            continue
-        val = _one_val(str(v))
-        if val is not None and val > 0:
-            best = val if best is None else max(best, val)
-    if best is not None:
-        return best
-    for v in meta.values():
-        val = _one_val(str(v))
-        if val is not None and 10 <= val <= 50000:
-            return val if val < 500 else val / 1000.0
-    return None
 
 
-def _current_spread_pct(
-    i1: Mapping | None, i2: Mapping | None, i3: Mapping | None,
-) -> float | None:
-    """Biên độ biến thiên dòng (max-min)/avg theo pha, lấy max các pha."""
-    best: float | None = None
-    for ix in (i1, i2, i3):
-        if not ix:
-            continue
-        avg = ix.get("avg")
-        lo = ix.get("min")
-        hi = ix.get("max")
-        if avg is None or lo is None or hi is None:
-            continue
-        try:
-            a = float(avg)
-        except (TypeError, ValueError):
-            continue
-        if a <= 0:
-            continue
-        try:
-            sp = (float(hi) - float(lo)) / a * 100.0
-        except (TypeError, ValueError):
-            continue
-        best = sp if best is None else max(best, sp)
-    return best
 
 
-def _waveform_phrase_mba(spread_pct: float | None) -> str:
-    if spread_pct is None or spread_pct != spread_pct:
-        return "biến đổi liên tục"
-    if spread_pct < _I_SPREAD_STABLE_PCT:
-        return "biến đổi liên tục với biên độ nhỏ"
-    if spread_pct < _I_SPREAD_MODERATE_PCT:
-        return "biến đổi liên tục với biên độ nhỏ"
-    return "biến đổi liên tục với biên độ lớn"
 
 
-def _waveform_phrase_device(spread_pct: float | None) -> str:
-    if spread_pct is None or spread_pct != spread_pct:
-        return "biến đổi liên tục với biên độ nhỏ"
-    if spread_pct < _I_SPREAD_STABLE_PCT:
-        return "biến đổi liên tục với biên độ nhỏ"
-    if spread_pct < _I_SPREAD_MODERATE_PCT:
-        return "biến đổi liên tục với biên độ nhỏ"
-    return "biến đổi liên tục với biên độ lớn"
 
 
-def _pf_text_for_remarks(pf_avg: float | None) -> str:
-    """Trong đoạn văn: mốc 0,8 — theo quy-tac-2 / quy-tac.md."""
-    if pf_avg is None or pf_avg != pf_avg:
-        return "chưa xác định đủ từ dữ liệu INPS"
-    p = abs(float(pf_avg))
-    if p >= 0.995:
-        return "rất cao (cosφ ≈ 1, có thể đã lắp đặt tụ bù)"
-    if p >= 0.8:
-        return "cao (trên 0,8)"
-    if p >= 0.5:
-        return "trung bình (dưới 0,8)"
-    return "thấp (dưới 0,8)"
 
 
-def _du_rhetorical_mba(uv_max_pct: float | None) -> str:
-    """Theo thói quan mẫu MBA: thường «ở mức cao» trừ khi cực nhỏ."""
-    if uv_max_pct is None or uv_max_pct != uv_max_pct:
-        return "cao"
-    return "thấp" if uv_max_pct < 0.1 else "cao"
 
 
-def _quality_level_mba(
-    *,
-    u12eval: str,
-    dueval: str,
-    pfeval: str,
-    thdeval: str,
-    tddeval: str,
-) -> str:
-    ok = [x for x in (u12eval, dueval, pfeval, thdeval, tddeval) if x == "Đạt"]
-    bad = [x for x in (u12eval, dueval, pfeval, thdeval, tddeval) if x == "Không đạt"]
-    if len(ok) >= 4 and not bad:
-        return "tốt"
-    if len(bad) >= 2:
-        return "chưa tốt"
-    return "tương đối tốt"
 
 
-def _quality_level_device(
-    *,
-    delta_u_ok: bool,
-    thd_ok: bool,
-    tdd_ok: bool,
-    di_ok: bool,
-    pf_avg: float | None,
-) -> str:
-    p = abs(float(pf_avg)) if pf_avg is not None and pf_avg == pf_avg else None
-    score = sum([delta_u_ok, thd_ok, tdd_ok, di_ok])
-    if p is not None and p >= 0.8:
-        score += 1
-    if score >= 5:
-        return "Tốt"
-    if score == 4:
-        return "Khá tốt"
-    if score >= 2:
-        return "Tương đối tốt"
-    return "Chưa tốt"
 
 
-def _line_voltage_range(
-    u12: Mapping | None, u23: Mapping | None, u31: Mapping | None,
-) -> tuple[float | None, float | None]:
-    mins: list[float] = []
-    maxs: list[float] = []
-    for u in (u12, u23, u31):
-        if not u:
-            continue
-        for key in ("min", "max"):
-            v = u.get(key)
-            if v is None:
-                continue
-            try:
-                x = float(v)
-            except (TypeError, ValueError):
-                continue
-            if x > 10:
-                (mins if key == "min" else maxs).append(x)
-    if not mins or not maxs:
-        return None, None
-    return min(mins), max(maxs)
 
 
-def _delta_u_line_window_pct(
-    u_min: float | None, u_max: float | None, vref: float,
-) -> tuple[float | None, float | None, bool]:
-    if u_min is None or u_max is None or vref <= 0:
-        return None, None, False
-    d_lo = (u_min - vref) / vref * 100.0
-    d_hi = (u_max - vref) / vref * 100.0
-    ok = abs(d_lo) <= _V_DEV_LIMIT_PCT and abs(d_hi) <= _V_DEV_LIMIT_PCT
-    return min(d_lo, d_hi), max(d_lo, d_hi), ok
 
 
-def _thd_tdd_maxes(
-    thd1: Mapping | None,
-    thd2: Mapping | None,
-    thd3: Mapping | None,
-    tdd1: Mapping | None,
-    tdd2: Mapping | None,
-    tdd3: Mapping | None,
-) -> tuple[float | None, float | None]:
-    thds: list[float] = []
-    tdds: list[float] = []
-    for d in (thd1, thd2, thd3, tdd1, tdd2, tdd3):
-        if not d:
-            continue
-        m = d.get("max")
-        if m is None:
-            continue
-        try:
-            x = float(m)
-        except (TypeError, ValueError):
-            continue
-        if d in (thd1, thd2, thd3):
-            thds.append(x)
-        else:
-            tdds.append(x)
-    return (max(thds) if thds else None), (max(tdds) if tdds else None)
 
 
-def _compose_remarks_mba_intro(
-    *,
-    name: str,
-    load_pct: float | None,
-    wave: str,
-    du_rhetorical: str,
-    pf_txt: str,
-    quality: str,
-) -> str:
-    load_seg = ""
-    if load_pct is not None and load_pct == load_pct:
-        load_seg = (
-            f"Công suất tiêu thụ của {name} đạt {_fmt_remark_pct(load_pct, 2)}% công suất thiết kế. "
-        )
-    return (
-        f"Nhận xét: {load_seg}"
-        f"Biểu đồ dòng điện tiêu thụ tại thời điểm đo kiểm {wave}, "
-        f"độ lệch pha điện áp ở mức {du_rhetorical}, "
-        f"hệ số công suất cosφ ở mức {pf_txt}. "
-        f"Chất lượng điện đo tại {name} ở mức {quality}. "
-        f"Dưới đây là bảng tổng hợp thông số hoạt động của {name}:"
-    )
 
 
-def _compose_remarks_device_paragraph(
-    *,
-    name: str,
-    vref: float,
-    tdd_limit_pct: float,
-    u_line_min: float | None,
-    u_line_max: float | None,
-    du_line_low: float | None,
-    du_line_high: float | None,
-    delta_u_ok: bool,
-    uv_unb_max: float | None,
-    ua_max: float | None,
-    di_ok: bool,
-    pf_avg: float | None,
-    thd_max: float | None,
-    tdd_max: float | None,
-    spread_pct: float | None,
-) -> str:
-    """Một đoạn liên tục 6 ý — theo quy-tac-2.md phần thiết bị."""
-    wave = _waveform_phrase_device(spread_pct)
-    q = _quality_level_device(
-        delta_u_ok=delta_u_ok,
-        thd_ok=thd_max is not None and thd_max < _THDV_LIMIT_PCT,
-        tdd_ok=tdd_max is not None and tdd_max < tdd_limit_pct,
-        di_ok=di_ok,
-        pf_avg=pf_avg,
-    )
-    pf_txt = _pf_text_for_remarks(pf_avg)
-    umin = _fmt_remark_voltage(u_line_min, 1)
-    umax = _fmt_remark_voltage(u_line_max, 1)
-    d1 = _fmt_remark_pct(du_line_low, 2)
-    d2 = _fmt_remark_pct(du_line_high, 2)
-    du_s = _fmt_remark_pct(uv_unb_max, 2) if uv_unb_max is not None else "—"
-    di_s = _fmt_remark_pct(ua_max, 2) if ua_max is not None else "—"
-
-    if uv_unb_max is None or ua_max is None:
-        return (
-            f"Nhận xét: Dữ liệu INPS tại {name} thiếu độ lệch pha (UV%/UA%); "
-            "không thể tự động lập nhận xét đầy đủ theo quy chuẩn."
-        )
-
-    du_num = float(uv_unb_max) if uv_unb_max is not None else 0.0
-    di_num = float(ua_max) if ua_max is not None else 0.0
-    du_pass = du_num < _V_DEV_LIMIT_PCT
-    di_pass = di_ok
-    if du_pass and di_pass:
-        di_cmp = "<"
-        di_part = f"đều ở mức thấp (ΔU = {du_s}% < 5,0%, ΔI = {di_s}% {di_cmp} 10,0%)."
-    elif du_pass and not di_pass:
-        di_cmp = ">" if di_num > 10.0 else ">"
-        di_part = (
-            f"điện áp ở mức thấp (ΔU = {du_s}% < 5,0%); tuy nhiên, "
-            f"độ lệch pha dòng điện ở mức cao (ΔI = {di_s}% {di_cmp} 10,0%)."
-        )
-    elif not du_pass and di_pass:
-        di_part = (
-            f"độ lệch pha dòng điện ở mức thấp (ΔI = {di_s}% < 10,0%); tuy nhiên, "
-            f"độ lệch pha điện áp vượt mức cho phép (ΔU = {du_s}% > 5,0%)."
-        )
-    else:
-        di_cmp = ">" if di_num > 10.0 else ">"
-        di_part = (
-            f"điện áp và dòng điện đều cần chú ý (ΔU = {du_s}% > 5,0%, ΔI = {di_s}% {di_cmp} 10,0%)."
-        )
-
-    thd_ok = thd_max is not None and thd_max < _THDV_LIMIT_PCT
-    tdd_ok = tdd_max is not None and tdd_max < tdd_limit_pct
-    th_s = _fmt_remark_pct(thd_max, 2) if thd_max is not None else "—"
-    td_s = _fmt_remark_pct(tdd_max, 2) if tdd_max is not None else "—"
-    lim_s = _fmt_remark_pct(tdd_limit_pct, 1)
-
-    if thd_ok and tdd_ok:
-        harm = (
-            f"Tổng biến dạng sóng hài điện áp và dòng điện đều ở mức cho phép "
-            f"(THDmax = {th_s}% < 8,0% & TDDmax = {td_s}% < {lim_s}%)."
-        )
-    elif thd_ok and not tdd_ok:
-        harm = (
-            f"Tổng biến dạng sóng hài điện áp ở mức cho phép (THDmax = {th_s}% < 8,0%); "
-            f"tuy nhiên, tổng biến dạng sóng hài dòng điện cao hơn mức cho phép "
-            f"(TDDmax = {td_s}% > {lim_s}%)."
-        )
-    elif not thd_ok and tdd_ok:
-        harm = (
-            f"Tổng biến dạng sóng hài dòng điện ở mức cho phép (TDDmax = {td_s}% < {lim_s}%); "
-            f"tuy nhiên, tổng biến dạng sóng hài điện áp cao hơn mức cho phép "
-            f"(THDmax = {th_s}% > 8,0%)."
-        )
-    else:
-        harm = (
-            f"Tổng biến dạng sóng hài điện áp và dòng điện đều cao hơn mức cho phép "
-            f"(THDmax = {th_s}% > 8,0% & TDDmax = {td_s}% > {lim_s}%)."
-        )
-
-    return (
-        f"Nhận xét: Chất lượng điện cấp cho {name} ở mức {q}. "
-        f"Biểu đồ dòng điện tiêu thụ tại {name} {wave} trong thời gian đo kiểm. "
-        f"Hệ số công suất cosφ ở mức {pf_txt}. "
-        f"Điện áp dao động từ {umin} ÷ {umax} V, độ lệch chuẩn của điện áp δU "
-        f"(= {d1}% ÷ {d2}%) đạt tiêu chuẩn (-5,0% ≤ δ ≤ 5,0%). "
-        f"Độ lệch pha điện áp và dòng điện {di_part} "
-        f"{harm}"
-    )
 
 
 def _device_tdd_limit_from_name(name: str) -> float:
@@ -743,120 +427,6 @@ def _device_tdd_limit_from_name(name: str) -> float:
     return 20.0
 
 
-def _build_auto_remarks_from_inps(
-    stats: Mapping[str, dict],
-    *,
-    name: str,
-    kind: SectionKind,
-    folder: str | Path | None,
-    nominal_voltage: float | None,
-) -> str:
-    """Sinh đoạn «Nhận xét:» từ cùng nguồn INPS với bả Word (quy-tac.md / quy-tac-2.md)."""
-    if not stats:
-        return ""
-
-    u12 = _pick(stats, "AVG_VL1[V]", "AVG_V12[V]")
-    u23 = _pick(stats, "AVG_VL2[V]", "AVG_V23[V]")
-    u31 = _pick(stats, "AVG_VL3[V]", "AVG_V31[V]")
-    if not u12:
-        v1 = _pick(stats, "AVG_V1[V]")
-        v2 = _pick(stats, "AVG_V2[V]")
-        v3 = _pick(stats, "AVG_V3[V]")
-        k = 3 ** 0.5
-        u12, u23, u31 = _scale(v1, k), _scale(v2, k), _scale(v3, k)
-
-    vref = float(nominal_voltage) if nominal_voltage and nominal_voltage > 0 else _MBA_NOMINAL_VOLTAGE_V
-    u12eval, _, _, _ = _eval_voltage(u12.get("max"), u12.get("min"), vref)
-
-    i1 = _pick(stats, "AVG_A1[A]")
-    i2 = _pick(stats, "AVG_A2[A]")
-    i3 = _pick(stats, "AVG_A3[A]")
-    uv_unb = _pick(stats, "AVG_UV[%]", "AVG_VUNB[%]")
-    ua_unb = _pick(stats, "AVG_UA[%]", "AVG_AUNB[%]")
-    pf = _pick_total(stats, "PF", "[_]") or _pick(stats, "AVG_PF[_]")
-    thd1 = _pick(stats, "AVG_THDVR1[%]", "AVG_VTHD1[%]")
-    thd2 = _pick(stats, "AVG_THDVR2[%]", "AVG_VTHD2[%]")
-    thd3 = _pick(stats, "AVG_THDVR3[%]", "AVG_VTHD3[%]")
-    tdd1 = _pick(stats, "AVG_THDAR1[%]", "AVG_ATHD1[%]")
-    tdd2 = _pick(stats, "AVG_THDAR2[%]", "AVG_ATHD2[%]")
-    tdd3 = _pick(stats, "AVG_THDAR3[%]", "AVG_ATHD3[%]")
-
-    dueval = "Đạt" if (uv_unb.get("max") is not None and uv_unb["max"] < _V_DEV_LIMIT_PCT) else (
-        "Không đạt" if uv_unb.get("max") is not None else "—"
-    )
-    pfeval = _eval_pf(pf.get("avg"))
-    thdeval = _eval_thd(
-        [thd1.get("max"), thd2.get("max"), thd3.get("max")], _THDV_LIMIT_PCT
-    )
-    tdd_lim = _TDD_LIMIT_PCT if kind == "mba" else _device_tdd_limit_from_name(name)
-    tddeval = _eval_thd(
-        [tdd1.get("max"), tdd2.get("max"), tdd3.get("max")], tdd_lim
-    )
-
-    u_line_min, u_line_max = _line_voltage_range(u12, u23, u31)
-    du_lo, du_hi, delta_u_ok = _delta_u_line_window_pct(u_line_min, u_line_max, vref)
-    uv_max = uv_unb.get("max")
-    try:
-        uv_max_f = float(uv_max) if uv_max is not None else None
-    except (TypeError, ValueError):
-        uv_max_f = None
-    ua_max = ua_unb.get("max")
-    try:
-        ua_max_f = float(ua_max) if ua_max is not None else None
-    except (TypeError, ValueError):
-        ua_max_f = None
-    di_ok = ua_max_f is not None and ua_max_f < 10.0
-
-    pf_avg = pf.get("avg")
-    try:
-        pf_avg_f = float(pf_avg) if pf_avg is not None else None
-    except (TypeError, ValueError):
-        pf_avg_f = None
-
-    thd_max, tdd_max = _thd_tdd_maxes(thd1, thd2, thd3, tdd1, tdd2, tdd3)
-    spread = _current_spread_pct(i1, i2, i3)
-
-    if kind == "mba":
-        s_total = _pick_total(stats, "S", "[VA]") or _pick(stats, "AVG_S[VA]")
-        s_avg_va = s_total.get("avg") if s_total else None
-        try:
-            s_avg_kva = float(s_avg_va) / 1000.0 if s_avg_va is not None else None
-        except (TypeError, ValueError):
-            s_avg_kva = None
-        rated = _rated_kva_from_inis_folder(folder)
-        load_pct = None
-        if s_avg_kva is not None and rated is not None and rated > 0:
-            load_pct = s_avg_kva / rated * 100.0
-
-        q = _quality_level_mba(
-            u12eval=u12eval, dueval=dueval, pfeval=pfeval, thdeval=thdeval, tddeval=tddeval,
-        )
-        return _compose_remarks_mba_intro(
-            name=name,
-            load_pct=load_pct,
-            wave=_waveform_phrase_mba(spread),
-            du_rhetorical=_du_rhetorical_mba(uv_max_f),
-            pf_txt=_pf_text_for_remarks(pf_avg_f),
-            quality=q,
-        )
-
-    return _compose_remarks_device_paragraph(
-        name=name,
-        vref=vref,
-        tdd_limit_pct=tdd_lim,
-        u_line_min=u_line_min,
-        u_line_max=u_line_max,
-        du_line_low=du_lo,
-        du_line_high=du_hi,
-        delta_u_ok=delta_u_ok,
-        uv_unb_max=uv_max_f,
-        ua_max=ua_max_f,
-        di_ok=di_ok,
-        pf_avg=pf_avg_f,
-        thd_max=thd_max,
-        tdd_max=tdd_max,
-        spread_pct=spread,
-    )
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -981,9 +551,9 @@ def _compose_remarks_from_excel_fields(
 
     # ── Đánh giá chất lượng tổng quan ────────────────────────────────────
     if kind == "mba":
-        quality = "Tốt" if loi_dem == 0 else ("Tương đối tốt" if loi_dem == 1 else "Chưa thực sự tốt")
+        quality = "tốt" if loi_dem == 0 else ("tương đối tốt" if loi_dem == 1 else "chưa thực sự tốt")
     else:
-        quality = "Tốt" if loi_dem == 0 else ("Tương đối tốt" if loi_dem == 1 else "Chưa tốt")
+        quality = "tốt" if loi_dem == 0 else ("tương đối tốt" if loi_dem == 1 else "chưa tốt")
 
     # ── Câu Hệ số công suất ───────────────────────────────────────────────
     pf_txt = _pf_phrase(cos_phi)
@@ -1059,19 +629,27 @@ def _compose_remarks_from_excel_fields(
             f"đều vượt mức cho phép (THDmax = {th_s}% > 8,0%, TDDmax = {td_s}% > {lim_s}%)."
         )
 
-    # ── MBA: 3 câu (% tải → biểu đồ dòng → đánh giá + dẫn bảng) ────────
+    # ── MBA: đầy đủ các câu (% tải → biểu đồ → cosφ → ΔU/ΔI → THD/TDD → đánh giá + dẫn bảng) ──
     if kind == "mba":
         load_seg = ""
         if p_kw is not None and cos_phi is not None and abs(cos_phi) > 0.01 and pdm_kva is not None and pdm_kva > 0:
             s_kva = p_kw / abs(cos_phi)
             load_pct = s_kva / pdm_kva * 100.0
-            load_seg = f"Công suất tiêu thụ của {name} đạt {_pct(load_pct, 2)}% công suất thiết kế. "
-        return (
-            f"{load_seg}"
-            f"Biểu đồ dòng điện tiêu thụ tại thời điểm đo kiểm {wave}. "
+            load_seg = f"Công suất tiêu thụ của {name} đạt {_pct(load_pct, 2)}% công suất thiết kế."
+        mba_parts: list[str] = []
+        if load_seg:
+            mba_parts.append(load_seg)
+        mba_parts.append(f"Biểu đồ dòng điện tiêu thụ tại thời điểm đo kiểm {wave}.")
+        mba_parts.append(f"Hệ số công suất cosφ ở mức {pf_txt}.")
+        if unbalance_sent:
+            mba_parts.append(unbalance_sent)
+        if harm_sent:
+            mba_parts.append(harm_sent)
+        mba_parts.append(
             f"Chất lượng điện đo tại {name} ở mức {quality}. "
             f"Dưới đây là bảng tổng hợp thông số hoạt động của {name}:"
         )
+        return " ".join(mba_parts)
 
     # ── Device: 6 câu theo thứ tự spec ───────────────────────────────────
     # Câu 4: Điện áp dao động + δU so danh định
@@ -1082,7 +660,7 @@ def _compose_remarks_from_excel_fields(
         verdict = "đạt tiêu chuẩn (-5,0% ≤ δ ≤ 5,0%)" if both_in else "vượt giới hạn cho phép (-5,0% ≤ δ ≤ 5,0%)"
         volt_sent = (
             f"Điện áp dao động từ {umin_s} ÷ {umax_s} V, "
-            f"độ lệch so với điện áp danh định δU = {dlo_s}% ÷ {dhi_s}%, {verdict}."
+            f"độ lệch chuẩn của điện áp δU = {dlo_s}% ÷ {dhi_s}%, {verdict}."
         )
     elif u_min is not None and u_max is not None:
         volt_sent = f"Điện áp dao động từ {umin_s} ÷ {umax_s} V."
@@ -1091,7 +669,7 @@ def _compose_remarks_from_excel_fields(
 
     parts: list[str] = [
         f"Chất lượng điện cấp cho {name} ở mức {quality}.",
-        f"Biểu đồ dòng điện tiêu thụ tại {name} {wave} trong thời gian đo kiểm.",
+        f"Biểu đồ dòng điện tiêu thụ {wave} trong thời gian đo kiểm.",
         f"Hệ số công suất cosφ ở mức {pf_txt}.",
     ]
     if volt_sent:
@@ -1366,9 +944,9 @@ def mba_kwargs_from_inps(
     return {
         "name": name,
         "imga": imga, "img1": img1, "img2": img2, "img4": img4, "img6": img6,
-        "cap_fig_mba": cap_fig_mba if cap_fig_mba is not None else f"Hình ảnh đo tại {name}",
+        "cap_fig_mba": cap_fig_mba if cap_fig_mba is not None else f"Kết quả đo chất lượng điện {name}",
         "remarks_mba": remarks_mba,
-        "cap_tab_mba": cap_tab_mba if cap_tab_mba is not None else f"Bảng tổng hợp thông số đo tại {name}",
+        "cap_tab_mba": cap_tab_mba if cap_tab_mba is not None else f"Thông số hoạt động của {name}",
         "u12max": u12max, "u12min": u12min, "u12avg": u12avg, "u12eval": u12eval,
         "u23max": u23max, "u23min": u23min, "u23avg": u23avg,
         "u31max": u31max, "u31min": u31min, "u31avg": u31avg,
@@ -1440,7 +1018,7 @@ def device_kwargs_from_folder(
     images = auto_pick_device_images(folder)
     return {
         "name": name,
-        "cap_device": cap_device if cap_device is not None else f"Hình ảnh đo tại {name}",
+        "cap_device": cap_device if cap_device is not None else f"Kết quả đo chất lượng điện {name}",
         "remarks_device": _resolve_remarks_field(
             kind="device",
             folder=Path(folder),
