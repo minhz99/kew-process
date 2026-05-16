@@ -492,6 +492,118 @@ def generate_word_report():
         shutil.rmtree(work, ignore_errors=True)
 
 
+@kew_bp.route("/generate-chapter4", methods=["POST"])
+def generate_chapter4():
+    """
+    API endpoint để sinh Chương 4 Word: chỉ các thiết bị có ``type=\"4\"``.
+
+    Sử dụng template ``device4.docx`` (cấu trúc giống ``device.docx``).
+
+    Returns:
+        Response: File .docx Chương 4 hoặc lỗi JSON.
+    """
+    from modules.report.gen_word import build_chapter4_from_zip
+
+    zf = request.files.get("zip") or request.files.get("file")
+    if zf is None or not getattr(zf, "filename", None):
+        return jsonify({"error": "Cần upload file ZIP (form field zip hoặc file)."}), 400
+    if not str(zf.filename).lower().endswith(".zip"):
+        return jsonify({"error": "Chỉ chấp nhận file .zip."}), 400
+
+    zip_bytes = zf.read()
+    if not zip_bytes:
+        return jsonify({"error": "File ZIP rỗng."}), 400
+
+    out_name = (request.form.get("filename", "") or "").strip() or "Chương 4.docx"
+    if not out_name.lower().endswith(".docx"):
+        out_name += ".docx"
+
+    work = tempfile.mkdtemp(prefix="kew_chap4_")
+    try:
+        out_path = os.path.join(work, out_name)
+        try:
+            _, warnings = build_chapter4_from_zip(zip_bytes, out_path)
+        except (FileNotFoundError, ValueError) as e:
+            return jsonify({"error": str(e)}), 400
+        except RuntimeError as e:
+            return jsonify({"error": str(e)}), 400
+        if not os.path.isfile(out_path):
+            return jsonify({"error": "Không tạo được file Word Chương 4."}), 500
+
+        with open(out_path, "rb") as fh:
+            buf = io.BytesIO(fh.read())
+        buf.seek(0)
+        resp = send_file(
+            buf,
+            as_attachment=True,
+            download_name=out_name,
+            mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+        if warnings:
+            resp.headers["X-KEW-Word-Warnings"] = urllib.parse.quote("; ".join(warnings))
+        return resp
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": f"Lỗi sinh báo cáo Chương 4: {e}"}), 500
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+@kew_bp.route("/generate-chapter5", methods=["POST"])
+def generate_chapter5():
+    """
+    API endpoint để sinh Chương 5 Word: MBA + các thiết bị không có ``type=\"4\"``.
+
+    Returns:
+        Response: File .docx Chương 5 hoặc lỗi JSON.
+    """
+    from modules.report.gen_word import build_chapter5_from_zip
+
+    zf = request.files.get("zip") or request.files.get("file")
+    if zf is None or not getattr(zf, "filename", None):
+        return jsonify({"error": "Cần upload file ZIP (form field zip hoặc file)."}), 400
+    if not str(zf.filename).lower().endswith(".zip"):
+        return jsonify({"error": "Chỉ chấp nhận file .zip."}), 400
+
+    zip_bytes = zf.read()
+    if not zip_bytes:
+        return jsonify({"error": "File ZIP rỗng."}), 400
+
+    out_name = (request.form.get("filename", "") or "").strip() or "Chương 5.docx"
+    if not out_name.lower().endswith(".docx"):
+        out_name += ".docx"
+
+    work = tempfile.mkdtemp(prefix="kew_chap5_")
+    try:
+        out_path = os.path.join(work, out_name)
+        try:
+            _, warnings = build_chapter5_from_zip(zip_bytes, out_path)
+        except (FileNotFoundError, ValueError) as e:
+            return jsonify({"error": str(e)}), 400
+        except RuntimeError as e:
+            return jsonify({"error": str(e)}), 400
+        if not os.path.isfile(out_path):
+            return jsonify({"error": "Không tạo được file Word Chương 5."}), 500
+
+        with open(out_path, "rb") as fh:
+            buf = io.BytesIO(fh.read())
+        buf.seek(0)
+        resp = send_file(
+            buf,
+            as_attachment=True,
+            download_name=out_name,
+            mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+        if warnings:
+            resp.headers["X-KEW-Word-Warnings"] = urllib.parse.quote("; ".join(warnings))
+        return resp
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": f"Lỗi sinh báo cáo Chương 5: {e}"}), 500
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
 @kew_bp.route("/generate-table6", methods=["POST"])
 def generate_table6():
     """
