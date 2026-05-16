@@ -481,16 +481,6 @@ def _fmt_remark_voltage(v: float | None, decimals: int = 1) -> str:
         return "—"
     return f"{v:.{decimals}f}".replace(".", ",")
 
-def _is_full_manual_remarks(text: str) -> bool:
-    """Người dùng dán cả đoạn nhận xét (không ghép với sinh tự động)."""
-    t = text.strip()
-    if not t:
-        return False
-    if "Nhận xét:" in t:
-        return True
-    if len(t) > 160 and "=" not in t.split("\n", 1)[0]:
-        return True
-    return False
 
 def _merge_auto_and_excel_notes(auto: str, excel_bits: str) -> str:
     auto = (auto or "").strip()
@@ -794,8 +784,6 @@ def _resolve_remarks_field(
         str: Đoạn nhận xét cuối cùng.
     """
     raw = (user_remarks or "").strip()
-    if _is_full_manual_remarks(raw):
-        return raw
 
     params = excel_params or {}
     current_char = params.get("current_char")
