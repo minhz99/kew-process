@@ -1,3 +1,9 @@
+"""
+Module: kew_api.py
+Description: Cung cấp các API RESTful để xử lý dữ liệu từ thiết bị KEW6315.
+Bao gồm các tính năng: xuất dữ liệu sang template MBA.xlsm và tổ chức hồ sơ hiện trường từ ZIP.
+"""
+
 import os
 import io
 import shutil

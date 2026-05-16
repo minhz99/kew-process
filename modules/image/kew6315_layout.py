@@ -1,34 +1,43 @@
-KEW6315_REF_WIDTH = 240
-KEW6315_REF_HEIGHT = 256
+"""
+Module: kew6315_layout.py
+Description: Định nghĩa cấu trúc bố cục (layout) của các màn hình thiết bị KEW6315.
+Cung cấp tọa độ (x, y) và các thuộc tính vùng nhận dạng (overlays) cho từng loại màn hình.
+"""
+
+# Kích thước tham chiếu của màn hình KEW6315 (QVGA)
+KEW6315_REF_WIDTH = 320
+KEW6315_REF_HEIGHT = 240
 
 
-def make_grid(ids, x_rights, y_bot, bg):
+def make_grid(ids: list[str], x_rights: list[int], y_bot: int, bg: str) -> list[dict]:
     """
-    Tạo danh sách các điểm chèn (overlays) theo dạng lưới.
-    
+    Tạo một nhóm các vùng nhận dạng (overlays) theo dạng lưới ngang.
+
     Args:
-        ids: Danh sách ID của các đại lượng.
-        x_rights: Danh sách tọa độ X (căn lề phải).
-        y_bot: Tọa độ Y (đường cơ sở dưới).
-        bg: Loại màu nền (w: trắng, g: xám).
-        
+        ids: Danh sách mã định danh các thông số.
+        x_rights: Danh sách tọa độ X (cạnh phải) của từng thông số.
+        y_bot: Tọa độ Y (cạnh dưới) dùng chung cho cả hàng.
+        bg: Màu nền của vùng ('w' cho trắng, 'g' cho xanh/xám).
+
     Returns:
-        list: Danh sách các dict định nghĩa tọa độ.
+        list: Danh sách các dict cấu hình overlay.
     """
     return [{"id": id_, "x": x, "y": y_bot, "bg": bg} for id_, x in zip(ids, x_rights)]
 
 
-def _map_sd140(overlay):
+def _map_sd140(overlay: dict) -> dict:
+    """Helper để gán độ rộng vùng xóa mặc định cho các trường PF."""
     if overlay["id"] in ["PF1", "PF2", "PF3"]:
         overlay["w_clear"] = 55
     return overlay
 
-# ─── Định nghĩa cấu trúc các màn hình thiết bị đo ─────────────────────
-# Mỗi màn hình (SDxxx) chứa danh sách các 'overlays' - vị trí các thông số
-# có thể được chỉnh sửa/chèn thêm chữ số trên ảnh gốc.
 
-SCREENS = [
-    {
+# ─── Định nghĩa cấu trúc các màn hình (SCREENS) ─────────────────────
+# Mỗi màn hình (SDxxx) chứa danh sách các 'overlays' - vị trí các thông số
+# có thể được nhận dạng OCR hoặc chèn thêm số.
+
+SCREENS = {
+    "SD140": {
         "id": "SD140",
         "overlays": list(map(_map_sd140,
             make_grid(["V1", "V2", "V3"], [94, 158, 222], 54, "w") +
@@ -47,7 +56,7 @@ SCREENS = [
             ]
         ))
     },
-    {
+    "SD141": {
         "id": "SD141",
         "overlays": [
             {"id": "V1", "x": 63, "y": 36, "bg": "w", "w_clear": 45},
@@ -67,28 +76,25 @@ SCREENS = [
             {"id": "A_unb", "alias": "A%", "x": 83, "y": 205, "bg": "w", "w_clear": 45}
         ]
     },
-    {
+    "SD142": {
         "id": "SD142",
         "overlays": make_grid(["V1", "V2", "V3"], [76, 136, 196], 47, "w") +
         make_grid(["A1", "A2", "A3"], [76, 136, 196], 63, "g")
     },
-    {
+    "SD143": {
         "id": "SD143",
         "overlays": make_grid(["V1", "V2", "V3"], [76, 136, 196], 47, "w") +
         make_grid(["A1", "A2", "A3"], [76, 136, 196], 63, "g")
     },
-    {
+    "SD144": {
         "id": "SD144",
         "overlays": make_grid(["V1", "V2", "V3"], [76, 136, 196], 47, "w") +
         make_grid(["THDV1", "THDV2", "THDV3"], [76, 136, 196], 63, "g")
     },
-    {
+    "SD145": {
         "id": "SD145",
         "overlays": make_grid(["A1", "A2", "A3"], [76, 136, 196], 47, "w") +
         make_grid(["THDA1", "THDA2", "THDA3"], [76, 136, 196], 63, "g")
     }
-]
+}
 
-
-SCREEN_BY_ID = {screen["id"]: screen for screen in SCREENS}
-SCREEN_BY_INDEX = {index: screen for index, screen in enumerate(SCREENS)}

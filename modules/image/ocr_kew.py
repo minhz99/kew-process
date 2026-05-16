@@ -235,30 +235,29 @@ def _scan_digits_rtl(
 
 
 def extract_overlay_value(
-    img: Image.Image,
-    overlay: dict,
+    img_arr: np.ndarray,
+    overlay: dict[str, Any],
     digits_dir: str = _DEFAULT_DIGITS_DIR,
-) -> Optional[float]:
+) -> Optional[str]:
     """
-    Đọc giá trị số từ một overlay cụ thể trên ảnh BMP.
+    Trích xuất giá trị số từ một vùng overlay cụ thể trên mảng ảnh đã được xử lý.
 
     Args:
-        img: PIL Image (RGB hoặc RGBA) chứa giá trị cần đọc.
-        overlay: Dict cấu hình overlay từ SCREENS (cần có x, y, w_clear, bg).
-        digits_dir: Thư mục chứa ảnh mẫu chữ số.
+        img_arr: Mảng numpy float32 (Grayscale) của ảnh màn hình.
+        overlay: Dict cấu hình overlay (x, y, w_clear, bg).
+        digits_dir: Thư mục chứa các chữ số mẫu.
 
     Returns:
-        Giá trị số (float) đọc được, hoặc None nếu không nhận dạng được.
+        Optional[str]: Chuỗi nhận dạng được (ví dụ "0.934") hoặc None.
     """
     x_right = overlay.get("x", 0)
     y_bot = overlay.get("y", 0)
-    color = overlay.get("bg", "w")
     w_clear = overlay.get("w_clear", 50)
+    bg_color = overlay.get("bg", "w")
 
+    # Tính toán tọa độ ROI
     x_left = max(0, x_right - w_clear + 1)
     y_top = max(0, y_bot - _ROI_H + 1)
-
-    img_arr = np.array(img.convert("L"), dtype=np.float32)
 
     # Giới hạn tọa độ trong ảnh
     h_img, w_img = img_arr.shape

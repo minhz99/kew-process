@@ -405,7 +405,6 @@ def read_plans_from_excel(excel_path: str) -> tuple[list[RowPlan], list[str]]:
         raise ValueError("Không có dòng hợp lệ nào trong Excel (sau khi lọc).")
     return plans, warnings
 
-
 def _ranges_overlap(a0: int, a1: int, b0: int, b1: int) -> bool:
     return not (a1 < b0 or b1 < a0)
 
@@ -540,13 +539,19 @@ def run_ocr_and_update_excel(
     overwrite_existing: bool = False,
 ) -> list[str]:
     """
-    Chạy OCR trên tất cả thiết bị (không phải MBA) và ghi kết quả vào file Excel.
+    Chạy OCR nhận dạng cho từng thiết bị và cập nhật trực tiếp vào file Excel.
 
-    Nếu cột đo lường chưa tồn tại trong Excel, hàm sẽ tự động tạo thêm cột mới.
-    Chỉ điền vào các ô còn trống trong Excel (hoặc ghi đè nếu ``overwrite_existing=True``).
+    Hệ thống sẽ kiểm tra xem cột đã có giá trị chưa, nếu chưa có sẽ thực hiện OCR.
+    Hỗ trợ MBA (Transformer) nếu người dùng cung cấp chỉ số ảnh.
+
+    Args:
+        excel_path: Đường dẫn tới file Excel cần cập nhật.
+        plans: Danh sách kế hoạch đọc từ Excel.
+        bmp_map: Mapping chỉ số ảnh -> đường dẫn file nguồn.
+        overwrite_existing: Nếu True, sẽ ghi đè cả các ô đã có dữ liệu.
 
     Returns:
-        Danh sách cảnh báo (warnings).
+        list: Danh sách các cảnh báo (warnings) nhận dạng được.
     """
     try:
         from openpyxl import load_workbook
