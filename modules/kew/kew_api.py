@@ -12,6 +12,7 @@ import traceback
 import zipfile
 import re
 import urllib.parse
+from pathlib import Path
 from flask import Blueprint, request, jsonify, send_file
 
 
@@ -677,5 +678,94 @@ def generate_table6():
     except Exception as e:
         traceback.print_exc()
         return jsonify({"error": f"Lỗi sinh bảng tổng hợp: {e}"}), 500
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+@kew_bp.route("/generate-excel-mba", methods=["POST"])
+def generate_excel_mba():
+    """
+    API endpoint để sinh báo cáo Excel MBA từ hồ sơ thiết bị (file ZIP).
+    Sử dụng template MBA.xlsm với logic copy sheet và bảng tổng hợp.
+    """
+    from modules.report.gen_word import _find_project_root, _find_first_excel, read_device_metadata_from_excel, _lookup_device_metadata, _nfc
+    from modules.report.gen_excel_mba import generate_mba_excel_from_devices
+
+    zf = request.files.get("zip") or request.files.get("file")
+    if zf is None or not getattr(zf, "filename", None):
+        return jsonify({"error": "Cần upload file ZIP (form field zip hoặc file)."}), 400
+    
+    zip_bytes = zf.read()
+    if not zip_bytes:
+        return jsonify({"error": "File ZIP rỗng."}), 400
+
+    out_name = (request.form.get("filename", "") or "").strip() or "BaoCao_MBA.xlsm"
+    if not out_name.lower().endswith((".xlsm", ".xlsx")):
+        out_name += ".xlsm"
+
+    work = tempfile.mkdtemp(prefix="kew_excel_mba_")
+    try:
+        extract = os.path.join(work, "in")
+        os.makedirs(extract, exist_ok=True)
+        bio = io.BytesIO(zip_bytes)
+        with zipfile.ZipFile(bio, "r") as zf_in:
+            zf_in.extractall(extract)
+
+        project_root = _find_project_root(Path(extract))
+        excel_path = _find_first_excel(Path(extract))
+        metadata = read_device_metadata_from_excel(excel_path) if excel_path else {}
+
+        raw_dirs = [
+            d for d in project_root.iterdir()
+            if d.is_dir() and not d.name.startswith(".") and d.name != "__MACOSX"
+        ]
+
+        _stt_fallback = 10**9
+
+        def _device_dir_sort_key(p: Path) -> tuple[int, int, str]:
+            from modules.report.gen_word import _resolve_word_section_kind
+            m = _lookup_device_metadata(metadata, p.name)
+            display = _nfc(m.get("name") or p.name)
+            kind = _resolve_word_section_kind({"kind": m.get("kind")}, name=display, default_kind=None)
+            st = m.get("stt")
+            st_val = st if isinstance(st, int) else _stt_fallback
+            return (0 if kind == "mba" else 1, st_val, p.name.lower())
+
+        device_dirs = sorted(raw_dirs, key=_device_dir_sort_key)
+        
+        devices = []
+        for d in device_dirs:
+            meta = _lookup_device_metadata(metadata, d.name)
+            display = _nfc(meta.get("name") or d.name)
+            devices.append({
+                "name": display,
+                "folder": d,
+                "kind": meta.get("kind"),
+                "excel_params": meta.get("excel_params") or {},
+            })
+
+        template_path = _MBA_TEMPLATE_PATH
+        out_path = os.path.join(work, out_name)
+        
+        try:
+            generate_mba_excel_from_devices(devices, out_path, template_path)
+        except Exception as e:
+            traceback.print_exc()
+            return jsonify({"error": f"Lỗi sinh báo cáo Excel MBA: {e}"}), 500
+
+        if not os.path.isfile(out_path):
+            return jsonify({"error": "Không tạo được file Excel MBA."}), 500
+
+        with open(out_path, "rb") as fh:
+            buf = io.BytesIO(fh.read())
+        buf.seek(0)
+        
+        return send_file(
+            buf,
+            as_attachment=True,
+            download_name=out_name,
+            mimetype="application/vnd.ms-excel.sheet.macroEnabled.12" if out_name.endswith(".xlsm") else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": f"Lỗi hệ thống: {e}"}), 500
     finally:
         shutil.rmtree(work, ignore_errors=True)

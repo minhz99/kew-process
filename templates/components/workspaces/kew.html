@@ -163,6 +163,13 @@
               style="display:none;width:12px;height:12px;border:2px solid rgba(0,0,0,0.15);border-radius:50%;border-top-color:#8b5cf6;animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:6px"></span>
             Tạo chương 5
           </button>
+          <button type="button" class="btn" id="btn-kew-excelmba-process"
+            style="border-color:#10b981;color:#10b981;font-weight:600"
+            onclick="window.kewExcelMbaProcessZip && window.kewExcelMbaProcessZip()" disabled>
+            <span id="kew-excelmba-spinner"
+              style="display:none;width:12px;height:12px;border:2px solid rgba(0,0,0,0.15);border-radius:50%;border-top-color:#10b981;animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:6px"></span>
+            Excel MBA
+          </button>
           <button type="button" class="btn" id="btn-kew-table6-process"
             style="border-color:#f59e0b;color:#f59e0b;font-weight:600"
             onclick="window.kewTable6ProcessZip && window.kewTable6ProcessZip()" disabled>
@@ -473,6 +480,7 @@
       return [
         document.getElementById('btn-kew-chapter4-process'),
         document.getElementById('btn-kew-chapter5-process'),
+        document.getElementById('btn-kew-excelmba-process'),
         document.getElementById('btn-kew-table6-process'),
       ];
     }
@@ -638,6 +646,59 @@
         .catch(function (err) {
           alert('Lỗi: ' + err.message);
           if (st) st.textContent = '❌ Tạo Bảng 6.3 thất bại';
+        })
+        .finally(function () {
+          _setBtnState();
+          if (spin) spin.style.display = 'none';
+        });
+    };
+
+    /* ─── Tạo Excel MBA ───────────────────────────────────────────── */
+    window.kewExcelMbaProcessZip = function () {
+      if (!_kewWordFile) { alert('Chưa chọn file ZIP.'); return; }
+      var btn1 = document.getElementById('btn-kew-chapter4-process');
+      var btn2 = document.getElementById('btn-kew-chapter5-process');
+      var btn3 = document.getElementById('btn-kew-excelmba-process');
+      var btn4 = document.getElementById('btn-kew-table6-process');
+      var spin = document.getElementById('kew-excelmba-spinner');
+      var st = document.getElementById('kew-word-status');
+
+      if (btn1) btn1.disabled = true;
+      if (btn2) btn2.disabled = true;
+      if (btn3) btn3.disabled = true;
+      if (btn4) btn4.disabled = true;
+      if (spin) spin.style.display = 'inline-block';
+      if (st) st.textContent = 'Đang tạo Excel MBA…';
+
+      var baseName = (document.getElementById('kew-word-out-filename').value || '').trim() || 'Nhà Máy A';
+      var outName = 'Excel MBA ' + baseName + '.xlsm';
+
+      var fd = new FormData();
+      fd.append('zip', _kewWordFile, _kewWordFile.name);
+      fd.append('filename', outName);
+
+      fetch('/api/kew/generate-excel-mba', { method: 'POST', body: fd })
+        .then(function (r) {
+          if (!r.ok) {
+            return r.json().then(function (j) {
+              throw new Error((j.error || j.errors && j.errors.join('\n')) || ('HTTP ' + r.status));
+            });
+          }
+          return r.blob().then(function (blob) { return { blob: blob }; });
+        })
+        .then(function (res) {
+          var url = URL.createObjectURL(res.blob);
+          var a = document.createElement('a');
+          a.href = url;
+          a.download = outName;
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 400);
+          if (st) st.textContent = '✅ Đã tải ' + outName;
+        })
+        .catch(function (err) {
+          alert('Lỗi: ' + err.message);
+          if (st) st.textContent = '❌ Tạo Excel MBA thất bại';
         })
         .finally(function () {
           _setBtnState();

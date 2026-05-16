@@ -238,7 +238,7 @@ def extract_overlay_value(
     img_arr: np.ndarray,
     overlay: dict[str, Any],
     digits_dir: str = _DEFAULT_DIGITS_DIR,
-) -> Optional[str]:
+) -> Optional[float]:
     """
     Trích xuất giá trị số từ một vùng overlay cụ thể trên mảng ảnh đã được xử lý.
 
@@ -248,7 +248,7 @@ def extract_overlay_value(
         digits_dir: Thư mục chứa các chữ số mẫu.
 
     Returns:
-        Optional[str]: Chuỗi nhận dạng được (ví dụ "0.934") hoặc None.
+        Optional[float]: Giá trị số nhận dạng được hoặc None.
     """
     x_right = overlay.get("x", 0)
     y_bot = overlay.get("y", 0)
@@ -270,7 +270,7 @@ def extract_overlay_value(
     if roi.size == 0:
         return None
 
-    templates = _load_all_templates(color, digits_dir)
+    templates = _load_all_templates(bg_color, digits_dir)
     if not templates:
         return None
 
@@ -307,7 +307,9 @@ def read_screen_values(
     overlays = screen.get("overlays", [])
 
     try:
-        img = Image.open(bmp_path).convert("RGB")
+        # Load và chuyển sang numpy array grayscale ngay từ đầu
+        img = Image.open(bmp_path).convert("L")
+        img_arr = np.array(img, dtype=np.float32)
     except Exception:
         return {ov.get("id", ""): None for ov in overlays}
 
@@ -316,7 +318,7 @@ def read_screen_values(
         ov_id = overlay.get("id", "")
         if not ov_id:
             continue
-        val = extract_overlay_value(img, overlay, digits_dir)
+        val = extract_overlay_value(img_arr, overlay, digits_dir)
         result[ov_id] = val
 
     return result
