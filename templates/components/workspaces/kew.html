@@ -146,8 +146,7 @@
 
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:0.5rem">
           <input type="text" id="kew-word-out-filename" class="btn"
-            style="width:220px;padding:5px 10px;font-size:0.8rem" placeholder="Tên dự án (VD: NhaMayA)"
-            value="NhaMayA">
+            style="width:220px;padding:5px 10px;font-size:0.8rem" placeholder="Tên dự án (VD: Nhà máy A)">
           <button type="button" class="btn" id="btn-kew-word-process"
             style="border-color:#8b5cf6;color:#8b5cf6;font-weight:600"
             onclick="window.kewWordProcessZip && window.kewWordProcessZip()" disabled>
@@ -522,7 +521,7 @@
       if (spin) spin.style.display = 'inline-block';
       if (st) st.textContent = 'Đang xử lý…';
 
-      var baseName = (document.getElementById('kew-word-out-filename').value || '').trim() || 'DuAn';
+      var baseName = (document.getElementById('kew-word-out-filename').value || '').trim() || 'Nhà Máy A';
       var outName = baseName.toLowerCase().endsWith('.docx') ? baseName : baseName + '.docx';
       if (!outName.startsWith('Chương 4+5')) {
         outName = 'Chương 4+5 ' + outName;
@@ -564,62 +563,62 @@
         });
     };
 
-  window.kewTable6ProcessZip = function () {
-    if (!_kewWordFile) {
-      alert('Chưa chọn file ZIP.');
-      return;
-    }
-    var btn1 = document.getElementById('btn-kew-word-process');
-    var btn2 = document.getElementById('btn-kew-table6-process');
-    var spin = document.getElementById('kew-table6-spinner');
-    var st = document.getElementById('kew-word-status');
+    window.kewTable6ProcessZip = function () {
+      if (!_kewWordFile) {
+        alert('Chưa chọn file ZIP.');
+        return;
+      }
+      var btn1 = document.getElementById('btn-kew-word-process');
+      var btn2 = document.getElementById('btn-kew-table6-process');
+      var spin = document.getElementById('kew-table6-spinner');
+      var st = document.getElementById('kew-word-status');
 
-    if (btn1) btn1.disabled = true;
-    if (btn2) btn2.disabled = true;
-    if (spin) spin.style.display = 'inline-block';
-    if (st) st.textContent = 'Đang tạo Bảng 6.3…';
+      if (btn1) btn1.disabled = true;
+      if (btn2) btn2.disabled = true;
+      if (spin) spin.style.display = 'inline-block';
+      if (st) st.textContent = 'Đang tạo Bảng 6.3…';
 
-    var baseName = (document.getElementById('kew-word-out-filename').value || '').trim() || 'DuAn';
-    var outName = baseName.toLowerCase().endsWith('.docx') ? baseName : baseName + '.docx';
-    if (!outName.startsWith('Bảng 6.3')) {
-      outName = 'Bảng 6.3 ' + outName;
-    }
+      var baseName = (document.getElementById('kew-word-out-filename').value || '').trim() || 'Nhà Máy A';
+      var outName = baseName.toLowerCase().endsWith('.docx') ? baseName : baseName + '.docx';
+      if (!outName.startsWith('Bảng 6.3')) {
+        outName = 'Bảng 6.3 ' + outName;
+      }
 
-    var fd = new FormData();
-    fd.append('zip', _kewWordFile, _kewWordFile.name);
+      var fd = new FormData();
+      fd.append('zip', _kewWordFile, _kewWordFile.name);
 
-    fetch('/api/kew/generate-table6', { method: 'POST', body: fd })
-      .then(function (r) {
-        if (!r.ok) {
-          return r.json().then(function (j) {
-            var parts = [];
-            if (j.errors && j.errors.length) parts.push(j.errors.join('\n'));
-            if (j.error) parts.push(j.error);
-            throw new Error(parts.join('\n\n') || ('HTTP ' + r.status));
-          });
-        }
-        return r.blob().then(function (blob) { return { blob: blob }; });
-      })
-      .then(function (res) {
-        var url = URL.createObjectURL(res.blob);
-        var a = document.createElement('a');
-        a.href = url;
-        a.download = outName;
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 400);
-        if (st) st.textContent = '✅ Đã tải Bảng 6.3';
-      })
-      .catch(function (err) {
-        alert('Lỗi: ' + err.message);
-        if (st) st.textContent = '❌ tạo Bảng 6.3 thất bại';
-      })
-      .finally(function () {
-        _setBtnState();
-        if (spin) spin.style.display = 'none';
-      });
-  };
+      fetch('/api/kew/generate-table6', { method: 'POST', body: fd })
+        .then(function (r) {
+          if (!r.ok) {
+            return r.json().then(function (j) {
+              var parts = [];
+              if (j.errors && j.errors.length) parts.push(j.errors.join('\n'));
+              if (j.error) parts.push(j.error);
+              throw new Error(parts.join('\n\n') || ('HTTP ' + r.status));
+            });
+          }
+          return r.blob().then(function (blob) { return { blob: blob }; });
+        })
+        .then(function (res) {
+          var url = URL.createObjectURL(res.blob);
+          var a = document.createElement('a');
+          a.href = url;
+          a.download = outName;
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 400);
+          if (st) st.textContent = '✅ Đã tải Bảng 6.3';
+        })
+        .catch(function (err) {
+          alert('Lỗi: ' + err.message);
+          if (st) st.textContent = '❌ tạo Bảng 6.3 thất bại';
+        })
+        .finally(function () {
+          _setBtnState();
+          if (spin) spin.style.display = 'none';
+        });
+    };
 
-  _setBtnState();
-  }) ();
+    _setBtnState();
+  })();
 </script>

@@ -56,17 +56,18 @@ __all__ = [
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_MBA_TEMPLATE = _REPO_ROOT / "static" / "word-template" / "mba.docx"
 DEFAULT_DEVICE_TEMPLATE = _REPO_ROOT / "static" / "word-template" / "device.docx"
+DEFAULT_TOTALMBA_TEMPLATE = _REPO_ROOT / "static" / "word-template" / "totalmba.docx"
 DEFAULT_TABLE6_TEMPLATE = _REPO_ROOT / "static" / "word-template" / "table6.docx"
 
 WIDTH_LARGE, WIDTH_SMALL, HEIGHT_MBA = Mm(109.6), Mm(53.8), Mm(40.5)
 WIDTH_A, WIDTH_SUB, HEIGHT_A, HEIGHT_SUB = Mm(166.3), Mm(54.3), Mm(60.0), Mm(41.3)
 
-SectionKind = Literal["mba", "device"]
+SectionKind = Literal["mba", "device", "total_mba"]
 
 _DEVICE_KIND_LABELS = frozenset(
     {"device", "thiết bị", "thiet bi", "tủ", "tu", "khac", "khác"}
 )
-# Các cột ghi chú cũ — giữ lại để đọc nhưng không ghép vào remarks tự động nữa.
+# Các cột dữ liệu ghi chú mở rộng từ hiện trường.
 _EXCEL_METRIC_REMARKS: tuple[tuple[str, str], ...] = (
     ("p", "P"),
     ("pf", "PF"),
@@ -187,6 +188,9 @@ def mba(
     tdd3max: str,
     tdd3min: str,
     tdd3avg: str,
+    # Danh sách thiết bị (tuỳ chọn)
+    ds_mba: list[dict] | None = None,
+    **kwargs,
 ) -> dict:
     """
     Xây dựng context dictionary cho template báo cáo Máy biến áp (MBA).
@@ -228,6 +232,8 @@ def mba(
         "tdd1max": tdd1max, "tdd1min": tdd1min, "tdd1avg": tdd1avg, "tddeval": tddeval,
         "tdd2max": tdd2max, "tdd2min": tdd2min, "tdd2avg": tdd2avg,
         "tdd3max": tdd3max, "tdd3min": tdd3min, "tdd3avg": tdd3avg,
+        "ds_mba": ds_mba or [],
+        **kwargs,
     }
 
 def device(
@@ -269,6 +275,9 @@ def device(
         "cap1": cap_device,
         "remarks": remarks_device,
     }
+
+def total_mba(doc: DocxTemplate, *, ds_mba: list[dict], **kwargs) -> dict:
+    return {"ds_mba": ds_mba}
 
 # ════════════════════════════════════════════════════════════════════
 #                            Format helpers
@@ -478,7 +487,7 @@ def _device_tdd_limit_from_name(name: str) -> float:
     return 20.0
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Sinh nhận xét từ các trường Excel hiện trường (KHÔNG dùng INPS)
+# Sinh nhận xét từ các trường Excel hiện trường
 # ──────────────────────────────────────────────────────────────────────────────
 
 _CURRENT_CHAR_MAP: dict[str, str] = {
@@ -810,7 +819,7 @@ def list_bmp_in_folder(folder: str | Path) -> list[Path]:
         if m:
             bmps.append((int(m.group(1)), f))
     bmps.sort(key=lambda x: x[0])
-    # Fallback: mọi file .bmp nếu không có tên PS-SD (hồ sơ cũ / tay)
+    # Fallback: mọi file .bmp nếu không theo định dạng đặt tên chuẩn
     if not bmps:
         extra: list[tuple[int, Path]] = []
         for i, f in enumerate(sorted(p.glob("*.BMP")) + sorted(p.glob("*.bmp"))):
@@ -1116,6 +1125,7 @@ def merge_mba_device_docx(
     *,
     mba_template: str | Path,
     device_template: str | Path,
+    totalmba_template: str | Path | None = None,
     mba_sections: list[dict] | None = None,
     device_sections: list[dict] | None = None,
     sections: Sequence[tuple[SectionKind, dict]] | None = None,
@@ -1129,6 +1139,7 @@ def merge_mba_device_docx(
     mba_sections = mba_sections or []
     device_sections = device_sections or []
     mba_tpl, device_tpl = Path(mba_template), Path(device_template)
+    totalmba_tpl = Path(totalmba_template) if totalmba_template else Path(DEFAULT_TOTALMBA_TEMPLATE)
 
     if sections is not None:
         work: list[tuple[SectionKind, dict]] = list(sections)
@@ -1140,7 +1151,11 @@ def merge_mba_device_docx(
             "merge_mba_device_docx: cần sections hoặc mba_sections/device_sections không rỗng."
         )
 
-    kind_render = {"mba": (mba_tpl, mba), "device": (device_tpl, device)}
+    kind_render = {
+        "mba": (mba_tpl, mba),
+        "device": (device_tpl, device),
+        "total_mba": (totalmba_tpl, total_mba),
+    }
 
     with TemporaryDirectory() as td:
         tmp = Path(td)
@@ -1206,10 +1221,18 @@ def build_field_word_report(
     *,
     mba_template: str | Path,
     device_template: str | Path,
+    totalmba_template: str | Path | None = None,
     devices: Sequence[Mapping] | None = None,
     default_kind: SectionKind | None = None,
 ) -> tuple[Path, list[str]]:
-    """Quét ``project_root`` (= ``Project_Output/``) → xuất 1 file Word tổng hợp.
+    """Quét thư mục gốc ``project_root`` (ví dụ ``Project_Output/``) và sinh một file báo cáo Word tổng hợp.
+    
+    Quy trình xử lý:
+    1. Quét toàn bộ các thư mục con trong dự án và trích xuất dữ liệu đo kiểm.
+    2. Sắp xếp danh sách thiết bị để đưa các Máy biến áp (MBA) lên đầu danh sách.
+    3. Tổng hợp bảng thông số `ds_mba` (gồm tt, ten, pdm, p, pf) để xuất ra bảng tổng hợp.
+    4. Sinh và ghép các section Word theo thứ tự: Các Máy biến áp -> Bảng tổng hợp MBA -> Các thiết bị đo kiểm.
+    5. Lưu kết quả ra file ``output_path``.
 
     ``devices`` (tuỳ chọn): danh sách ``{name, folder, kind?, remarks?, nominal_voltage?}``.
         * ``folder`` có thể là tên thư mục con trong ``project_root`` hoặc đường dẫn tuyệt đối.
@@ -1237,6 +1260,37 @@ def build_field_word_report(
         raise ValueError("Không có thiết bị nào để dựng báo cáo Word.")
 
     warnings: list[str] = []
+    
+    ds_mba = []
+    mba_count = 0
+    for spec in devices:
+        name = _nfc(str(spec.get("name") or "").strip())
+        if not name:
+            continue
+        kind = _resolve_word_section_kind(spec, name=name, default_kind=default_kind)
+        if kind == "mba":
+            mba_count += 1
+            ep = spec.get("excel_params") or {}
+            def _fmt(v, dec=2):
+                if v is None: return "—"
+                try:
+                    import pandas as pd
+                    if isinstance(v, float) and pd.isna(v): return "—"
+                except Exception: pass
+                try:
+                    x = float(str(v).strip().replace(",", "."))
+                    if x != x: return "—"
+                    return f"{x:.{dec}f}".replace(".", ",")
+                except Exception:
+                    return str(v).strip() if str(v).strip() else "—"
+            ds_mba.append({
+                "tt": mba_count,
+                "ten": name,
+                "pdm": _fmt(ep.get("pdm"), 0),
+                "p": _fmt(ep.get("p"), 0),
+                "pf": _fmt(ep.get("cos_phi"), 3),
+            })
+
     sections: list[tuple[SectionKind, dict]] = []
     for spec in devices:
         name = _nfc(str(spec.get("name") or "").strip())
@@ -1266,6 +1320,7 @@ def build_field_word_report(
                     folder, name=name, remarks_mba=remarks,
                     excel_params=excel_params,
                 )
+                kwargs["ds_mba"] = ds_mba
             else:
                 kwargs = device_kwargs_from_folder(
                     folder,
@@ -1280,6 +1335,14 @@ def build_field_word_report(
         except Exception as e:
             warnings.append(f"«{name}»: lỗi dựng section ({e}).")
 
+    if ds_mba:
+        insert_idx = len(sections)
+        for i, (k, _) in enumerate(sections):
+            if k == "device":
+                insert_idx = i
+                break
+        sections.insert(insert_idx, ("total_mba", {"ds_mba": ds_mba}))
+
     if not sections:
         raise RuntimeError("Không dựng được section nào: " + "; ".join(warnings))
 
@@ -1288,6 +1351,7 @@ def build_field_word_report(
         out,
         mba_template=mba_template,
         device_template=device_template,
+        totalmba_template=totalmba_template,
         sections=sections,
     )
     return out, warnings
@@ -1537,12 +1601,17 @@ def build_word_report_from_zip(
     *,
     mba_template: str | Path | None = None,
     device_template: str | Path | None = None,
+    totalmba_template: str | Path | None = None,
 ) -> tuple[Path, list[str]]:
     """
     Điểm nhập chính để tạo báo cáo Word từ một file ZIP chứa dữ liệu.
     
     Giải nén ZIP, tìm file Excel metadata, quét các thư mục thiết bị và 
-    render báo cáo Word tổng hợp.
+    render báo cáo Word tổng hợp. 
+    
+    Quy tắc sắp xếp: MBAs luôn được đưa lên đầu danh sách (dựa trên metadata hoặc đoán tên), 
+    sau đó mới đến các thiết bị đo kiểm khác. Thứ tự trong từng nhóm tuân theo 
+    cột STT trong Excel.
     
     Args:
         zip_bytes: Dữ liệu nhị phân của file ZIP.
@@ -1591,14 +1660,16 @@ def build_word_report_from_zip(
 
         _stt_fallback = 10**9
 
-        def _device_dir_sort_key(p: Path) -> tuple[int, str]:
+        def _device_dir_sort_key(p: Path) -> tuple[int, int, str]:
             if not metadata:
-                return (_stt_fallback, p.name.lower())
+                kind_no_meta = _resolve_word_section_kind({}, name=p.name, default_kind=None)
+                return (0 if kind_no_meta == "mba" else 1, _stt_fallback, p.name.lower())
             m = _lookup_device_metadata(metadata, p.name)
+            display = _nfc(m.get("name") or p.name)
+            kind = _resolve_word_section_kind({"kind": m.get("kind")}, name=display, default_kind=None)
             st = m.get("stt")
-            if isinstance(st, int):
-                return (st, p.name.lower())
-            return (_stt_fallback, p.name.lower())
+            st_val = st if isinstance(st, int) else _stt_fallback
+            return (0 if kind == "mba" else 1, st_val, p.name.lower())
 
         device_dirs = sorted(raw_dirs, key=_device_dir_sort_key)
 
@@ -1622,6 +1693,7 @@ def build_word_report_from_zip(
             out,
             mba_template=mba_template,
             device_template=device_template,
+            totalmba_template=totalmba_template,
             devices=devices,
         )
         if excel_path:

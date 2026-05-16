@@ -17,7 +17,7 @@ Các cột đã có sẵn từ trước, được tái dùng để sinh nhận x
 - ``thd``: THD điện áp lớn nhất (%).
 - ``tdd``: TDD dòng điện lớn nhất (%).
 
-Các cột mới thêm để sinh nhận xét:
+Các cột đánh giá tự động (sinh nhận xét):
 - ``current_char``: Đặc tính dòng điện — một trong: "Ổn định" / "Dao động nhẹ" /
   "Biến đổi liên tục" / "Chu kỳ Load-Unload".
 - ``u_min``, ``u_max``: Điện áp đo được thấp nhất / cao nhất (V); tool tự tính δU.

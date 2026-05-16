@@ -168,7 +168,7 @@ def _evaluate_for_excel(df: "pd.DataFrame") -> dict[int, str]:
     """
     from modules.report.gen_word import (
         _eval_voltage, _eval_pf, _eval_thd, _eval_unbalance,
-        _V_DEV_LIMIT_PCT, _PF_LIMIT, _THDV_LIMIT_PCT, _TDD_LIMIT_PCT, _MBA_NOMINAL_VOLTAGE_V
+        _V_DEV_LIMIT_PCT, _THDV_LIMIT_PCT, _TDD_LIMIT_PCT, _MBA_NOMINAL_VOLTAGE_V
     )
     
     res = {}
@@ -434,13 +434,16 @@ def organize_field_zip():
 @kew_bp.route("/generate-word-report", methods=["POST"])
 def generate_word_report():
     """
-    API endpoint để sinh báo cáo Word tổng hợp từ hồ sơ đã tổ chức.
+    API endpoint để sinh báo cáo Word tổng hợp từ hồ sơ thiết bị (file ZIP).
     
-    Duyệt qua các thư mục thiết bị trong ZIP, đọc dữ liệu KEW (INPS) và 
-    render báo cáo Word dựa trên template MBA và thiết bị.
+    Quy trình xử lý:
+    1. Tiếp nhận file ZIP từ client và giải nén vào bộ nhớ tạm.
+    2. Duyệt cấu trúc thư mục, nhận diện Máy biến áp (MBA) và thiết bị phụ tải.
+    3. Tạo và trộn các section theo thứ tự: Các MBA -> Bảng tổng kết MBA -> Các thiết bị phụ tải.
+    4. Trả về file Word hoàn chỉnh cho người dùng.
     
     Returns:
-        Response: File Word báo cáo hoặc lỗi JSON.
+        Response: File .docx báo cáo (application/vnd.openxmlformats-officedocument.wordprocessingml.document) hoặc lỗi JSON.
     """
     from modules.report.gen_word import build_word_report_from_zip
 
