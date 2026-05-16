@@ -388,7 +388,13 @@ def organize_field_zip():
     1. Đọc file Excel kế hoạch trong ZIP.
     2. Đổi tên các thư mục Sxxxx thành tên thiết bị tương ứng.
     3. Di chuyển các file ảnh PS-SDxxx.BMP vào đúng thư mục thiết bị.
-    4. Nén lại thành file ZIP kết quả.
+    4. (Tùy chọn) Chạy OCR tự động đọc các thông số đo từ ảnh BMP và ghi vào Excel.
+    5. Nén lại thành file ZIP kết quả.
+
+    Form params:
+        zip / file: File ZIP đầu vào.
+        run_ocr: '1' hoặc 'true' để chạy OCR sau khi sắp xếp (mặc định: true).
+        ocr_overwrite: '1' hoặc 'true' để ghi đè các ô Excel đã có giá trị (mặc định: false).
     
     Returns:
         Response: File ZIP đã tổ chức lại hoặc lỗi JSON.
@@ -405,9 +411,17 @@ def organize_field_zip():
     if not zip_bytes:
         return jsonify({"error": "File ZIP rỗng."}), 400
 
+    # Tham số OCR từ form
+    run_ocr_raw = request.form.get("run_ocr", "true").strip().lower()
+    run_ocr = run_ocr_raw not in ("0", "false", "no", "")
+    ocr_overwrite_raw = request.form.get("ocr_overwrite", "false").strip().lower()
+    ocr_overwrite = ocr_overwrite_raw in ("1", "true", "yes")
+
     work = tempfile.mkdtemp(prefix="kew_field_org_")
     try:
-        out_path, warnings, fatal = organize_mod.process_field_zip_bytes(zip_bytes, work)
+        out_path, warnings, fatal = organize_mod.process_field_zip_bytes(
+            zip_bytes, work, run_ocr=run_ocr, ocr_overwrite=ocr_overwrite
+        )
         if fatal:
             return jsonify({"errors": fatal, "warnings": warnings}), 400
         if not out_path or not os.path.isfile(out_path):

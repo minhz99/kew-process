@@ -1,30 +1,19 @@
 """
 Tổ chức hồ sơ đo KEW6315 từ ZIP: đọc Excel hiện trường (.xlsx), đổi tên thư mục Sxxxx,
-chuyển ảnh PS-SDxxx.BMP vào đúng thư mục thiết bị, nén lại Project_Output.zip.
+chuyển ảnh PS-SDxxx.BMP vào đúng thư mục thiết bị, chạy OCR tự động điền thông số,
+nén lại Project_Output.zip.
 
-Excel hiện trường chỉ hỗ trợ một bộ cột cố định (tên cột không phân biệt hoa thường):
-``stt``, ``name``, ``file``, ``img``, ``imgend``, ``imgomit``, ``imglu``, ``type``, ``pdm``,
-``p``, ``pf``, ``i1``, ``i2``, ``i3``, ``di``, ``thd``, ``tdd``,
-``current_char``, ``u_min``, ``u_max``, ``delta_u``.
+File Excel hiện trường chỉ cần có **10 cột bắt buộc** (xem :data:`FIELD_XLSX_REQUIRED`).
+Các cột thông số đo lường (:data:`FIELD_XLSX_OCR`) sẽ được **OCR tự động điền** sau khi sắp xếp
+ảnh, hoặc nếu đã có sẵn trong Excel thì được giữ nguyên (không ghi đè).
 
-Bước tổ chức ZIP dùng ``name`` / ``file`` / ``img`` / ``imgend`` / ``imgomit`` /
-``imglu`` (tuỳ chọn: chỉ số ảnh PS-SDxxx dùng riêng cho máy nén khí load/unload —
-sẽ được copy vào thư mục thiết bị với tên ``load-unload-xxx.BMP``);
-``stt`` và các cột còn lại dành cho bước Word (thứ tự thiết bị, metadata).
+Các cột bắt buộc (``FIELD_XLSX_REQUIRED``):
+``stt``, ``name``, ``file``, ``img``, ``imgend``, ``imgomit``, ``imglu``,
+``type``, ``pdm``, ``current_char``.
 
-Các cột đã có sẵn từ trước, được tái dùng để sinh nhận xét (không dùng INPS):
-- ``pf``: Hệ số công suất trung bình (cosφ).
-- ``di``: Độ lệch pha (mất cân bằng) dòng điện lớn nhất (%).
-- ``thd``: THD điện áp lớn nhất (%).
-- ``tdd``: TDD dòng điện lớn nhất (%).
-
-Các cột đánh giá tự động (sinh nhận xét):
-- ``current_char``: Đặc tính dòng điện — một trong: "Ổn định" / "Dao động nhẹ" /
-  "Biến đổi liên tục" / "Chu kỳ Load-Unload".
-- ``u_min``, ``u_max``: Điện áp đo được thấp nhất / cao nhất (V); tool tự tính δU.
-- ``delta_u``: Độ lệch pha (mất cân bằng) điện áp lớn nhất (%).
-- ``imglu``: (Tuỳ chọn) Chỉ số ảnh PS-SDxxx dùng cho dạng sóng load/unload — được đổi
-  tên thành ``load-unload-xxx.BMP`` khi copy vào thư mục thiết bị.
+Các cột do OCR tự điền (``FIELD_XLSX_OCR``):
+``p``, ``cos_phi``, ``i_max``, ``u_min``, ``u_max``,
+``delta_u``, ``delta_i``, ``thd``, ``tdd``.
 """
 from __future__ import annotations
 
@@ -41,31 +30,35 @@ import pandas as pd
 
 _SKIP_DIR_NAMES = {"__MACOSX"}
 
-# Một file Excel hiện trường duy nhất: đủ 18 cột (so khớp sau chuẩn hóa NFKC + chữ thường).
-FIELD_XLSX_HEADERS: tuple[str, ...] = (
-    # ── Tổ chức file (bước xử lý sơ bộ ZIP) ────────────────────────────
+# ── Cột bắt buộc người dùng phải điền vào Excel hiện trường ──────────────────
+FIELD_XLSX_REQUIRED: tuple[str, ...] = (
     "stt",           # Số thứ tự (thứ tự trong báo cáo Word)
     "name",          # Tên thiết bị (hiển thị trong báo cáo)
     "file",          # Mã thư mục KEW (Sxxxx)
     "img",           # Chỉ số ảnh đầu dải (PS-SDxxx)
     "imgend",        # Chỉ số ảnh cuối dải
     "imgomit",       # Chỉ số ảnh bỏ qua trong dải (tuỳ chọn)
-    "imglu",         # (Tuỳ chọn) Chỉ số ảnh PS-SDxxx dạng sóng load/unload → đổi tên load-unload-xxx.BMP
-    # ── Phân loại & thông tin chung ────────────────────────────────────
+    "imglu",         # (Tuỳ chọn) Chỉ số ảnh load/unload → đổi tên load-unload-xxx.BMP
     "type",          # Loại section: MBA / device (thiết bị)
     "pdm",           # Công suất định mức (kVA) — dùng tính % tải MBA
-    # ── Thông số đo lường hiện trường (dùng sinh nhận xét Word) ────────
-    "current_char",  # Đặc tính dòng điện: Ổn định / Dao động nhẹ / Biến đổi liên tục / Chu kỳ Load-Unload
-    "u_min",         # Điện áp đo thấp nhất (V) — tool tự tính δU_min
-    "u_max",         # Điện áp đo cao nhất (V) — tool tự tính δU_max
-    "i_max",         # Dòng điện lớn nhất đo được (A)
-    "delta_u",       # Độ lệch pha (mất cân bằng) điện áp lớn nhất (%)
-    "delta_i",       # Độ lệch pha (mất cân bằng) dòng điện lớn nhất (%)
-    "p",             # Công suất tác dụng trung bình (kW) — dùng tính % tải MBA
-    "cos_phi",       # Hệ số công suất trung bình (cosφ)
-    "thd",           # Tổng biến dạng sóng hài điện áp lớn nhất (%)
-    "tdd",           # Tổng biến dạng sóng hài dòng điện lớn nhất (%)
+    "current_char",  # Đặc tính dòng điện: Ổn định / Dao động nhẹ / ...
 )
+
+# ── Cột do OCR tự động điền sau khi nhận dạng ảnh BMP ────────────────────────
+FIELD_XLSX_OCR: tuple[str, ...] = (
+    "p",             # Công suất tác dụng trung bình (kW)
+    "cos_phi",       # Hệ số công suất trung bình (cosφ)
+    "i_max",         # Dòng điện lớn nhất đo được (A)
+    "u_min",         # Điện áp đo thấp nhất (V)
+    "u_max",         # Điện áp đo cao nhất (V)
+    "delta_u",       # Mất cân bằng điện áp lớn nhất (%)
+    "delta_i",       # Mất cân bằng dòng điện lớn nhất (%)
+    "thd",           # THD điện áp lớn nhất (%)
+    "tdd",           # TDD dòng điện lớn nhất (%)
+)
+
+# ── Toàn bộ schema đầy đủ (required + OCR) — dùng cho Word report ────────────
+FIELD_XLSX_HEADERS: tuple[str, ...] = FIELD_XLSX_REQUIRED + FIELD_XLSX_OCR
 
 _BMP_RE = re.compile(r"^PS-SD(\d{1,4})\.BMP$", re.IGNORECASE)
 _S_DIR_RE = re.compile(r"^S(\d{4})$", re.IGNORECASE)
@@ -287,8 +280,16 @@ def _unique_name(base: str, used: set[str]) -> str:
 def resolve_field_excel_column_map(df: pd.DataFrame) -> dict[str, Any]:
     """Map tên cột logic (chữ thường) → tên cột gốc trong DataFrame.
 
-    Chỉ chấp nhận đúng :data:`FIELD_XLSX_HEADERS`; thiếu cột hoặc trùng tên sau
-    chuẩn hóa → ``ValueError``.
+    Chỉ bắt buộc các cột trong :data:`FIELD_XLSX_REQUIRED`; các cột OCR
+    trong :data:`FIELD_XLSX_OCR` có thể vắng mặt (sẽ được tạo mới sau OCR).
+    Cột trùng tên sau chuẩn hóa → ``ValueError``.
+
+    Args:
+        df: DataFrame đọc từ file Excel hiện trường.
+
+    Returns:
+        Dict mapping tên cột logic → tên cột gốc. Các cột OCR vắng mặt
+        được map → ``None`` (không có trong DataFrame).
     """
     seen: dict[str, Any] = {}
     for c in df.columns:
@@ -301,22 +302,27 @@ def resolve_field_excel_column_map(df: pd.DataFrame) -> dict[str, Any]:
             )
         if k not in seen:
             seen[k] = c
-    unknown = sorted(k for k in seen if k not in set(FIELD_XLSX_HEADERS))
-    if unknown:
+
+    # Cột không nhận biết: chỉ cảnh báo, không lỗi (ví dụ cột ghi chú riêng của user)
+    all_known = set(FIELD_XLSX_HEADERS)
+    # (không raise — bỏ qua cột không biết)
+
+    # Kiểm tra các cột BẮT BUỘC
+    missing_required = [h for h in FIELD_XLSX_REQUIRED if h not in seen]
+    if missing_required:
         raise ValueError(
-            "File Excel có cột không được hỗ trợ: "
-            + ", ".join(unknown)
-            + ". Chỉ chấp nhận: "
-            + ", ".join(FIELD_XLSX_HEADERS)
+            "File Excel hiện trường thiếu các cột bắt buộc: "
+            + ", ".join(missing_required)
+            + ". Cột bắt buộc: "
+            + ", ".join(FIELD_XLSX_REQUIRED)
+            + f". Các cột hiện có: {list(df.columns)}"
         )
-    missing = [h for h in FIELD_XLSX_HEADERS if h not in seen]
-    if missing:
-        raise ValueError(
-            "File Excel hiện trường cần đủ các cột: "
-            + ", ".join(FIELD_XLSX_HEADERS)
-            + f". Thiếu: {', '.join(missing)}. Các cột hiện có: {list(df.columns)}"
-        )
-    return {h: seen[h] for h in FIELD_XLSX_HEADERS}
+
+    # Trả về map đầy đủ: cột vắng mặt (OCR) → None
+    result: dict[str, Any] = {}
+    for h in FIELD_XLSX_HEADERS:
+        result[h] = seen.get(h)  # None nếu không có
+    return result
 
 
 @dataclass
@@ -328,6 +334,7 @@ class RowPlan:
     img_end: int
     img_omit: frozenset[int]
     img_lu: Optional[int]  # Chỉ số ảnh load/unload (None nếu không có)
+    excel_row: int         # Chỉ số hàng 1-based trong Excel (bao gồm header)
 
 
 def read_plans_from_excel(excel_path: str) -> tuple[list[RowPlan], list[str]]:
@@ -391,6 +398,7 @@ def read_plans_from_excel(excel_path: str) -> tuple[list[RowPlan], list[str]]:
                 img_end=i1,
                 img_omit=omit_eff,
                 img_lu=img_lu,
+                excel_row=int(idx) + 2,  # idx 0-based của data, row 1-indexed (header=row 1)
             )
         )
     if not plans:
@@ -525,11 +533,120 @@ def zip_directory(folder: str, zip_path: str) -> None:
                 zf.write(fp, arcname=arc)
 
 
-def process_field_zip_bytes(zip_bytes: bytes, work_dir: str) -> tuple[str, list[str], list[str]]:
+def run_ocr_and_update_excel(
+    excel_path: str,
+    plans: list[RowPlan],
+    bmp_map: dict[int, str],
+    overwrite_existing: bool = False,
+) -> list[str]:
+    """
+    Chạy OCR trên tất cả thiết bị (không phải MBA) và ghi kết quả vào file Excel.
+
+    Nếu cột đo lường chưa tồn tại trong Excel, hàm sẽ tự động tạo thêm cột mới.
+    Chỉ điền vào các ô còn trống trong Excel (hoặc ghi đè nếu ``overwrite_existing=True``).
+
+    Returns:
+        Danh sách cảnh báo (warnings).
+    """
+    try:
+        from openpyxl import load_workbook
+    except ImportError:
+        return ["Thiếu thư viện openpyxl — bỏ qua bước OCR điền Excel."]
+
+    try:
+        from modules.image.ocr_kew import read_device_ocr
+    except ImportError as e:
+        return [f"Không tải được module OCR ({e}) — bỏ qua bước OCR."]
+
+    warnings_out: list[str] = []
+
+    # Mở workbook để ghi trực tiếp
+    try:
+        wb = load_workbook(excel_path)
+        ws = wb.active
+    except Exception as e:
+        return [f"OCR: không mở được workbook để ghi ({e})."]
+
+    header_row = 1
+
+    # ── Quét header hiện có trong worksheet ──────────────────────────────────
+    existing_col_map: dict[str, int] = {}  # cột chuẩn hóa → col_idx (1-indexed)
+    max_col = 0
+    for col_idx, cell in enumerate(ws[header_row], start=1):
+        max_col = max(max_col, col_idx)
+        if cell.value is not None:
+            k = _norm_key(str(cell.value))
+            if k:
+                existing_col_map[k] = col_idx
+
+    # ── Đảm bảo mỗi cột OCR tồn tại trong header; tạo mới nếu chưa có ───────
+    col_indices: dict[str, int] = {}
+    for field in FIELD_XLSX_OCR:
+        if field in existing_col_map:
+            col_indices[field] = existing_col_map[field]
+        else:
+            max_col += 1
+            ws.cell(row=header_row, column=max_col, value=field)
+            col_indices[field] = max_col
+            warnings_out.append(f"OCR: tạo mới cột «{field}» tại cột số {max_col}.")
+
+    # Tìm cột 'type' để lọc MBA (dựa trên header thực tế)
+    type_col_idx = existing_col_map.get("type")
+
+    for plan in plans:
+        # Bỏ qua MBA nếu không có thông tin ảnh (trước đây bỏ qua cứng, nay cho phép nếu có img_start)
+        if type_col_idx:
+            row_type_val = ws.cell(row=plan.excel_row, column=type_col_idx).value
+            row_type = str(row_type_val).strip().lower() if row_type_val else ""
+            # Vẫn cho phép OCR MBA nếu user có điền chỉ số ảnh
+            if not plan.img_start:
+                continue
+
+        # Lấy danh sách ảnh thực tế sau khi loại bỏ omit
+        valid_indices = [
+            i for i in range(plan.img_start, plan.img_end + 1)
+            if i not in plan.img_omit
+        ]
+
+        # Chạy OCR cho thiết bị này
+        ocr_vals, ocr_warns = read_device_ocr(
+            bmp_indices=valid_indices,
+            bmp_map=bmp_map,
+        )
+        if ocr_warns:
+            warnings_out.extend([f"[{plan.device_raw}] {w}" for w in ocr_warns])
+
+        # Ghi từng giá trị vào Excel
+        for field_name, value in ocr_vals.items():
+            if value is None or field_name not in col_indices:
+                continue
+            
+            col_idx = col_indices[field_name]
+            cell = ws.cell(row=plan.excel_row, column=col_idx)
+
+            # Không ghi đè nếu ô đã có giá trị (trừ khi overwrite_existing)
+            if not overwrite_existing and cell.value is not None and str(cell.value).strip():
+                continue
+
+            cell.value = round(value, 4)
+
+    try:
+        wb.save(excel_path)
+    except Exception as e:
+        warnings_out.append(f"OCR: không lưu được Excel sau khi cập nhật ({e}).")
+
+    return warnings_out
+
+
+def process_field_zip_bytes(
+    zip_bytes: bytes,
+    work_dir: str,
+    run_ocr: bool = True,
+    ocr_overwrite: bool = False,
+) -> tuple[str, list[str], list[str]]:
     """
     Giải nén zip_bytes vào work_dir, xử lý, tạo file ZIP kết quả trong work_dir.
     Trả về (đường_dẫn_zip_kết_quả, warnings, errors_fatal).
-    errors_fatal rỗng nếu thành công.
     """
     warnings: list[str] = []
     extract = os.path.join(work_dir, "in")
@@ -557,9 +674,24 @@ def process_field_zip_bytes(zip_bytes: bytes, work_dir: str) -> tuple[str, list[
     if fatal:
         return "", warnings, fatal
 
+    # ── Chạy OCR tự động điền Excel ──────────────────────────────────────────
+    if run_ocr:
+        ocr_warns = run_ocr_and_update_excel(
+            excel_path=excel_path,
+            plans=plans,
+            bmp_map=bmp_map,
+            overwrite_existing=ocr_overwrite,
+        )
+        warnings.extend(ocr_warns)
+
     staging = os.path.join(work_dir, "staging")
     os.makedirs(staging, exist_ok=True)
     build_project_output(extract, staging, plans, s_map, bmp_map, warnings)
+
+    # Copy Excel (đã cập nhật nếu run_ocr=True) vào Project_Output để có trong ZIP kết quả
+    excel_dst = os.path.join(staging, "Project_Output", os.path.basename(excel_path))
+    if not os.path.exists(excel_dst):
+        shutil.copy2(excel_path, excel_dst)
 
     out_zip = os.path.join(work_dir, "KEW_HoSoDaXuLy.zip")
     proj = os.path.join(staging, "Project_Output")
