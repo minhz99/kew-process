@@ -102,11 +102,8 @@ def _safe_screen(idx):
     return SCREENS[idx % len(SCREENS)]
 
 
-def _build_bmp_name(prefix, filename):
-    fname = filename or 'edited.bmp'
-    if not fname.lower().endswith('.bmp'):
-        fname += '.bmp'
-    return f"{prefix}_{fname}"
+def _build_bmp_name(filename):
+    return filename or 'edited.bmp'
 
 
 @image_bp.route('/process', methods=['POST'])
@@ -154,7 +151,7 @@ def process_image():
         buf,
         mimetype='image/bmp',
         as_attachment=True,
-        download_name=_build_bmp_name("Edited", getattr(file, 'filename', 'edited.bmp')),
+        download_name=_build_bmp_name(getattr(file, 'filename', 'edited.bmp')),
     )
 
 
@@ -262,5 +259,5 @@ def apply_timestamp():
         buf,
         mimetype='image/bmp',
         as_attachment=True,
-        download_name=_build_bmp_name("TS", getattr(file, 'filename', 'edited.bmp')),
+        download_name=_build_bmp_name(getattr(file, 'filename', 'edited.bmp')),
     )

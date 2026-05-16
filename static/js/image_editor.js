@@ -165,7 +165,7 @@ let SLOT_MAPPING = [null, null, null, null, null, null]; // slot index → PENDI
           card.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
           <div style="font-size:0.75rem; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:70%;">${file.name}</div>
-          <a href="${url}" download="Edited_${file.name}" style="font-size:0.7rem; color:var(--accent); text-decoration:none;">Lưu ⬇️</a>
+          <a href="${url}" download="${file.name}" style="font-size:0.7rem; color:var(--accent); text-decoration:none;">Lưu ⬇️</a>
         </div>
         <img src="${url}" style="width:100%; border-radius:4px; cursor:pointer;" onclick="window.open('${url}')" />
         ${tsLabel}
@@ -191,7 +191,7 @@ let SLOT_MAPPING = [null, null, null, null, null, null]; // slot index → PENDI
 
       const zip = new JSZip();
       EDITED_FILES.forEach(item => {
-        zip.file('Edited_' + item.name, item.blob);
+        zip.file(item.name, item.blob);
       });
 
       try {
@@ -199,7 +199,7 @@ let SLOT_MAPPING = [null, null, null, null, null, null]; // slot index → PENDI
         const url = URL.createObjectURL(content);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'Edited_Meter_Images.zip';
+        a.download = 'Meter_Images.zip';
         document.body.appendChild(a);
         a.click();
         a.remove();
