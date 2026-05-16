@@ -582,6 +582,10 @@ def _merge_auto_and_excel_notes(auto: str, excel_bits: str) -> str:
     Returns:
         str: Chuỗi văn bản đã ghép, cách nhau bởi 2 dấu xuống dòng.
     """
+    bits = (excel_bits or "").strip()
+    if not bits:
+        return auto
+    return f"{auto}\n\n{bits}"
 
 def _device_tdd_limit_from_name(name: str) -> float:
     """Xác định ngưỡng giới hạn TDD dòng điện dựa trên tên/loại thiết bị.
@@ -829,26 +833,69 @@ def _compose_remarks_from_excel_fields(
             f"đều vượt mức cho phép (THDmax = {th_s}% {_GT} 8,0% {_AMP} TDDmax = {td_s}% {_GT} {lim_s}%)."
         )
 
-    # ── MBA: đầy đủ các câu (% tải → biểu đồ → cosφ → ΔU/ΔI → THD/TDD → đánh giá + dẫn bảng) ──
+    # ── MBA: format mới ──────────────────────────────────────────────────────
+    # Câu 1: % tải (nếu có đủ dữ liệu)
+    # Câu 2: Biểu đồ dòng điện
+    # Câu 3: Chất lượng điện + ΔU [+ ΔI nếu cùng mức] + cosφ (một câu)
+    # Câu 4: ΔI riêng (chỉ khi ΔI khác mức với ΔU)
+    # Câu 5: TDD trong mức (bỏ qua nếu vượt mức)
+    # Câu cuối: Dẫn bảng tổng hợp
     if kind == "mba":
-        load_seg = ""
+        mba_parts: list[str] = []
+
+        # Câu 1 — % công suất tiêu thụ
         if p_kw is not None and cos_phi is not None and abs(cos_phi) > 0.01 and pdm_kva is not None and pdm_kva > 0:
             s_kva = p_kw / abs(cos_phi)
             load_pct = s_kva / pdm_kva * 100.0
-            load_seg = f"Công suất tiêu thụ của {name_mid} đạt {_pct(load_pct, 2)}% công suất thiết kế."
-        mba_parts: list[str] = []
-        if load_seg:
-            mba_parts.append(load_seg)
-        mba_parts.append(f"Biểu đồ dòng điện tiêu thụ tại thời điểm đo kiểm {wave}.")
-        mba_parts.append(f"Hệ số công suất cosφ ở mức {pf_txt}.")
-        if unbalance_sent:
-            mba_parts.append(unbalance_sent)
-        if harm_sent:
-            mba_parts.append(harm_sent)
+            mba_parts.append(
+                f"Công suất tiêu thụ của {name_mid} đạt {_pct(load_pct, 2)}% công suất thiết kế."
+            )
+
+        # Câu 2 — Biểu đồ dòng điện
         mba_parts.append(
-            f"Kết quả chất lượng điện đo được ở mức {quality}. "
+            f"Biểu đồ dòng điện tiêu thụ tại thời điểm đo kiểm {wave}."
+        )
+
+        # Câu 3 — Chất lượng điện + ΔU/ΔI + cosφ
+        quality_cap = quality[0].upper() + quality[1:]  # Viết hoa chữ đầu
+        du_level = "thấp" if (du_num is not None and du_num <= _V_DEV_LIMIT_PCT) else "cao"
+        di_level = ("thấp" if di_pass else "cao") if di_num is not None else None
+
+        # Gộp ΔU + ΔI nếu cùng mức, tách câu 4 nếu khác mức
+        if di_level is not None and di_level == du_level:
+            # Cùng mức → gộp chung vào câu 3
+            unbalance_part = f"độ lệch pha điện áp và dòng điện đều ở mức {du_level}"
+            di_separate = False
+        else:
+            # Khác mức hoặc không có ΔI → chỉ nêu ΔU ở câu 3
+            unbalance_part = f"độ lệch pha điện áp ở mức {du_level}"
+            di_separate = di_level is not None  # Câu 4 riêng nếu có ΔI
+
+        quality_sent = (
+            f"Chất lượng điện đo tại {name_mid} ở mức {quality_cap}, "
+            f"{unbalance_part}, "
+            f"hệ số công suất cosφ ở mức {pf_txt}."
+        )
+        mba_parts.append(quality_sent)
+
+        # Câu 4 — ΔI riêng (chỉ khi khác mức ΔU)
+        if di_separate:
+            mba_parts.append(
+                f"Độ lệch pha dòng điện ở mức {di_level} (ΔI = {di_s}%)."
+            )
+
+        # Câu 5 — TDD dòng điện trong mức (bỏ qua nếu TDD vượt mức)
+        if tdd_ok:
+            mba_parts.append(
+                f"Tổng biến dạng sóng hài dòng điện ở mức cho phép "
+                f"(TDDmax = {td_s}% {_LT} {lim_s}%)."
+            )
+
+        # Câu cuối — Dẫn bảng
+        mba_parts.append(
             f"Dưới đây là bảng tổng hợp thông số hoạt động của {name_mid}:"
         )
+
         return " ".join(mba_parts)
 
     # ── Device: 6 câu theo thứ tự spec ───────────────────────────────────
