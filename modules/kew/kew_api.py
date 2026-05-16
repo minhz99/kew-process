@@ -68,6 +68,16 @@ _KM_RE = re.compile(r"^\s*([+-]?\d+(?:\.\d+)?)\s*([kKmM])\s*$")
 
 
 def _mba_to_number(v):
+    """
+    Chuyển đổi một giá trị từ file KEW sang số thực (float).
+    Xử lý các đơn vị k (kilo), m (mega) và loại bỏ các ký hiệu đơn vị khác.
+    
+    Args:
+        v: Giá trị cần chuyển đổi.
+        
+    Returns:
+        float or pd.NA: Giá trị số sau khi chuyển đổi hoặc pd.NA nếu không hợp lệ.
+    """
     if v is None or (isinstance(v, float) and pd.isna(v)):
         return pd.NA
     s = str(v).strip()
@@ -93,6 +103,16 @@ def _mba_to_number(v):
 
 
 def _mba_extract(df: "pd.DataFrame") -> "tuple[pd.DataFrame, list[str]]":
+    """
+    Trích xuất và chuẩn hóa dữ liệu từ DataFrame gốc của file KEW.
+    Áp dụng mapping cột, chuyển đổi đơn vị và làm tròn số.
+    
+    Args:
+        df (pd.DataFrame): DataFrame dữ liệu gốc.
+        
+    Returns:
+        tuple: (DataFrame đã chuẩn hóa, danh sách các cảnh báo warnings).
+    """
     orig_cols = list(_MBA_COLUMN_MAPPING.keys())
     available_cols = [c for c in orig_cols if c in df.columns]
     missing = [c for c in orig_cols if c not in df.columns]
@@ -135,60 +155,77 @@ def _mba_extract(df: "pd.DataFrame") -> "tuple[pd.DataFrame, list[str]]":
 
 
 def _evaluate_for_excel(df: "pd.DataFrame") -> dict[int, str]:
+    """
+    Đánh giá các chỉ số kỹ thuật (điện áp, PF, THD, unbalance) để ghi nhận xét vào file Excel.
+    Sử dụng các hàm đánh giá dùng chung với module report.
+    
+    Args:
+        df (pd.DataFrame): DataFrame dữ liệu đã chuẩn hóa.
+        
+    Returns:
+        dict: Một dictionary mapping dòng (row index) với chuỗi nhận xét (ví dụ {8: "Đạt"}).
+    """
     from modules.report.gen_word import (
         _eval_voltage, _eval_pf, _eval_thd, _eval_unbalance,
         _V_DEV_LIMIT_PCT, _PF_LIMIT, _THDV_LIMIT_PCT, _TDD_LIMIT_PCT, _MBA_NOMINAL_VOLTAGE_V
     )
-
+    
     res = {}
-
+    
     # AE8: Điện áp
     if "AVG_VL1[V]" in df.columns:
         u_vals = df["AVG_VL1[V]"].dropna()
         if not u_vals.empty:
             eval_str, _, _, _ = _eval_voltage(u_vals.max(), u_vals.min(), u_vals.mean(), _MBA_NOMINAL_VOLTAGE_V)
             res[8] = eval_str
-
+            
     # AE11: Dòng điện (Word không có logic đánh giá)
     res[11] = "—"
-
+    
     # AE14: Pha áp
     if "AVG_Vunb[%]" in df.columns:
         vu_vals = df["AVG_Vunb[%]"].dropna()
         if not vu_vals.empty:
             res[14] = _eval_unbalance(vu_vals.max(), vu_vals.mean(), _V_DEV_LIMIT_PCT)
-
+            
     # AE15: Pha dòng
     if "AVG_Aunb[%]" in df.columns:
         au_vals = df["AVG_Aunb[%]"].dropna()
         if not au_vals.empty:
             res[15] = _eval_unbalance(au_vals.max(), au_vals.mean(), 10.0)
-
+            
     # AE16: PF
     if "AVG_PF" in df.columns:
         pf_vals = df["AVG_PF"].dropna()
         if not pf_vals.empty:
             res[16] = _eval_pf(pf_vals.max(), pf_vals.min(), pf_vals.mean())
-
+            
     # AE20: THD
     thd_cols = [c for c in ["AVG_Vthd1[%]", "AVG_Vthd2[%]", "AVG_Vthd3[%]"] if c in df.columns]
     if thd_cols:
         max_vals = [df[c].max() for c in thd_cols if not df[c].dropna().empty]
         avg_vals = [df[c].mean() for c in thd_cols if not df[c].dropna().empty]
         res[20] = _eval_thd(max_vals, avg_vals, _THDV_LIMIT_PCT)
-
+        
     # AE23: TDD
     tdd_cols = [c for c in ["AVG_Athd1[%]", "AVG_Athd2[%]", "AVG_Athd3[%]"] if c in df.columns]
     if tdd_cols:
         max_vals = [df[c].max() for c in tdd_cols if not df[c].dropna().empty]
         avg_vals = [df[c].mean() for c in tdd_cols if not df[c].dropna().empty]
         res[23] = _eval_thd(max_vals, avg_vals, _TDD_LIMIT_PCT)
-
+        
     return res
 
 
 def _mba_write(ws, df: "pd.DataFrame") -> None:
-    """Ghi header + data vào sheet, bắt đầu từ B2."""
+    """
+    Ghi dữ liệu từ DataFrame vào worksheet Excel và áp dụng định dạng.
+    Cũng ghi các nhận xét đánh giá vào cột AE (cột 31).
+    
+    Args:
+        ws: Worksheet của openpyxl.
+        df (pd.DataFrame): DataFrame dữ liệu đã chuẩn hóa.
+    """
     sr, sc = _MBA_START_ROW, _MBA_START_COL
     
     # Xoá vùng dữ liệu mẫu cũ (nếu có)
@@ -223,12 +260,13 @@ kew_bp = Blueprint('kew_bp', __name__)
 @kew_bp.route('/export-mba', methods=['POST'])
 def export_mba():
     """
-    Nhận nhiều file INPS (.KEW hoặc .ZIP), mỗi file → 1 sheet trong output Excel.
-    Form fields:
-        files[]  – list các file KEW / ZIP (multipart, có thể gửi nhiều)
-        sheets   – JSON array tên sheet tương ứng, ví dụ '["MBA1","MBA2"]'
-                   Nếu thiếu / ngắn hơn số file, các sheet còn lại tự đặt tên MBA1, MBA2, ...
-        filename – tên file xuất (mặc định 'NX-MBA.xlsm')
+    API endpoint để xuất báo cáo MBA sang file Excel (.xlsm).
+    
+    Nhận các file KEW hoặc ZIP từ người dùng, trích xuất dữ liệu và điền vào 
+    template Excel có sẵn. Mỗi file KEW sẽ tương ứng với một sheet MBA trong file kết quả.
+    
+    Returns:
+        Response: File Excel kết quả hoặc lỗi JSON.
     """
     if not _MBA_DEPS_OK:
         return jsonify({'error': 'Thiếu thư viện pandas hoặc openpyxl.'}), 500
@@ -343,9 +381,16 @@ def export_mba():
 @kew_bp.route("/organize-field-zip", methods=["POST"])
 def organize_field_zip():
     """
-    Nhận một ZIP: Excel hiện trường (đúng bộ cột ``name``, ``file``, ``img``, ``imgend``, ``imgomit``, …;
-    xem ``FIELD_XLSX_HEADERS``) + thư mục Sxxxx + ảnh PS-SDxxx.BMP.
-    Đổi tên thư mục theo cột ``name``, chuyển ảnh vào đúng thư mục, trả về ZIP Project_Output.
+    API endpoint để tổ chức lại file ZIP hồ sơ hiện trường.
+    
+    Thực hiện:
+    1. Đọc file Excel kế hoạch trong ZIP.
+    2. Đổi tên các thư mục Sxxxx thành tên thiết bị tương ứng.
+    3. Di chuyển các file ảnh PS-SDxxx.BMP vào đúng thư mục thiết bị.
+    4. Nén lại thành file ZIP kết quả.
+    
+    Returns:
+        Response: File ZIP đã tổ chức lại hoặc lỗi JSON.
     """
     from modules.kew import organize_field_zip as organize_mod
 
@@ -388,13 +433,13 @@ def organize_field_zip():
 @kew_bp.route("/generate-word-report", methods=["POST"])
 def generate_word_report():
     """
-    Nhận một file ZIP đã được tổ chức (``Project_Output/<tên thiết bị>/`` …) +
-    tổng hợp số liệu từ ``INPSxxxx.KEW`` của từng thư mục để xuất 1 file
-    Word ``BaoCao_KEW.docx``.
-
-    Form field:
-        zip / file: file .zip duy nhất.
-        filename:   tên file Word xuất (mặc định ``BaoCao_KEW.docx``).
+    API endpoint để sinh báo cáo Word tổng hợp từ hồ sơ đã tổ chức.
+    
+    Duyệt qua các thư mục thiết bị trong ZIP, đọc dữ liệu KEW (INPS) và 
+    render báo cáo Word dựa trên template MBA và thiết bị.
+    
+    Returns:
+        Response: File Word báo cáo hoặc lỗi JSON.
     """
     from modules.report.gen_word import build_word_report_from_zip
 
@@ -446,11 +491,13 @@ def generate_word_report():
 @kew_bp.route("/generate-table6", methods=["POST"])
 def generate_table6():
     """
-    Nhận một file ZIP đã được tổ chức (có chứa file Excel hiện trường)
-    và sinh bảng tổng hợp (Table 6).
-
-    Form field:
-        zip / file: file .zip duy nhất.
+    API endpoint để sinh bảng tổng hợp kết quả đo kiểm (Table 6).
+    
+    Trích xuất các chỉ số I, P, PF, THD, TDD từ Excel hiện trường và 
+    tạo bảng tổng hợp trong file Word.
+    
+    Returns:
+        Response: File Word chứa Table 6 hoặc lỗi JSON.
     """
     from modules.report.gen_word import generate_table6_from_zip
 

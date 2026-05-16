@@ -37,6 +37,17 @@ CHAR_MAP = {'.': 'dot', '-': 'minus'}
 _DIGIT_TEMPLATES = {}
 
 def get_digit_img(char, color, digits_dir):
+    """
+    Lấy hình ảnh của một chữ số hoặc ký tự đặc biệt (chấm, trừ) với màu sắc tương ứng.
+    
+    Args:
+        char (str): Ký tự cần lấy (0-9, '.', '-').
+        color (str): Mã màu ('w' cho trắng, 'g' cho xanh lục...).
+        digits_dir (str): Thư mục chứa các file ảnh chữ số.
+        
+    Returns:
+        PIL.Image: Ảnh chữ số đã load hoặc None nếu không tìm thấy.
+    """
     s = CHAR_MAP.get(char, char)
     key = f"{s}_{color}"
     if key in _DIGIT_TEMPLATES:
@@ -64,6 +75,16 @@ def get_digit_img(char, color, digits_dir):
     return None
 
 def apply_text_to_image(img, img_draw, config, text, digits_dir):
+    """
+    Dán văn bản (số) lên ảnh dựa trên cấu hình tọa độ và thư mục chứa chữ số.
+    
+    Args:
+        img (PIL.Image): Ảnh gốc.
+        img_draw (PIL.ImageDraw): Đối tượng vẽ lên ảnh.
+        config (dict): Cấu hình vị trí và thuộc tính của overlay.
+        text (str): Văn bản/số cần dán.
+        digits_dir (str): Thư mục chứa ảnh chữ số.
+    """
     x_right = config['x']
     y_bot = config['y']
     color = config.get('bg', 'w')
@@ -190,6 +211,12 @@ def _paste_digits_in_field(target_img, digits_str, field_cfg, time_digits_dir):
 
 
 def _parse_timestamp_values(form):
+    """
+    Phân tích các giá trị timestamp từ form request.
+    
+    Returns:
+        dict: Một dictionary chứa các chuỗi đã chuẩn hóa (zfill) cho dd, mo, yyyy, hh, mi, ss.
+    """
     timestamp = form.get('timestamp', '').strip()
     if timestamp:
         try:

@@ -16,7 +16,16 @@ CELL_ADDR_RE = re.compile(r"^[A-Z]{1,3}[1-9][0-9]*$")
 
 @excel_bp.route('/apply-updates', methods=['POST'])
 def apply_updates():
-    """Apply value updates to an uploaded .xlsx while preserving existing styles."""
+    """
+    Cập nhật giá trị vào file Excel được upload trong khi vẫn giữ nguyên định dạng (styles).
+    
+    Hỗ trợ hai loại thao tác:
+    1. Cập nhật giá trị ô: Dựa trên địa chỉ ô (vd: 'A1').
+    2. Chèn dòng mới: Chèn dòng tại vị trí chỉ định và sao chép định dạng từ dòng phía trên.
+    
+    Returns:
+        Response: File Excel đã được cập nhật hoặc lỗi JSON.
+    """
     if load_workbook is None:
         return jsonify({"error": "Thiếu thư viện openpyxl trên server."}), 500
 

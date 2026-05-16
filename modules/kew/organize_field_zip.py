@@ -74,6 +74,9 @@ _WIN_RESERVED = {
 
 
 def _norm_key(s: str) -> str:
+    """
+    Chuẩn hóa chuỗi để so khớp tên cột (NFKC, viết thường, xóa khoảng trắng thừa).
+    """
     if s is None or (isinstance(s, float) and pd.isna(s)):
         return ""
     t = unicodedata.normalize("NFKC", str(s)).strip().lower()
@@ -82,11 +85,23 @@ def _norm_key(s: str) -> str:
 
 
 def _is_skipped_path(path: str) -> bool:
+    """
+    Kiểm tra xem đường dẫn có nên bị bỏ qua (thư mục hệ thống macOS, file ẩn).
+    """
     parts = path.split(os.sep)
     return any(p in _SKIP_DIR_NAMES or p.startswith("._") for p in parts)
 
 
 def find_first_excel(root: str) -> Optional[str]:
+    """
+    Tìm file Excel đầu tiên trong thư mục gốc.
+    
+    Args:
+        root (str): Thư mục để tìm kiếm.
+        
+    Returns:
+        Optional[str]: Đường dẫn đến file Excel tìm được hoặc None.
+    """
     candidates: list[str] = []
     for dirpath, _, filenames in os.walk(root):
         if _is_skipped_path(dirpath):
@@ -102,7 +117,12 @@ def find_first_excel(root: str) -> Optional[str]:
 
 
 def scan_s_folders(root: str) -> tuple[dict[str, str], list[str]]:
-    """Trả về map S0001 -> đường dẫn tuyệt đối."""
+    """
+    Quét tất cả các thư mục có định dạng Sxxxx (ví dụ S0001).
+    
+    Returns:
+        tuple: (Map Sxxxx -> đường dẫn tuyệt đối, danh sách lỗi trùng lặp).
+    """
     mapping: dict[str, str] = {}
     errors: list[str] = []
     for dirpath, dirnames, _ in os.walk(root):
@@ -142,6 +162,15 @@ def scan_bmp_files(root: str) -> tuple[dict[int, str], list[str]]:
 
 
 def file_code_to_s_name(raw: Any) -> Optional[str]:
+    """
+    Chuyển đổi một giá trị (số hoặc chuỗi) sang định dạng thư mục Sxxxx.
+    
+    Args:
+        raw: Giá trị thô từ Excel.
+        
+    Returns:
+        Optional[str]: Chuỗi định dạng Sxxxx hoặc None.
+    """
     if raw is None or (isinstance(raw, float) and pd.isna(raw)):
         return None
     s = str(raw).strip()
@@ -157,6 +186,9 @@ def file_code_to_s_name(raw: Any) -> Optional[str]:
 
 
 def _to_int_img(v: Any) -> Optional[int]:
+    """
+    Chuyển đổi chỉ số ảnh sang kiểu integer.
+    """
     if v is None or (isinstance(v, float) and pd.isna(v)):
         return None
     if isinstance(v, (int, float)) and not isinstance(v, bool):
@@ -209,10 +241,14 @@ def _parse_img_omit(raw: Any) -> tuple[frozenset[int], list[str]]:
 
 
 def bmp_basename_for_index(n: int) -> str:
+    """Trả về tên file BMP cho chỉ số n (ví dụ PS-SD001.BMP)."""
     return f"PS-SD{n:03d}.BMP"
 
 
 def sanitize_device_folder(name: Any) -> str:
+    """
+    Làm sạch tên thiết bị để dùng làm tên thư mục (xóa ký tự cấm, chuẩn hóa NFC).
+    """
     if name is None or (isinstance(name, float) and pd.isna(name)):
         raise ValueError("Tên thiết bị trống.")
     s = unicodedata.normalize("NFKC", str(name)).strip()
@@ -231,6 +267,7 @@ def sanitize_device_folder(name: Any) -> str:
 
 
 def _unique_name(base: str, used: set[str]) -> str:
+    """Đảm bảo tên thư mục là duy nhất bằng cách thêm hậu tố _2, _3..."""
     if base not in used:
         used.add(base)
         return base
@@ -289,6 +326,12 @@ class RowPlan:
 
 
 def read_plans_from_excel(excel_path: str) -> tuple[list[RowPlan], list[str]]:
+    """
+    Đọc kế hoạch tổ chức hồ sơ từ file Excel hiện trường.
+    
+    Returns:
+        tuple: (Danh sách các RowPlan, danh sách cảnh báo warnings).
+    """
     warnings: list[str] = []
     try:
         df = pd.read_excel(excel_path, header=0, engine="openpyxl")
@@ -356,6 +399,10 @@ def validate_plans_against_fs(
     s_map: dict[str, str],
     bmp_map: dict[int, str],
 ) -> list[str]:
+    """
+    Kiểm tra xem các thư mục và ảnh trong kế hoạch có thực sự tồn tại trong file hệ thống/ZIP không.
+    Kiểm tra trùng lặp dải ảnh giữa các thiết bị.
+    """
     errors: list[str] = []
     for p in plans:
         if p.s_key not in s_map:

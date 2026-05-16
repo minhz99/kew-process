@@ -9,6 +9,10 @@ let SLOT_MAPPING = [null, null, null, null, null, null]; // slot index → PENDI
 
     document.getElementById('ei-bulk-upload-area').onclick = () => document.getElementById('ei-bulk-input').click();
 
+    /**
+     * Xử lý khi kéo thả nhiều file vào vùng tải lên.
+     * @param {File[]} files - Danh sách các file.
+     */
     function handleBulkFiles(files) {
       const container = document.getElementById('ei-preview-container');
       Array.from(files).forEach(file => {
@@ -32,6 +36,11 @@ let SLOT_MAPPING = [null, null, null, null, null, null]; // slot index → PENDI
       });
     }
 
+    /**
+     * Xử lý khi kéo thả một file vào ô chức năng (slot).
+     * @param {DragEvent} e - Sự kiện drag.
+     * @param {number} slotIdx - Chỉ số ô (0-5).
+     */
     function handleDropToSlot(e, slotIdx) {
       e.preventDefault();
       const fileId = e.dataTransfer.getData('text/plain');
@@ -58,6 +67,9 @@ let SLOT_MAPPING = [null, null, null, null, null, null]; // slot index → PENDI
     }
 
 
+    /**
+     * Gửi các ảnh đã chọn và thông số lên server để xử lý.
+     */
     async function submitEditImages() {
       const errorEl = document.getElementById('ei-error');
       const gallery = document.getElementById('ei-gallery');
@@ -219,6 +231,14 @@ let SLOT_MAPPING = [null, null, null, null, null, null]; // slot index → PENDI
 //  API HELPERS
 // ════════════════════════════════════════════════════════════════════
 
+/**
+ * Gửi yêu cầu xử lý ảnh (chèn thông số đo) lên server.
+ * @param {File} file - File ảnh gốc.
+ * @param {number} screenIdx - Chỉ số màn hình (loại thông số).
+ * @param {object} params - Các thông số đo lường.
+ * @param {string} meterModel - Model thiết bị đo.
+ * @returns {Promise<Blob>} - Blob ảnh đã xử lý.
+ */
 async function processImageServerSide(file, screenIdx, params, meterModel) {
     const formData = new FormData();
     formData.append('file', file);

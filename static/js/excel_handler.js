@@ -8,6 +8,11 @@ const DEFAULT_TEMPLATE_URL = "/static/excel-template/excel-so-dien.xlsx";
 const DEFAULT_TEMPLATE_NAME = "excel-so-dien.xlsx";
 
 // Helper functions from Python logic
+/**
+ * Chuyển đổi giá trị sang số, xử lý định dạng số Việt Nam (dấu chấm ngăn cách hàng nghìn, dấu phẩy thập phân).
+ * @param {any} val - Giá trị cần chuyển đổi.
+ * @returns {number|any} - Số thực đã chuyển đổi hoặc giá trị gốc nếu lỗi.
+ */
 function to_number(val) {
     if (val === null || val === undefined) return null;
     if (typeof val === 'number') return val;
@@ -21,6 +26,13 @@ function to_number(val) {
 }
 
 
+/**
+ * Tìm dòng tương ứng với tháng và kỳ trong worksheet.
+ * @param {object} ws - Worksheet của SheetJS.
+ * @param {number} target_month - Tháng cần tìm.
+ * @param {number} target_period - Kỳ cần tìm.
+ * @returns {number} - Chỉ số dòng (1-based).
+ */
 function find_row(ws, target_month, target_period) {
     // Read target cells (Column D/4 is Month, Column E/5 is Period)
     // ws indexing is A1, B1... or {c:3, r:4}
@@ -98,6 +110,11 @@ function registerInsertRow(sheetName, rowIndex) {
     });
 }
 
+/**
+ * Chèn một dòng mới vào worksheet phía client (chỉ để hiển thị/preview).
+ * @param {object} ws - Worksheet.
+ * @param {number} rowIndex1Based - Chỉ số dòng chèn (1-based).
+ */
 function insertRowJS(ws, rowIndex1Based) {
     if (!ws['!ref']) return;
     const range = XLSX.utils.decode_range(ws['!ref']);

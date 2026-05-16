@@ -3,6 +3,18 @@ KEW6315_REF_HEIGHT = 256
 
 
 def make_grid(ids, x_rights, y_bot, bg):
+    """
+    Tạo danh sách các điểm chèn (overlays) theo dạng lưới.
+    
+    Args:
+        ids: Danh sách ID của các đại lượng.
+        x_rights: Danh sách tọa độ X (căn lề phải).
+        y_bot: Tọa độ Y (đường cơ sở dưới).
+        bg: Loại màu nền (w: trắng, g: xám).
+        
+    Returns:
+        list: Danh sách các dict định nghĩa tọa độ.
+    """
     return [{"id": id_, "x": x, "y": y_bot, "bg": bg} for id_, x in zip(ids, x_rights)]
 
 
@@ -11,6 +23,9 @@ def _map_sd140(overlay):
         overlay["w_clear"] = 55
     return overlay
 
+# ─── Định nghĩa cấu trúc các màn hình thiết bị đo ─────────────────────
+# Mỗi màn hình (SDxxx) chứa danh sách các 'overlays' - vị trí các thông số
+# có thể được chỉnh sửa/chèn thêm chữ số trên ảnh gốc.
 
 SCREENS = [
     {

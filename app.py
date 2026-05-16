@@ -8,6 +8,16 @@ from modules.kew.kew_api import kew_bp
 from modules.image.image_api import image_bp
 
 def _env_int(name, default):
+    """
+    Chuyển đổi biến môi trường sang kiểu integer.
+    
+    Args:
+        name (str): Tên biến môi trường.
+        default (int): Giá trị mặc định nếu biến không tồn tại hoặc lỗi chuyển đổi.
+        
+    Returns:
+        int: Giá trị integer của biến môi trường hoặc giá trị mặc định.
+    """
     try:
         return int(os.environ.get(name, default))
     except (TypeError, ValueError):
@@ -27,6 +37,15 @@ app.register_blueprint(image_bp, url_prefix='/api/image')
 
 @app.errorhandler(RequestEntityTooLarge)
 def handle_request_entity_too_large(_exc):
+    """
+    Xử lý lỗi khi file upload vượt quá kích thước cho phép.
+    
+    Args:
+        _exc: Đối tượng exception.
+        
+    Returns:
+        Response: Thông báo lỗi dạng JSON hoặc text với mã trạng thái 413.
+    """
     max_upload_mb = app.config["MAX_CONTENT_LENGTH"] // (1024 * 1024)
     if request.path.startswith("/api/"):
         return jsonify({"error": f"File upload vượt quá giới hạn {max_upload_mb} MB của server."}), 413

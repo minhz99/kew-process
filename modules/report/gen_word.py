@@ -107,6 +107,7 @@ _BMP_RE = re.compile(r"^PS-SD(\d+)\.BMP$", re.IGNORECASE)
 # ════════════════════════════════════════════════════════════════════
 
 def _inline(doc: DocxTemplate, path: str, height, width) -> InlineImage:
+    """Tạo đối tượng InlineImage cho template Word."""
     return InlineImage(doc, path, height=height, width=width)
 
 def mba(
@@ -187,6 +188,18 @@ def mba(
     tdd3min: str,
     tdd3avg: str,
 ) -> dict:
+    """
+    Xây dựng context dictionary cho template báo cáo Máy biến áp (MBA).
+    
+    Args:
+        doc: Đối tượng DocxTemplate.
+        name: Tên máy biến áp.
+        imga, img1, img2, img4, img6: Đường dẫn tới các file ảnh.
+        ... (các thông số đo lường dạng chuỗi)
+        
+    Returns:
+        dict: Context để render template.
+    """
     return {
         "mba_name": name,
         "imga": _inline(doc, imga, HEIGHT_MBA, WIDTH_LARGE),
@@ -231,6 +244,19 @@ def device(
     cap_device: str,
     remarks_device: str,
 ) -> dict:
+    """
+    Xây dựng context dictionary cho template báo cáo thiết bị phụ tải.
+    
+    Args:
+        doc: Đối tượng DocxTemplate.
+        name: Tên thiết bị.
+        imga, img1, img2, img3, img4, img5, img6: Đường dẫn tới các file ảnh.
+        cap_device: Chú thích bảng/hình.
+        remarks_device: Nhận xét văn bản.
+        
+    Returns:
+        dict: Context để render template.
+    """
     return {
         "device_name": name,
         "imga": _inline(doc, imga, HEIGHT_A, WIDTH_A),
@@ -298,7 +324,16 @@ def _parse_inps(inps_path: str | Path) -> dict[str, dict]:
     return out
 
 def _pick(stats: Mapping[str, dict], *keys: str) -> dict:
-    """Trả về stat của khóa khớp đầu tiên trong ``stats`` (case-insensitive)."""
+    """
+    Lấy thống kê từ một trong các khóa khớp đầu tiên (không phân biệt hoa thường).
+    
+    Args:
+        stats: Dictionary các thống kê.
+        *keys: Các khóa tiềm năng.
+        
+    Returns:
+        dict: Dữ liệu thống kê hoặc dict rỗng.
+    """
     upper = {k.upper(): v for k, v in stats.items()}
     for k in keys:
         v = upper.get(k.upper())
@@ -328,7 +363,12 @@ def _scale(d: Mapping[str, float] | None, k: float) -> dict:
     }
 
 def _eval_voltage(u_max, u_min, u_avg, vref: float) -> tuple[str, float, float, float]:
-    """Trả về (đánh giá, δmax, δmin, δavg) cho dải điện áp so với ``vref`` (±5%)."""
+    """
+    Đánh giá chất lượng điện áp dựa trên độ lệch so với điện áp danh định (±5%).
+    
+    Returns:
+        tuple: (Kết quả "Đạt"/"Không đạt", δmax, δmin, δavg).
+    """
     if u_max is None or u_min is None or vref <= 0:
         return "—", None, None, None
     dmax = (u_max - vref) / vref * 100
@@ -356,6 +396,7 @@ def _eval_voltage(u_max, u_min, u_avg, vref: float) -> tuple[str, float, float, 
     return res, dabs_max, dabs_min, (dabs_max + dabs_min) / 2
 
 def _eval_pf(pf_max, pf_min, pf_avg) -> str:
+    """Đánh giá hệ số công suất (PF) so với ngưỡng 0.9."""
     if pf_avg is None and pf_max is None and pf_min is None:
         return "—"
     
@@ -371,6 +412,7 @@ def _eval_pf(pf_max, pf_min, pf_avg) -> str:
         return "Đạt"
 
 def _eval_thd(values_max: Iterable[float | None], values_avg: Iterable[float | None], limit: float) -> str:
+    """Đánh giá tổng biến dạng sóng hài (THD/TDD) so với giới hạn cho phép."""
     max_vals = [v for v in values_max if v is not None]
     avg_vals = [v for v in values_avg if v is not None]
     
@@ -388,6 +430,7 @@ def _eval_thd(values_max: Iterable[float | None], values_avg: Iterable[float | N
         return "Đạt"
 
 def _eval_unbalance(unb_max: float | None, unb_avg: float | None, limit: float) -> str:
+    """Đánh giá độ lệch pha (mất cân bằng) điện áp/dòng điện."""
     if unb_avg is not None and unb_max is not None:
         if unb_avg >= limit:
             return "Không đạt"
@@ -480,6 +523,7 @@ def _wave_phrase_from_char(current_char: str | None) -> str:
     return str(current_char).strip()
 
 def _pf_phrase(cos_phi: float | None) -> str:
+    """Trả về cụm từ mô tả hệ số công suất dựa trên giá trị cosφ."""
     if cos_phi is None or cos_phi != cos_phi:
         return "chưa xác định"
     p = abs(cos_phi)
@@ -691,7 +735,19 @@ def _resolve_remarks_field(
     nominal_voltage: float | None,
     excel_params: dict | None = None,
 ) -> str:
-    """Sinh nhận xét từ các trường Excel hiện trường.
+    """
+    Quyết định sử dụng nhận xét thủ công hay sinh tự động từ dữ liệu Excel.
+    
+    Args:
+        kind: Loại phần (mba hoặc device).
+        folder: Thư mục chứa dữ liệu.
+        name: Tên thiết bị/MBA.
+        user_remarks: Nhận xét thủ công từ người dùng.
+        nominal_voltage: Điện áp danh định.
+        excel_params: Các tham số đo lường từ Excel.
+        
+    Returns:
+        str: Đoạn nhận xét cuối cùng.
     """
     raw = (user_remarks or "").strip()
     if _is_full_manual_remarks(raw):
@@ -765,7 +821,12 @@ def list_bmp_in_folder(folder: str | Path) -> list[Path]:
     return [pp for _, pp in bmps]
 
 def find_overview_png(folder: str | Path) -> Path | None:
-    """Ảnh tổng quan ``a.png`` / ``A.png`` (stem ``a``) trong thư mục thiết bị, nếu có."""
+    """
+    Tìm file ảnh tổng quan (thường là a.png) trong thư mục.
+    
+    Returns:
+        Path or None: Đường dẫn file ảnh hoặc None nếu không tìm thấy.
+    """
     p = Path(folder)
     if not p.is_dir():
         return None
@@ -794,10 +855,15 @@ def _take(lst: list[Path], idx: int, fallback: Path | None) -> Path | None:
     return lst[idx] if 0 <= idx < len(lst) else fallback
 
 def auto_pick_mba_images(folder: str | Path) -> dict[str, str]:
-    """Chọn ảnh cho template MBA (``imga`` + ``img1, img2, img4, img6``).
-
-    * ``imga``: **bắt buộc** file ``a.png`` (stem ``a``, đuôi ``.png``) trong thư mục.
-    * Các ô nhỏ: ``PS-SD*.BMP`` theo thứ tự số → ``img1``, ``img2``, ``img4``, ``img6``.
+    """
+    Tự động chọn các file ảnh cho template MBA từ thư mục thiết bị.
+    
+    Yêu cầu:
+    - 1 file 'a.png' (ảnh tổng quan).
+    - Các file 'PS-SD*.BMP' (ảnh thông số).
+    
+    Returns:
+        dict: Mapping các khóa template (imga, img1, img2, img4, img6) với đường dẫn file.
     """
     overview, bmps = _require_overview_png_and_bmps(folder)
     fb = bmps[0]
@@ -841,16 +907,18 @@ def mba_kwargs_from_inps(
     remarks_mba: str = "",
     cap_tab_mba: str | None = None,
 ) -> dict:
-    """Đọc INPS (nếu có), tổng hợp số liệu, trả về ``kwargs`` cho :func:`mba`.
-
-    Khi ``inps_path`` là ``None`` hoặc không đọc được file, bảng số liệu dùng
-    ``"—"`` (vẫn render template MBA — ví dụ thiếu INPS nhưng Excel ghi loại MBA).
-
-    Đánh giá lệch điện áp U12: cố định so với **400 V** (mỗi lệch % tại Umax/Umin nằm trong ±5%),
-    không dùng cột điện áp định mức từ Excel.
-
-    ``imga, img1, img2, img4, img6`` là đường dẫn ảnh (đã tự chọn từ thư mục
-    hoặc do người dùng chỉ định).
+    """
+    Tạo bộ tham số (kwargs) cho hàm mba() bằng cách đọc dữ liệu từ file INPS.
+    
+    Args:
+        inps_path: Đường dẫn tới file .KEW.
+        name: Tên máy biến áp.
+        imga, img1, img2, img4, img6: Đường dẫn các file ảnh đã chọn.
+        cap_fig_mba, cap_tab_mba: Chú thích hình/bảng.
+        remarks_mba: Nhận xét văn bản.
+        
+    Returns:
+        dict: Bộ tham số đã được tính toán và định dạng chuỗi.
     """
     if inps_path is None:
         stats: dict[str, dict] = {}
@@ -1470,19 +1538,20 @@ def build_word_report_from_zip(
     mba_template: str | Path | None = None,
     device_template: str | Path | None = None,
 ) -> tuple[Path, list[str]]:
-    """Entry-point cho tab "Tạo báo cáo Word".
-
-    Nhận ZIP đã tổ chức (output của "Xử lý file sơ bộ"):
-        ``Project_Output/<Tên thiết bị>/a.png + PS-SDxxx.BMP``
-
-    Có thể chấp nhận ZIP không có ``Project_Output/`` (các thư mục thiết bị nằm ngay dưới gốc giải nén).
-
-    Nếu có Excel kèm theo đủ bộ cột hiện trường (``stt``, ``name``, ``file``, ``img``,
-    ``imgend``, ``imgomit``, ``type``, ``pdm``, ``p``, ``pf``, ``i1``–``i3``, ``di``, ``thd``,
-    ``tdd``), các giá trị được dùng làm metadata; thứ tự section trong Word theo ``stt``;
-    ``pdm`` truyền vào nhận xét thiết bị (δU so với điện áp danh định).
-
-    Trả về ``(đường_dẫn_báo_cáo_word, warnings)``.
+    """
+    Điểm nhập chính để tạo báo cáo Word từ một file ZIP chứa dữ liệu.
+    
+    Giải nén ZIP, tìm file Excel metadata, quét các thư mục thiết bị và 
+    render báo cáo Word tổng hợp.
+    
+    Args:
+        zip_bytes: Dữ liệu nhị phân của file ZIP.
+        output_docx: Đường dẫn file Word đầu ra.
+        mba_template: Template cho MBA (tuỳ chọn).
+        device_template: Template cho thiết bị (tuỳ chọn).
+        
+    Returns:
+        tuple: (Đường dẫn file báo cáo, danh sách cảnh báo).
     """
     mba_template = Path(mba_template or DEFAULT_MBA_TEMPLATE)
     device_template = Path(device_template or DEFAULT_DEVICE_TEMPLATE)
@@ -1572,13 +1641,16 @@ _T6_TDD_HIGH = 12.0
 
 
 def _t6_auto_nhan_xet(delta_I: object, cos_phi: object, tdd: object) -> str:
-    """Tự động sinh cột nhận xét theo bộ quy tắc Table6.
-
-    Ngưỡng:
-    - Cosφ < 0.75 → "Hệ số Cosφ còn thấp"
-    - ΔI ≥ 10 % → "Độ lệch pha dòng điện còn cao"
-    - TDD ≥ 12 % → "Tổng biến dạng sóng hài dòng điện còn cao"
-    - Không vi phạm → "Thiết bị vận hành ổn định"
+    """
+    Tự động sinh đoạn văn nhận xét cho bảng tổng hợp Table 6 dựa trên các chỉ số đo lường.
+    
+    Args:
+        delta_I: Độ lệch pha dòng điện.
+        cos_phi: Hệ số công suất.
+        tdd: Tổng biến dạng sóng hài dòng điện.
+        
+    Returns:
+        str: Chuỗi nhận xét (ví dụ: "Thiết bị vận hành ổn định").
     """
     vi_pham: list[str] = []
 
@@ -1694,16 +1766,16 @@ def generate_table6_from_zip(
     *,
     template_path: str | Path | None = None,
 ) -> tuple[Path, list[str]]:
-    """Entry-point cho API: đọc ZIP (có thể kèm Excel hiện trường) → sinh Table6.
-
-    Dữ liệu mỗi thiết bị lấy từ các cột Excel:
-        ``name`` → ``ten``,  ``i_max`` → ``I``,  ``delta_i`` → ``delta_I``,
-        ``cos_phi`` → ``cos_phi``,  ``p`` → ``P``,  ``tdd`` → ``tdd``.
-
-    Thứ tự theo cột ``stt`` (nếu có); thiếu Excel hoặc thiếu cột → trả cảnh báo
-    và bảng rỗng (vẫn tạo file).
-
-    Trả về ``(đường_dẫn, warnings)``.
+    """
+    Tạo bảng tổng hợp Table 6 từ file ZIP chứa dữ liệu và Excel metadata.
+    
+    Args:
+        zip_bytes: Dữ liệu ZIP.
+        output_path: Đường dẫn file Word đầu ra.
+        template_path: Template Table 6 (tuỳ chọn).
+        
+    Returns:
+        tuple: (Đường dẫn file, danh sách cảnh báo).
     """
     warnings: list[str] = []
 

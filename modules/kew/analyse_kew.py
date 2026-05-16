@@ -12,7 +12,18 @@ if os.path.exists(config_path):
         pass
 
 def parse_inps(filepath):
-    """Đọc INPS file - dữ liệu power quality trung bình theo thời gian (1s/mẫu)"""
+    """
+    Đọc và phân tích cấu trúc file INPS (dữ liệu chất lượng điện từ thiết bị KEW).
+    
+    File INPS có cấu trúc nhị phân kết hợp văn bản, chứa các đại lượng trung bình, 
+    cực đại và cực tiểu theo từng chu kỳ lưu trữ (thường là 1 giây hoặc 1 phút).
+    
+    Args:
+        filepath: Đường dẫn tới file .KEW.
+        
+    Returns:
+        tuple: (Chuỗi Magic định danh, pandas.DataFrame chứa dữ liệu đã xử lý).
+    """
     try:
         with open(filepath, 'rb') as f:
             magic_bytes = f.readline().strip()
@@ -106,7 +117,15 @@ def parse_inps(filepath):
         return None, None
 
 def analyse_inps(df):
-    """Tổng hợp thống kê từ INPS dataframe"""
+    """
+    Tổng hợp các chỉ số thống kê từ DataFrame dữ liệu INPS.
+    
+    Args:
+        df: DataFrame chứa dữ liệu đo lường.
+        
+    Returns:
+        dict: Dictionary chứa các thống kê (avg, min, max, timestamps) theo từng cột.
+    """
     if df is None or df.empty:
         return {}
     
@@ -152,6 +171,16 @@ def analyse_inps(df):
     return result
 
 def find_file(folder, prefix):
+    """
+    Tìm file .KEW trong thư mục dựa trên tiền tố tên file.
+    
+    Args:
+        folder: Thư mục cần tìm.
+        prefix: Tiền tố tên file (không phân biệt hoa thường).
+        
+    Returns:
+        str or None: Đường dẫn file nếu tìm thấy, ngược lại là None.
+    """
     for f in os.listdir(folder):
         if f.upper().startswith(prefix.upper()) and f.upper().endswith('.KEW'):
             return os.path.join(folder, f)
