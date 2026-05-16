@@ -327,27 +327,65 @@ def _scale(d: Mapping[str, float] | None, k: float) -> dict:
         "max": d.get("max") * k if d.get("max") is not None else None,
     }
 
-def _eval_voltage(u_max, u_min, vref: float) -> tuple[str, float, float, float]:
+def _eval_voltage(u_max, u_min, u_avg, vref: float) -> tuple[str, float, float, float]:
     """Trả về (đánh giá, δmax, δmin, δavg) cho dải điện áp so với ``vref`` (±5%)."""
     if u_max is None or u_min is None or vref <= 0:
         return "—", None, None, None
     dmax = (u_max - vref) / vref * 100
     dmin = (u_min - vref) / vref * 100
-    ok = abs(dmax) <= _V_DEV_LIMIT_PCT and abs(dmin) <= _V_DEV_LIMIT_PCT
+    
     dabs_max = max(abs(dmax), abs(dmin))
     dabs_min = min(abs(dmax), abs(dmin))
-    return ("Đạt" if ok else "Không đạt"), dabs_max, dabs_min, (dabs_max + dabs_min) / 2
+    
+    if u_avg is not None:
+        davg = (u_avg - vref) / vref * 100
+        avg_ok = abs(davg) <= _V_DEV_LIMIT_PCT
+    else:
+        avg_ok = True
+        
+    max_ok = abs(dmax) <= _V_DEV_LIMIT_PCT
+    min_ok = abs(dmin) <= _V_DEV_LIMIT_PCT
+    
+    if not avg_ok:
+        res = "Không đạt"
+    elif not max_ok or not min_ok:
+        res = "Chưa đạt"
+    else:
+        res = "Đạt"
+        
+    return res, dabs_max, dabs_min, (dabs_max + dabs_min) / 2
 
-def _eval_pf(pf_avg) -> str:
-    if pf_avg is None:
+def _eval_pf(pf_max, pf_min, pf_avg) -> str:
+    if pf_avg is None and pf_max is None and pf_min is None:
         return "—"
-    return "Đạt" if abs(pf_avg) >= _PF_LIMIT else "Không đạt"
+    
+    avg_ok = True if pf_avg is None else abs(pf_avg) >= _PF_LIMIT
+    max_ok = True if pf_max is None else abs(pf_max) >= _PF_LIMIT
+    min_ok = True if pf_min is None else abs(pf_min) >= _PF_LIMIT
+    
+    if not avg_ok:
+        return "Không đạt"
+    elif not max_ok or not min_ok:
+        return "Chưa đạt"
+    else:
+        return "Đạt"
 
-def _eval_thd(values: Iterable[float | None], limit: float) -> str:
-    vals = [v for v in values if v is not None]
-    if not vals:
+def _eval_thd(values_max: Iterable[float | None], values_avg: Iterable[float | None], limit: float) -> str:
+    max_vals = [v for v in values_max if v is not None]
+    avg_vals = [v for v in values_avg if v is not None]
+    
+    if not max_vals and not avg_vals:
         return "—"
-    return "Đạt" if max(vals) < limit else "Không đạt"
+        
+    avg_exceeds = any(v >= limit for v in avg_vals)
+    max_exceeds = any(v >= limit for v in max_vals)
+    
+    if avg_exceeds:
+        return "Không đạt"
+    elif max_exceeds:
+        return "Chưa đạt"
+    else:
+        return "Đạt"
 
 def _fmt_remark_pct(v: float | None, decimals: int = 2) -> str:
     if v is None or v != v:  # NaN
@@ -822,7 +860,7 @@ def mba_kwargs_from_inps(
         u12, u23, u31 = _scale(v1, k), _scale(v2, k), _scale(v3, k)
 
     vref = _MBA_NOMINAL_VOLTAGE_V
-    u12eval, _, _, _ = _eval_voltage(u12.get("max"), u12.get("min"), vref)
+    u12eval, _, _, _ = _eval_voltage(u12.get("max"), u12.get("min"), u12.get("avg"), vref)
 
     # ─── Dòng điện I1, I2, I3 ─────────────────────────────────────
     i1 = _pick(stats, "AVG_A1[A]")
@@ -832,13 +870,21 @@ def mba_kwargs_from_inps(
     # ─── Độ lệch pha điện áp / dòng (%) ───────────────────────────
     uv_unb = _pick(stats, "AVG_UV[%]", "AVG_VUNB[%]")
     ua_unb = _pick(stats, "AVG_UA[%]", "AVG_AUNB[%]")
-    dueval = "Đạt" if (uv_unb.get("max") is not None and uv_unb["max"] < _V_DEV_LIMIT_PCT) else (
-        "Không đạt" if uv_unb.get("max") is not None else "—"
-    )
+    if uv_unb.get("avg") is not None and uv_unb.get("max") is not None:
+        if uv_unb["avg"] >= _V_DEV_LIMIT_PCT:
+            dueval = "Không đạt"
+        elif uv_unb["max"] >= _V_DEV_LIMIT_PCT:
+            dueval = "Chưa đạt"
+        else:
+            dueval = "Đạt"
+    elif uv_unb.get("max") is not None:
+        dueval = "Đạt" if uv_unb["max"] < _V_DEV_LIMIT_PCT else "Không đạt"
+    else:
+        dueval = "—"
 
     # ─── Hệ số công suất ─────────────────────────────────────────
     pf = _pick_total(stats, "PF", "[_]") or _pick(stats, "AVG_PF[_]")
-    pfeval = _eval_pf(pf.get("avg"))
+    pfeval = _eval_pf(pf.get("max"), pf.get("min"), pf.get("avg"))
 
     # ─── P, Q, S (đổi sang kW/kvar/kVA) ──────────────────────────
     p_total = _pick_total(stats, "P", "[W]") or _pick(stats, "AVG_P[W]")
@@ -857,10 +903,14 @@ def mba_kwargs_from_inps(
     tdd3 = _pick(stats, "AVG_THDAR3[%]", "AVG_ATHD3[%]")
 
     thdeval = _eval_thd(
-        [thd1.get("max"), thd2.get("max"), thd3.get("max")], _THDV_LIMIT_PCT
+        [thd1.get("max"), thd2.get("max"), thd3.get("max")],
+        [thd1.get("avg"), thd2.get("avg"), thd3.get("avg")],
+        _THDV_LIMIT_PCT
     )
     tddeval = _eval_thd(
-        [tdd1.get("max"), tdd2.get("max"), tdd3.get("max")], _TDD_LIMIT_PCT
+        [tdd1.get("max"), tdd2.get("max"), tdd3.get("max")],
+        [tdd1.get("avg"), tdd2.get("avg"), tdd3.get("avg")],
+        _TDD_LIMIT_PCT
     )
 
     u12max, u12min, u12avg = _tri(u12, 1)
