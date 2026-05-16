@@ -17,8 +17,6 @@ API chính:
 * ``build_chapter4_from_zip`` / ``build_chapter5_from_zip`` — Tách riêng Chương 4
   (chỉ thiết bị type=4) và Chương 5 (MBA + thiết bị còn lại).
 * ``generate_table6_from_zip`` — tạo Bảng 6.3 tổng hợp.
-
-Tham số / khóa template — xem ``modules/report/context_keys.json``.
 """
 
 from __future__ import annotations
