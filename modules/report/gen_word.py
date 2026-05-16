@@ -469,6 +469,7 @@ def _scale(d: Mapping[str, float] | None, k: float) -> dict:
         "max": d.get("max") * k if d.get("max") is not None else None,
     }
 
+def _eval_voltage(u_max, u_min, u_avg, vref: float = _MBA_NOMINAL_VOLTAGE_V) -> tuple:
     """Đánh giá chất lượng điện áp dựa trên độ lệch so với điện áp danh định (±5%).
 
     Args:
@@ -484,27 +485,28 @@ def _scale(d: Mapping[str, float] | None, k: float) -> dict:
         return "—", None, None, None
     dmax = (u_max - vref) / vref * 100
     dmin = (u_min - vref) / vref * 100
-    
+
     dabs_max = max(abs(dmax), abs(dmin))
     dabs_min = min(abs(dmax), abs(dmin))
-    
+
     if u_avg is not None:
         davg = (u_avg - vref) / vref * 100
         avg_ok = abs(davg) <= _V_DEV_LIMIT_PCT
     else:
         avg_ok = True
-        
+
     max_ok = abs(dmax) <= _V_DEV_LIMIT_PCT
     min_ok = abs(dmin) <= _V_DEV_LIMIT_PCT
-    
+
     if not avg_ok:
         res = "Không đạt"
     elif not max_ok or not min_ok:
         res = "Chưa đạt"
     else:
         res = "Đạt"
-        
+
     return res, dabs_max, dabs_min, (dabs_max + dabs_min) / 2
+
 
 def _eval_pf(pf_max, pf_min, pf_avg) -> str:
     """Đánh giá hệ số công suất (PF) so với ngưỡng 0.9."""
@@ -857,7 +859,6 @@ def _compose_remarks_from_excel_fields(
         )
 
         # Câu 3 — Chất lượng điện + ΔU/ΔI + cosφ
-        quality_cap = quality[0].upper() + quality[1:]  # Viết hoa chữ đầu
         du_level = "thấp" if (du_num is not None and du_num <= _V_DEV_LIMIT_PCT) else "cao"
         di_level = ("thấp" if di_pass else "cao") if di_num is not None else None
 
@@ -872,7 +873,7 @@ def _compose_remarks_from_excel_fields(
             di_separate = di_level is not None  # Câu 4 riêng nếu có ΔI
 
         quality_sent = (
-            f"Chất lượng điện đo tại {name_mid} ở mức {quality_cap}, "
+            f"Chất lượng điện đo tại {name_mid} ở mức {quality}, "
             f"{unbalance_part}, "
             f"hệ số công suất cosφ ở mức {pf_txt}."
         )
@@ -886,10 +887,7 @@ def _compose_remarks_from_excel_fields(
 
         # Câu 5 — TDD dòng điện trong mức (bỏ qua nếu TDD vượt mức)
         if tdd_ok:
-            mba_parts.append(
-                f"Tổng biến dạng sóng hài dòng điện ở mức cho phép "
-                f"(TDDmax = {td_s}% {_LT} {lim_s}%)."
-            )
+            mba_parts.append("Tổng biến dạng sóng hài dòng điện ở mức cho phép.")
 
         # Câu cuối — Dẫn bảng
         mba_parts.append(
