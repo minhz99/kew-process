@@ -1,13 +1,14 @@
 <!-- Sidebar -->
 <div class="d-flex flex-column flex-shrink-0 p-3 app-sidebar"
   style="width: 260px; border-right: 1px solid var(--border);">
-  <a href="/" class="d-flex align-items-center mb-3 mb-md-0 me-md-auto text-decoration-none gap-2" style="color: var(--text);">
+  <a href="/" class="d-flex align-items-center mb-3 mb-md-0 me-md-auto text-decoration-none gap-2"
+    style="color: var(--text);">
     <div class="logo-icon"
       style="width:32px; height:32px; background: linear-gradient(135deg, var(--accent), var(--accent2)); border-radius:8px; display:flex; align-items:center; justify-content:center; font-weight:bold;">
       ⚡</div>
     <span class="fs-5 fw-bold">POLYTEE Tools</span>
   </a>
-  <p class="small text-muted mt-2 mb-3">Bộ công cụ xử lý công việc - made by minhb</p>
+  <p class="small text-muted mt-2 mb-3">Bộ công cụ xử lý công việc - made by minhvu</p>
 
   <div class="tool-tabs d-flex flex-column gap-2 mb-3" id="tool-tabs" role="tablist" aria-label="Công cụ">
     <button class="tool-tab active" id="btn-tool-kew" onclick="switchTool('kew')" type="button">
@@ -23,9 +24,8 @@
 
   <hr class="mt-auto">
   <div class="mb-3">
-    <button class="btn btn-sm w-100 d-flex align-items-center justify-content-center gap-2" 
-            id="theme-toggle" onclick="toggleTheme()" 
-            style="background: var(--surface2); border: 1px solid var(--border); color: var(--text);">
+    <button class="btn btn-sm w-100 d-flex align-items-center justify-content-center gap-2" id="theme-toggle"
+      onclick="toggleTheme()" style="background: var(--surface2); border: 1px solid var(--border); color: var(--text);">
       <i class="bi bi-sun" id="theme-icon-light"></i>
       <i class="bi bi-moon-stars d-none" id="theme-icon-dark"></i>
       <span id="theme-text">Chế độ sáng</span>
