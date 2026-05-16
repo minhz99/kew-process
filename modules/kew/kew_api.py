@@ -12,6 +12,7 @@ from flask import Blueprint, request, jsonify, send_file
 try:
     import pandas as pd
     from openpyxl import load_workbook
+    from typing import Mapping
     _MBA_DEPS_OK = True
 except ImportError:
     _MBA_DEPS_OK = False
