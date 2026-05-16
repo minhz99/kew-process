@@ -4,7 +4,7 @@ API chính:
 * ``mba(doc, ...)``, ``device(doc, ...)`` — dựng context cho từng template.
 * ``merge_rendered_docx`` / ``merge_mba_device_docx`` — ghép nhiều file đã render.
 * ``mba_kwargs_from_inps`` / ``mba_kwargs_from_folder`` / ``device_kwargs_from_folder`` —
-  tự chọn ảnh từ thư mục thiết bị (**bắt buộc** ``a.png`` + PS-SDxxx.BMP). Với MBA,
+  tự chọn ảnh từ thư mục thiết bị (**bắt buộc** ``a.png`` + PS-SDxxxx.BMP). Với MBA,
   ``mba_kwargs_from_folder`` tự tìm ``INPSxxxx.KEW`` (cùng quy ước ``find_file`` như phân tích KEW
   và như luồng Excel MBA) rồi gọi ``mba_kwargs_from_inps``; thiếu INPSxxxx.KEW thì bảng dùng ``"—"``.
   **Nhận xét văn bản** (``remarks_mba`` / ``remarks_device``): tự sinh theo dữ liệu từ file INPSxxxx.KEW; có thể ghép thêm ghi chú
@@ -114,7 +114,17 @@ _BMP_RE = re.compile(r"^PS-SD(\d+)\.BMP$", re.IGNORECASE)
 # ════════════════════════════════════════════════════════════════════
 
 def _inline(doc: DocxTemplate, path: str, height, width) -> InlineImage:
-    """Tạo đối tượng InlineImage cho template Word."""
+    """Tạo đối tượng InlineImage để chèn ảnh vào template Word.
+
+    Args:
+        doc: Đối tượng DocxTemplate đang xử lý.
+        path: Đường dẫn vật lý đến file ảnh.
+        height: Chiều cao ảnh (đơn vị Mm hoặc tương đương).
+        width: Chiều rộng ảnh (đơn vị Mm hoặc tương đương).
+
+    Returns:
+        InlineImage: Đối tượng ảnh sẵn sàng để render vào template.
+    """
     return InlineImage(doc, path, height=height, width=width)
 
 def mba(
@@ -198,17 +208,30 @@ def mba(
     ds_mba: list[dict] | None = None,
     **kwargs,
 ) -> dict:
-    """
-    Xây dựng context dictionary cho template báo cáo Máy biến áp (MBA).
-    
+    """Xây dựng context dictionary đầy đủ cho template báo cáo Máy biến áp (MBA).
+
     Args:
-        doc: Đối tượng DocxTemplate.
-        name: Tên máy biến áp.
-        imga, img1, img2, img4, img6: Đường dẫn tới các file ảnh.
-        ... (các thông số đo lường dạng chuỗi)
-        
+        doc: Đối tượng DocxTemplate dùng để khởi tạo InlineImage.
+        name: Tên hiển thị của máy biến áp.
+        imga, img1, img2, img4, img6: Đường dẫn các file ảnh tương ứng (Overview, I, THD...).
+        cap_fig_mba: Chú thích cho phần hình ảnh.
+        remarks_mba: Nội dung nhận xét văn bản.
+        cap_tab_mba: Chú thích cho bảng thông số.
+        u12max, u12min, u12avg, u12eval: Các thông số điện áp dây pha 1-2.
+        u23max, u23min, u23avg: Các thông số điện áp dây pha 2-3.
+        u31max, u31min, u31avg: Các thông số điện áp dây pha 3-1.
+        i1max...i3avg: Các thông số dòng điện 3 pha.
+        dumax...dueval: Độ lệch pha điện áp và đánh giá.
+        dimax...diavg: Độ lệch pha dòng điện.
+        pfmax...pfeval: Hệ số công suất và đánh giá.
+        pmax...savg: Công suất tác dụng (P), phản kháng (Q), biểu kiến (S).
+        thd1max...thdeval: Sóng hài THD điện áp và đánh giá.
+        tdd1max...tddeval: Sóng hài TDD dòng điện và đánh giá.
+        ds_mba: Danh sách tóm tắt thiết bị cho bảng tổng hợp (nếu có).
+        **kwargs: Các tham số mở rộng khác.
+
     Returns:
-        dict: Context để render template.
+        dict: Tập hợp các cặp key-value để nạp vào template docxtpl.
     """
     return {
         "mba_name": name,
@@ -256,18 +279,18 @@ def device(
     cap_device: str,
     remarks_device: str,
 ) -> dict:
-    """
-    Xây dựng context dictionary cho template báo cáo thiết bị phụ tải.
-    
+    """Xây dựng context dictionary cho template báo cáo thiết bị phụ tải (Chương 4/5).
+
     Args:
-        doc: Đối tượng DocxTemplate.
-        name: Tên thiết bị.
-        imga, img1, img2, img3, img4, img5, img6: Đường dẫn tới các file ảnh.
-        cap_device: Chú thích bảng/hình.
-        remarks_device: Nhận xét văn bản.
-        
+        doc: Đối tượng DocxTemplate dùng để khởi tạo InlineImage.
+        name: Tên thiết bị đo kiểm.
+        imga: Đường dẫn ảnh tổng quan (thường là a.png).
+        img1, img2, img3, img4, img5, img6: Đường dẫn tới 6 ảnh thông số (BMP).
+        cap_device: Chú thích bảng/hình ảnh.
+        remarks_device: Nội dung nhận xét văn bản cho thiết bị.
+
     Returns:
-        dict: Context để render template.
+        dict: Context dữ liệu để render template.
     """
     return {
         "device_name": name,
@@ -283,14 +306,30 @@ def device(
     }
 
 def total_mba(doc: DocxTemplate, *, ds_mba: list[dict], **kwargs) -> dict:
+    """Dựng context cho template bảng tổng hợp danh sách máy biến áp.
+
+    Args:
+        doc: Đối tượng DocxTemplate.
+        ds_mba: Danh sách các dict chứa thông tin rút gọn (stt, tên, công suất, cosphi).
+        **kwargs: Các tham số mở rộng.
+
+    Returns:
+        dict: Context chứa khóa 'ds_mba'.
+    """
     return {"ds_mba": ds_mba}
 
 def _format_name_mid(name: str) -> str:
-    """
-    Định dạng tên thiết bị khi đưa vào giữa câu.
-    
-    Quy tắc: nếu từ đầu tiên viết hoa toàn bộ (MBA, OFFSET, T1...), giữ nguyên.
-    Nếu không, chuyển chữ cái đầu thành chữ thường (Máy biến áp -> máy biến áp).
+    """Định dạng tên thiết bị khi đưa vào giữa câu văn.
+
+    Quy tắc:
+    - Nếu từ đầu tiên viết hoa toàn bộ (VD: MBA, MSB, T1...), giữ nguyên hoa.
+    - Ngược lại, chuyển chữ cái đầu tiên sang chữ thường (VD: "Máy bơm" -> "máy bơm").
+
+    Args:
+        name: Tên gốc của thiết bị.
+
+    Returns:
+        str: Tên đã định dạng lại phù hợp ngữ cảnh giữa câu.
     """
     if not name:
         return ""
@@ -305,7 +344,15 @@ def _format_name_mid(name: str) -> str:
 # ════════════════════════════════════════════════════════════════════
 
 def _f(v, d: int = 1) -> str:
-    """Định dạng số kiểu Việt (dấu phẩy thập phân). Trả ``"—"`` nếu thiếu."""
+    """Định dạng giá trị số sang chuỗi theo kiểu Việt Nam (dấu phẩy thập phân).
+
+    Args:
+        v: Giá trị cần định dạng (int, float, str hoặc None).
+        d: Số chữ số thập phân sau dấu phẩy. Mặc định là 1.
+
+    Returns:
+        str: Chuỗi số đã định dạng (VD: "220,5"). Trả về "—" nếu v là None hoặc không hợp lệ.
+    """
     if v is None:
         return "—"
     try:
@@ -317,7 +364,15 @@ def _f(v, d: int = 1) -> str:
     return f"{x:.{d}f}".replace(".", ",")
 
 def _tri(d: Mapping, dec: int = 1) -> tuple[str, str, str]:
-    """min / max / avg → ba chuỗi định dạng ``_f``."""
+    """Chuyển đổi bộ ba thống kê (min, max, avg) sang chuỗi đã định dạng.
+
+    Args:
+        d: Mapping chứa các khóa 'min', 'max', 'avg'.
+        dec: Số chữ số thập phân cho hàm định dạng _f. Mặc định là 1.
+
+    Returns:
+        tuple[str, str, str]: Bộ ba chuỗi (max, min, avg) đã định dạng dấu phẩy.
+    """
     return _f(d.get("max"), dec), _f(d.get("min"), dec), _f(d.get("avg"), dec)
 
 # ════════════════════════════════════════════════════════════════════
@@ -325,12 +380,16 @@ def _tri(d: Mapping, dec: int = 1) -> tuple[str, str, str]:
 # ════════════════════════════════════════════════════════════════════
 
 def _parse_inps(inps_path: str | Path) -> dict[str, dict]:
-    """Đọc một file INPS .KEW và trả về ``{cột_avg: {min, max, avg}}``.
+    """Đọc và tóm tắt dữ liệu từ file INPSxxxx.KEW.
 
-    Sử dụng lại ``parse_inps`` / ``analyse_inps`` trong module phân tích KEW;
-    ``min/max`` ưu tiên cột ``recorded_min/max`` của thiết bị (giá trị cực trị
-    được KEW6315 ghi lại trong từng khoảng 1 s, chứ không phải min/max của
-    chuỗi trung bình).
+    Sử dụng logic từ module phân tích KEW để trích xuất các giá trị cực trị (recorded_min/max)
+    và giá trị trung bình (avg) cho từng kênh đo.
+
+    Args:
+        inps_path: Đường dẫn đến file .KEW.
+
+    Returns:
+        dict[str, dict]: Dictionary mapping tên cột với dict {avg, min, max}.
     """
     # Lazy import để gen_word có thể đứng độc lập khi không cần phân tích.
     from modules.kew.analyse_kew import analyse_inps, parse_inps  # type: ignore
@@ -372,7 +431,18 @@ def _pick(stats: Mapping[str, dict], *keys: str) -> dict:
     return {}
 
 def _pick_total(stats: Mapping[str, dict], prefix: str, unit_substr: str) -> dict:
-    """Lấy stat của cột tổng ``AVG_<prefix>[<unit>]`` (không có chỉ số pha)."""
+    """Tìm kiếm thống kê của cột tổng (không phân biệt pha) dựa trên tiền tố và đơn vị.
+
+    Ví dụ: tìm AVG_PF[_] cho hệ số công suất tổng.
+
+    Args:
+        stats: Dictionary chứa toàn bộ thống kê kênh đo.
+        prefix: Tiền tố tên cột (VD: 'PF', 'P', 'Q').
+        unit_substr: Chuỗi đơn vị nằm trong tên cột (VD: '[W]', '[_]').
+
+    Returns:
+        dict: Thống kê tìm được hoặc dict rỗng nếu không khớp.
+    """
     for col, d in stats.items():
         if not col.upper().startswith(f"AVG_{prefix.upper()}"):
             continue
@@ -384,6 +454,15 @@ def _pick_total(stats: Mapping[str, dict], prefix: str, unit_substr: str) -> dic
     return {}
 
 def _scale(d: Mapping[str, float] | None, k: float) -> dict:
+    """Nhân các giá trị thống kê (min, max, avg) với một hệ số tỉ lệ.
+
+    Args:
+        d: Mapping chứa các giá trị số.
+        k: Hệ số nhân (VD: 1e-3 để đổi từ W sang kW).
+
+    Returns:
+        dict: Dictionary chứa các giá trị đã được nhân tỉ lệ. Trả về dict rỗng nếu d là None.
+    """
     if not d:
         return {}
     return {
@@ -392,12 +471,16 @@ def _scale(d: Mapping[str, float] | None, k: float) -> dict:
         "max": d.get("max") * k if d.get("max") is not None else None,
     }
 
-def _eval_voltage(u_max, u_min, u_avg, vref: float) -> tuple[str, float, float, float]:
-    """
-    Đánh giá chất lượng điện áp dựa trên độ lệch so với điện áp danh định (±5%).
-    
+    """Đánh giá chất lượng điện áp dựa trên độ lệch so với điện áp danh định (±5%).
+
+    Args:
+        u_max: Điện áp cực đại đo được.
+        u_min: Điện áp cực tiểu đo được.
+        u_avg: Điện áp trung bình đo được.
+        vref: Điện áp danh định để so sánh (V).
+
     Returns:
-        tuple: (Kết quả "Đạt"/"Không đạt", δmax, δmin, δavg).
+        tuple: (Kết quả "Đạt"/"Chưa đạt"/"Không đạt", độ lệch max, độ lệch min, độ lệch avg).
     """
     if u_max is None or u_min is None or vref <= 0:
         return "—", None, None, None
@@ -460,7 +543,16 @@ def _eval_thd(values_max: Iterable[float | None], values_avg: Iterable[float | N
         return "Đạt"
 
 def _eval_unbalance(unb_max: float | None, unb_avg: float | None, limit: float) -> str:
-    """Đánh giá độ lệch pha (mất cân bằng) điện áp/dòng điện."""
+    """Đánh giá độ lệch pha (mất cân bằng) điện áp hoặc dòng điện.
+
+    Args:
+        unb_max: Giá trị mất cân bằng cực đại (%).
+        unb_avg: Giá trị mất cân bằng trung bình (%).
+        limit: Ngưỡng giới hạn cho phép (%).
+
+    Returns:
+        str: Kết quả đánh giá ("Đạt", "Chưa đạt", "Không đạt" hoặc "—").
+    """
     if unb_avg is not None and unb_max is not None:
         if unb_avg >= limit:
             return "Không đạt"
@@ -483,15 +575,25 @@ def _fmt_remark_voltage(v: float | None, decimals: int = 1) -> str:
 
 
 def _merge_auto_and_excel_notes(auto: str, excel_bits: str) -> str:
-    auto = (auto or "").strip()
-    bits = (excel_bits or "").strip()
-    if not bits:
-        return auto
-    if not auto:
-        return bits
-    return f"{auto}\n\nGhi chú hiện trường (Excel): {bits}"
+    """Ghép đoạn nhận xét sinh tự động với ghi chú bổ sung từ Excel hiện trường.
+
+    Args:
+        auto: Nội dung nhận xét tự động.
+        excel_bits: Ghi chú thủ công trích xuất từ cột Excel.
+
+    Returns:
+        str: Chuỗi văn bản đã ghép, cách nhau bởi 2 dấu xuống dòng.
+    """
 
 def _device_tdd_limit_from_name(name: str) -> float:
+    """Xác định ngưỡng giới hạn TDD dòng điện dựa trên tên/loại thiết bị.
+
+    Args:
+        name: Tên thiết bị để nhận diện loại (máy nén, máy ép...).
+
+    Returns:
+        float: Ngưỡng giới hạn (%) theo tiêu chuẩn nội bộ (thường là 12.0 hoặc 20.0).
+    """
     n = _norm(name)
     if any(k in n for k in ("nén", "nen", "nghiền", "nghien", "máy ép", "may ep", "băng tải", "bang tai")):
         return 12.0
@@ -516,6 +618,16 @@ _CURRENT_CHAR_MAP: dict[str, str] = {
 }
 
 def _parse_float_field(v: object) -> float | None:
+    """Trích xuất giá trị float từ một đối tượng dữ liệu (ô Excel, chuỗi...).
+
+    Hỗ trợ xử lý định dạng dấu phẩy (kiểu Việt Nam) và kiểm tra NaN từ Pandas.
+
+    Args:
+        v: Giá trị đầu vào cần chuyển đổi.
+
+    Returns:
+        float: Giá trị số thực hoặc None nếu không thể chuyển đổi.
+    """
     if v is None:
         return None
     try:
@@ -531,6 +643,16 @@ def _parse_float_field(v: object) -> float | None:
         return float(s)
     except (ValueError, TypeError):
         return None
+
+def _parse_pf_field(v: object) -> float | None:
+    """Đọc hệ số cos phi, hỗ trợ cả 0.987 và 987 (chia 1000)."""
+    val = _parse_float_field(v)
+    if val is None:
+        return None
+    # Nếu giá trị > 1.0 (VD 987, 850), chia cho 1000 để đưa về dải 0-1.
+    if abs(val) > 1.0:
+        return val / 1000.0
+    return val
 
 def _wave_phrase_from_char(current_char: str | None) -> str:
     """Chuyển giá trị cột current_char → cụm từ tiêu chuẩn."""
@@ -769,19 +891,18 @@ def _resolve_remarks_field(
     nominal_voltage: float | None,
     excel_params: dict | None = None,
 ) -> str:
-    """
-    Quyết định sử dụng nhận xét thủ công hay sinh tự động từ dữ liệu Excel.
-    
+    """Quyết định nội dung nhận xét dựa trên dữ liệu Excel hiện trường hoặc tự động.
+
     Args:
-        kind: Loại phần (mba hoặc device).
-        folder: Thư mục chứa dữ liệu.
-        name: Tên thiết bị/MBA.
-        user_remarks: Nhận xét thủ công từ người dùng.
-        nominal_voltage: Điện áp danh định.
-        excel_params: Các tham số đo lường từ Excel.
-        
+        kind: Loại thiết bị (mba/device/device4).
+        folder: Thư mục chứa dữ liệu thiết bị.
+        name: Tên thiết bị.
+        user_remarks: Ghi chú thủ công từ người dùng (nếu có).
+        nominal_voltage: Điện áp danh định (V).
+        excel_params: Các thông số đo kiểm từ Excel (P, Q, S, Cosphi, Harmonic...).
+
     Returns:
-        str: Đoạn nhận xét cuối cùng.
+        str: Chuỗi văn bản nhận xét hoàn chỉnh đã được format.
     """
     raw = (user_remarks or "").strip()
 
@@ -793,7 +914,7 @@ def _resolve_remarks_field(
     delta_u = _parse_float_field(params.get("delta_u"))
     delta_i = _parse_float_field(params.get("delta_i"))
     p_kw = _parse_float_field(params.get("p"))
-    cos_phi = _parse_float_field(params.get("cos_phi"))
+    cos_phi = _parse_pf_field(params.get("cos_phi"))
     thd_max = _parse_float_field(params.get("thd"))
     tdd_max_v = _parse_float_field(params.get("tdd"))
     pdm_kva = _parse_float_field(params.get("pdm"))
@@ -827,9 +948,13 @@ def _resolve_remarks_field(
 # ════════════════════════════════════════════════════════════════════
 
 def list_bmp_in_folder(folder: str | Path) -> list[Path]:
-    """Trả về danh sách ``PS-SDxxx.BMP`` trong ``folder``, sắp theo số trong tên (641→642→…).
+    """Tìm kiếm và sắp xếp các file ảnh PS-SDxxxx.BMP trong thư mục.
 
-    Không gồm ``a.png`` — ảnh tổng quan dùng :func:`find_overview_png`.
+    Args:
+        folder: Thư mục cần quét ảnh.
+
+    Returns:
+        list[Path]: Danh sách các đường dẫn file BMP, sắp xếp theo số hiệu ảnh.
     """
     p = Path(folder)
     if not p.is_dir():
@@ -853,11 +978,13 @@ def list_bmp_in_folder(folder: str | Path) -> list[Path]:
     return [pp for _, pp in bmps]
 
 def find_overview_png(folder: str | Path) -> Path | None:
-    """
-    Tìm file ảnh tổng quan (thường là a.png) trong thư mục.
-    
+    """Tìm file ảnh tổng quan (mặc định là a.png) trong thư mục thiết bị.
+
+    Args:
+        folder: Thư mục cần tìm kiếm.
+
     Returns:
-        Path or None: Đường dẫn file ảnh hoặc None nếu không tìm thấy.
+        Path | None: Đường dẫn file ảnh nếu tìm thấy, ngược lại là None.
     """
     p = Path(folder)
     if not p.is_dir():
@@ -880,22 +1007,24 @@ def _require_overview_png_and_bmps(folder: str | Path) -> tuple[Path, list[Path]
         )
     bmps = list_bmp_in_folder(p)
     if not bmps:
-        raise FileNotFoundError(f"Không tìm thấy PS-SD*.BMP trong {p!s}.")
+        raise FileNotFoundError(f"Không tìm thấy PS-SDxxxx.BMP trong {p!s}.")
     return overview, bmps
 
 def _take(lst: list[Path], idx: int, fallback: Path | None) -> Path | None:
     return lst[idx] if 0 <= idx < len(lst) else fallback
 
 def auto_pick_mba_images(folder: str | Path) -> dict[str, str]:
-    """
-    Tự động chọn các file ảnh cho template MBA từ thư mục thiết bị.
-    
+    """Tự động chọn bộ ảnh phù hợp cho template báo cáo MBA.
+
     Yêu cầu:
-    - 1 file 'a.png' (ảnh tổng quan).
-    - Các file 'PS-SD*.BMP' (ảnh thông số).
-    
+    - 1 file 'a.png' cho ảnh tổng quan (imga).
+    - Các file 'PS-SDxxxx.BMP' cho ảnh thông số (img1, img2, img4, img6).
+
+    Args:
+        folder: Thư mục chứa ảnh của máy biến áp.
+
     Returns:
-        dict: Mapping các khóa template (imga, img1, img2, img4, img6) với đường dẫn file.
+        dict: Mapping các khóa template ảnh với đường dẫn file thực tế.
     """
     overview, bmps = _require_overview_png_and_bmps(folder)
     fb = bmps[0]
@@ -912,7 +1041,7 @@ def auto_pick_device_images(folder: str | Path) -> dict[str, str]:
     """Chọn ảnh cho template device (``imga`` + ``img1``…``img6``).
 
     * ``imga``: **bắt buộc** file ``a.png`` trong thư mục.
-    * ``img1``…``img6``: ``PS-SD*.BMP`` theo thứ tự số (vd 641–646 → ``img1``–``img6``).
+    * ``img1``…``img6``: ``PS-SDxxxx.BMP`` theo thứ tự số (vd 641–646 → ``img1``–``img6``).
     """
     overview, bmps = _require_overview_png_and_bmps(folder)
     fb = bmps[0]
@@ -939,14 +1068,15 @@ def mba_kwargs_from_inps(
     remarks_mba: str = "",
     cap_tab_mba: str | None = None,
 ) -> dict:
-    """Đọc dữ liệu từ file INPSxxxx.KEW và chuẩn bị bộ tham số để render template MBA.
+    """Đọc dữ liệu từ file INPSxxxx.KEW và chuẩn bị bộ tham số (kwargs) để render template MBA.
 
     Args:
-        inps_path: Đường dẫn tới file INPSxxxx.KEW trích xuất từ máy đo.
+        inps_path: Đường dẫn tới file INPSxxxx.KEW. Nếu None, các giá trị sẽ là "—".
         name: Tên máy biến áp.
         imga, img1, img2, img4, img6: Đường dẫn tới các file ảnh đo kiểm.
-        cap_fig_mba, cap_tab_mba: Chú thích hình/bảng (tuỳ chọn).
-        remarks_mba: Nhận xét văn bản bổ sung.
+        cap_fig_mba: Chú thích hình (tuỳ chọn).
+        remarks_mba: Nhận xét văn bản bổ sung (tuỳ chọn).
+        cap_tab_mba: Chú thích bảng thông số (tuỳ chọn).
 
     Returns:
         dict: Context dữ liệu đầy đủ cho template MBA.
@@ -1076,15 +1206,15 @@ def mba_kwargs_from_folder(
     3. Sinh nội dung nhận xét dựa trên dữ liệu Excel hiện trường.
 
     Args:
-        folder: Đường dẫn thư mục chứa dữ liệu thiết bị.
-        name: Tên hiển thị của máy biến áp.
-        cap_fig_mba: Chú thích cho hình ảnh kết quả đo (tuỳ chọn).
-        remarks_mba: Ghi chú bổ sung từ người dùng (tuỳ chọn).
-        cap_tab_mba: Chú thích cho bảng thông số hoạt động (tuỳ chọn).
-        excel_params: Các tham số đo kiểm trích xuất từ Excel (P, Q, S, Cosφ...).
+        folder: Thư mục chứa dữ liệu của máy biến áp.
+        name: Tên hiển thị của MBA.
+        cap_fig_mba: Chú thích hình ảnh.
+        remarks_mba: Nhận xét bổ sung.
+        cap_tab_mba: Chú thích bảng.
+        excel_params: Các tham số đo lường bổ sung từ Excel (nếu có).
 
     Returns:
-        dict: Tập hợp các tham số (kwargs) sẵn sàng để truyền vào hàm :func:`mba`.
+        dict: Context dữ liệu sẵn sàng để truyền vào hàm mba().
     """
     folder = Path(folder)
     from modules.kew.analyse_kew import find_file  # type: ignore
@@ -1155,7 +1285,15 @@ def merge_rendered_docx(
     docx_paths: Sequence[str | Path],
     output_path: str | Path,
 ) -> Path:
-    """Ghép các file Word đã render thành một file, giữ quan hệ media."""
+    """Ghép nối nhiều file Word thành một file duy nhất, bảo toàn định dạng và media.
+
+    Args:
+        docx_paths: Danh sách đường dẫn các file .docx cần ghép.
+        output_path: Đường dẫn lưu file kết quả.
+
+    Returns:
+        Path: Đường dẫn file kết quả sau khi ghép.
+    """
     paths = [Path(p) for p in docx_paths]
     if not paths:
         raise ValueError("merge_rendered_docx: cần ít nhất một đường dẫn .docx.")
@@ -1292,18 +1430,18 @@ def build_field_word_report(
     5. Render từng section bằng template tương ứng và ghép thành file cuối cùng.
 
     Args:
-        project_root: Thư mục chứa các thư mục con của từng thiết bị.
+        project_root: Thư mục chứa các thư mục con của từng thiết bị (VD: Project_Output).
         output_path: Đường dẫn lưu file .docx kết quả.
-        mba_template: Template cho máy biến áp.
-        device_template: Template cho thiết bị đo kiểm thường (Chương 5).
-        device4_template: Template cho thiết bị loại 4 (Chương 4).
-        totalmba_template: Template cho bảng tổng hợp danh sách MBA.
-        devices: Danh sách metadata thiết bị (nếu đã có sẵn).
+        mba_template: Template cho MBA.
+        device_template: Template cho thiết bị thường.
+        device4_template: Template cho thiết bị loại 4.
+        totalmba_template: Template cho bảng danh sách MBA.
+        devices: Danh sách metadata (tên, thư mục, tham số Excel) đã chuẩn bị sẵn.
         default_kind: Loại thiết bị mặc định nếu không xác định được.
         chapter_filter: Chế độ lọc chương ("all", "chapter4", "chapter5").
 
     Returns:
-        tuple[Path, list[str]]: (Đường dẫn file báo cáo, danh sách các cảnh báo).
+        tuple[Path, list[str]]: (Đường dẫn file Word, danh sách các cảnh báo trong quá trình sinh).
     """
     root = Path(project_root)
     if not root.is_dir():
@@ -1354,7 +1492,7 @@ def build_field_word_report(
                 "ten": name,
                 "pdm": _fmt(ep.get("pdm"), 0),
                 "p": _fmt(ep.get("p"), 0),
-                "pf": _fmt(ep.get("cos_phi"), 3),
+                "pf": _fmt(_parse_pf_field(ep.get("cos_phi")), 3),
             })
 
     sections: list[tuple[SectionKind, dict]] = []
@@ -1522,7 +1660,14 @@ def _lookup_device_metadata(metadata: dict[str, dict], folder_name: str) -> dict
     return {}
 
 def _excel_stt(value: object) -> int | None:
-    """Số thứ tự từ cột ``stt`` (số nguyên hoặc chuỗi có chữ số)."""
+    """Trích xuất và chuẩn hóa số thứ tự (STT) từ ô dữ liệu Excel.
+
+    Args:
+        value: Giá trị thô từ ô Excel.
+
+    Returns:
+        int | None: Số nguyên đại diện cho STT, hoặc None nếu không hợp lệ.
+    """
     if value is None:
         return None
     if isinstance(value, float) and value != value:  # NaN
@@ -1541,6 +1686,15 @@ def _excel_stt(value: object) -> int | None:
     return int(digits)
 
 def _cell_text(row: object, col: str | None) -> str:
+    """Trích xuất chuỗi văn bản sạch từ một ô dữ liệu trong hàng (Series) của Pandas.
+
+    Args:
+        row: Hàng dữ liệu (Series).
+        col: Tên cột cần lấy dữ liệu.
+
+    Returns:
+        str: Chuỗi văn bản đã loại bỏ khoảng trắng hoặc chuỗi rỗng nếu ô trống/NaN.
+    """
     if col is None:
         return ""
     try:
@@ -1556,17 +1710,14 @@ def _cell_text(row: object, col: str | None) -> str:
 def read_device_metadata_from_excel(
     excel_path: str | Path,
 ) -> dict[str, dict]:
-    """Đọc Excel hiện trường → ``{tên_chuẩn_hóa: {name, stt, kind, nominal_voltage, remarks}}``.
+    """Đọc dữ liệu metadata và tham số đo kiểm từ file Excel hiện trường.
 
-    Chỉ hỗ trợ bộ cột cố định (xem ``FIELD_XLSX_HEADERS`` trong
-    ``modules.kew.organize_field_zip``), gồm ``imgomit`` (chỉ dùng bước ZIP, Word bỏ qua):
-    ``stt`` → thứ tự thiết bị khi ghép Word;
-    ``type`` → loại section; ``pdm`` → ``nominal_voltage`` (dùng cho δU trong nhận xét thiết bị;
-    MBA vẫn so bảng với 400 V); ``p``, ``pf``, ``i1``–``i3``,
-    ``di``, ``thd``, ``tdd`` ghép vào ``remarks`` (ghi chú Excel, ghép sau nhận xét tự động nếu có).
+    Args:
+        excel_path: Đường dẫn đến file Excel (.xlsx).
 
-    Nếu thiếu cột hoặc không đọc được file → trả về ``{}`` (báo cáo Word vẫn chạy
-    không metadata).
+    Returns:
+        dict[str, dict]: Mapping từ tên thiết bị (đã chuẩn hóa) sang thông tin chi tiết
+            (stt, loại, điện áp danh định, tham số đo lường...).
     """
     try:
         import pandas as pd
@@ -1697,11 +1848,12 @@ def build_word_report_from_zip(
         zip_bytes: Dữ liệu nhị phân của file ZIP.
         output_docx: Đường dẫn file Word đầu ra.
         mba_template: Template cho MBA (tuỳ chọn).
-        device_template: Template cho thiết bị (tuỳ chọn).
-        device4_template: Template cho thiết bị type-4 (tuỳ chọn).
-        
+        device_template: Template cho thiết bị thường (tuỳ chọn).
+        device4_template: Template cho thiết bị chương 4 (tuỳ chọn).
+        totalmba_template: Template cho bảng tổng hợp MBA (tuỳ chọn).
+
     Returns:
-        tuple: (Đường dẫn file báo cáo, danh sách cảnh báo).
+        tuple[Path, list[str]]: (Đường dẫn file báo cáo, danh sách các cảnh báo).
     """
     mba_template = Path(mba_template or DEFAULT_MBA_TEMPLATE)
     device_template = Path(device_template or DEFAULT_DEVICE_TEMPLATE)
@@ -1736,7 +1888,7 @@ def build_word_report_from_zip(
         if not raw_dirs:
             raise ValueError(
                 "ZIP không chứa thư mục thiết bị nào. Cấu trúc mong đợi: "
-                "Project_Output/<Tên thiết bị>/ (a.png, PS-SDxxx.BMP)."
+                "Project_Output/<Tên thiết bị>/ (a.png, PS-SDxxxx.BMP)."
             )
 
         excel_path = _find_first_excel(extract)
@@ -1796,19 +1948,19 @@ def _build_chapter_from_zip(
     device4_template: str | Path | None = None,
     totalmba_template: str | Path | None = None,
 ) -> tuple[Path, list[str]]:
-    """Hàm nội bộ thực hiện giải nén ZIP và dựng báo cáo theo chương được chỉ định.
+    """Logic dùng chung để dựng báo cáo Word (Chương 4 hoặc Chương 5) từ dữ liệu ZIP.
 
     Args:
-        zip_bytes: Nội dung file ZIP dữ liệu.
+        zip_bytes: Dữ liệu nhị phân file ZIP.
         output_docx: Đường dẫn file Word đầu ra.
-        chapter_filter: Lọc loại thiết bị ("chapter4" cho type 4, "chapter5" cho phần còn lại).
-        device_template: Template cho thiết bị đo kiểm thường.
-        mba_template: Template cho máy biến áp.
-        device4_template: Template cho thiết bị loại 4.
-        totalmba_template: Template cho bảng tổng hợp MBA.
+        chapter_filter: Lọc chương cần tạo (chapter4/chapter5/all).
+        device_template: Đường dẫn template thiết bị.
+        mba_template: Đường dẫn template MBA.
+        device4_template: Đường dẫn template thiết bị loại 4.
+        totalmba_template: Đường dẫn template bảng tổng hợp MBA.
 
     Returns:
-        tuple[Path, list[str]]: Đường dẫn file báo cáo và danh sách các cảnh báo (nếu có).
+        tuple[Path, list[str]]: (Đường dẫn file kết quả, danh sách cảnh báo).
     """
     _mba_tpl = Path(mba_template or DEFAULT_MBA_TEMPLATE)
     _dev_tpl = Path(device_template or DEFAULT_DEVICE_TEMPLATE)
@@ -1844,7 +1996,7 @@ def _build_chapter_from_zip(
         if not raw_dirs:
             raise ValueError(
                 "ZIP không chứa thư mục thiết bị nào. Cấu trúc mong đợi: "
-                "Project_Output/<Tên thiết bị>/ (a.png, PS-SDxxx.BMP)."
+                "Project_Output/<Tên thiết bị>/ (a.png, PS-SDxxxx.BMP)."
             )
 
         excel_path = _find_first_excel(extract)
@@ -1962,16 +2114,15 @@ _T6_TDD_HIGH = 12.0
 
 
 def _t6_auto_nhan_xet(delta_I: object, cos_phi: object, tdd: object) -> str:
-    """
-    Tự động sinh đoạn văn nhận xét cho bảng tổng hợp Table 6 dựa trên các chỉ số đo lường.
-    
+    """Tự động sinh đoạn văn nhận xét cho bảng tổng hợp Table 6 (Bảng 6.3).
+
     Args:
-        delta_I: Độ lệch pha dòng điện.
-        cos_phi: Hệ số công suất.
-        tdd: Tổng biến dạng sóng hài dòng điện.
-        
+        delta_I: Giá trị độ lệch pha dòng điện.
+        cos_phi: Giá trị hệ số công suất.
+        tdd: Giá trị sóng hài dòng điện TDD.
+
     Returns:
-        str: Chuỗi nhận xét (ví dụ: "Thiết bị vận hành ổn định").
+        str: Câu nhận xét tổng hợp ("Vận hành ổn định" hoặc các lỗi vi phạm).
     """
     vi_pham: list[str] = []
 
@@ -2006,7 +2157,17 @@ def _t6_auto_nhan_xet(delta_I: object, cos_phi: object, tdd: object) -> str:
 
 
 def _t6_fmt(v: object, decimals: int = 2) -> str:
-    """Định dạng số cho ô bảng Table6 (dấu phẩy thập phân, trả '—' nếu thiếu)."""
+    """Định dạng giá trị số cho các ô trong bảng tổng hợp Table 6.
+
+    Hỗ trợ xử lý NaN, None và định dạng dấu phẩy thập phân kiểu Việt Nam.
+
+    Args:
+        v: Giá trị cần định dạng.
+        decimals: Số chữ số thập phân.
+
+    Returns:
+        str: Chuỗi đã định dạng (VD: "0,987") hoặc "—" nếu thiếu dữ liệu.
+    """
     if v is None:
         return "—"
     try:
@@ -2030,23 +2191,15 @@ def generate_table6_docx(
     *,
     template_path: str | Path | None = None,
 ) -> Path:
-    """Sinh file Word bảng tổng hợp kết quả đo kiểm (Table 6).
+    """Sinh báo cáo Word cho Bảng 6.3 (Tổng hợp kết quả đo kiểm).
 
-    Mỗi phần tử ``devices`` là một dict với các khóa:
-        - ``ten``       : tên khu vực / thiết bị (bắt buộc)
-        - ``I``         : dòng điện trung bình (A)
-        - ``delta_I``   : độ lệch pha dòng điện (%)
-        - ``cos_phi``   : hệ số công suất
-        - ``P``         : công suất tác dụng (kW)
-        - ``tdd``       : tổng biến dạng sóng hài dòng điện (%)
-        - ``nhan_xet``  : (tuỳ chọn) nhận xét thủ công; nếu để trống hàm tự sinh
+    Args:
+        devices: Danh sách các dict thông số thiết bị (tên, I, delta_I, cosphi, P, tdd).
+        output_path: Đường dẫn lưu file .docx kết quả.
+        template_path: Đường dẫn template Table 6 (tuỳ chọn).
 
-    Template phải có vòng lặp Jinja2:
-        ``{% tr for item in ds_thiet_bi %}…{% endtr %}``
-    với các biến: ``item.tt``, ``item.ten``, ``item.I``, ``item.delta_I``,
-    ``item.cos_phi``, ``item.P``, ``item.tdd``, ``item.nhan_xet``.
-
-    Trả về ``Path`` đến file đã lưu.
+    Returns:
+        Path: Đường dẫn đến file Word đã sinh.
     """
     tpl_path = Path(template_path or DEFAULT_TABLE6_TEMPLATE)
     if not tpl_path.is_file():
@@ -2087,16 +2240,15 @@ def generate_table6_from_zip(
     *,
     template_path: str | Path | None = None,
 ) -> tuple[Path, list[str]]:
-    """
-    Tạo bảng tổng hợp Table 6 từ file ZIP chứa dữ liệu và Excel metadata.
-    
+    """Tạo bảng tổng hợp Table 6 (Bảng 6.3) từ file ZIP dữ liệu.
+
     Args:
-        zip_bytes: Dữ liệu ZIP.
+        zip_bytes: Nội dung nhị phân file ZIP.
         output_path: Đường dẫn file Word đầu ra.
         template_path: Template Table 6 (tuỳ chọn).
-        
+
     Returns:
-        tuple: (Đường dẫn file, danh sách cảnh báo).
+        tuple[Path, list[str]]: (Đường dẫn file Word kết quả, danh sách các cảnh báo).
     """
     warnings: list[str] = []
 
