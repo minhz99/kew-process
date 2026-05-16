@@ -134,6 +134,59 @@ def _mba_extract(df: "pd.DataFrame") -> "tuple[pd.DataFrame, list[str]]":
     return out, warnings
 
 
+def _evaluate_for_excel(df: "pd.DataFrame") -> dict[int, str]:
+    from modules.report.gen_word import (
+        _eval_voltage, _eval_pf, _eval_thd, _eval_unbalance,
+        _V_DEV_LIMIT_PCT, _PF_LIMIT, _THDV_LIMIT_PCT, _TDD_LIMIT_PCT, _MBA_NOMINAL_VOLTAGE_V
+    )
+
+    res = {}
+
+    # AE8: Điện áp
+    if "AVG_VL1[V]" in df.columns:
+        u_vals = df["AVG_VL1[V]"].dropna()
+        if not u_vals.empty:
+            eval_str, _, _, _ = _eval_voltage(u_vals.max(), u_vals.min(), u_vals.mean(), _MBA_NOMINAL_VOLTAGE_V)
+            res[8] = eval_str
+
+    # AE11: Dòng điện (Word không có logic đánh giá)
+    res[11] = "—"
+
+    # AE14: Pha áp
+    if "AVG_Vunb[%]" in df.columns:
+        vu_vals = df["AVG_Vunb[%]"].dropna()
+        if not vu_vals.empty:
+            res[14] = _eval_unbalance(vu_vals.max(), vu_vals.mean(), _V_DEV_LIMIT_PCT)
+
+    # AE15: Pha dòng
+    if "AVG_Aunb[%]" in df.columns:
+        au_vals = df["AVG_Aunb[%]"].dropna()
+        if not au_vals.empty:
+            res[15] = _eval_unbalance(au_vals.max(), au_vals.mean(), 10.0)
+
+    # AE16: PF
+    if "AVG_PF" in df.columns:
+        pf_vals = df["AVG_PF"].dropna()
+        if not pf_vals.empty:
+            res[16] = _eval_pf(pf_vals.max(), pf_vals.min(), pf_vals.mean())
+
+    # AE20: THD
+    thd_cols = [c for c in ["AVG_Vthd1[%]", "AVG_Vthd2[%]", "AVG_Vthd3[%]"] if c in df.columns]
+    if thd_cols:
+        max_vals = [df[c].max() for c in thd_cols if not df[c].dropna().empty]
+        avg_vals = [df[c].mean() for c in thd_cols if not df[c].dropna().empty]
+        res[20] = _eval_thd(max_vals, avg_vals, _THDV_LIMIT_PCT)
+
+    # AE23: TDD
+    tdd_cols = [c for c in ["AVG_Athd1[%]", "AVG_Athd2[%]", "AVG_Athd3[%]"] if c in df.columns]
+    if tdd_cols:
+        max_vals = [df[c].max() for c in tdd_cols if not df[c].dropna().empty]
+        avg_vals = [df[c].mean() for c in tdd_cols if not df[c].dropna().empty]
+        res[23] = _eval_thd(max_vals, avg_vals, _TDD_LIMIT_PCT)
+
+    return res
+
+
 def _mba_write(ws, df: "pd.DataFrame") -> None:
     """Ghi header + data vào sheet, bắt đầu từ B2."""
     sr, sc = _MBA_START_ROW, _MBA_START_COL
@@ -157,6 +210,12 @@ def _mba_write(ws, df: "pd.DataFrame") -> None:
                 fmt = _MBA_FMT.get(cname)
                 if fmt:
                     cell.number_format = fmt
+
+    # Ghi nhận xét vào các ô AE (col 31) theo logic của Word
+    evals = _evaluate_for_excel(df)
+    for r_idx, ev_str in evals.items():
+        cell = ws.cell(row=r_idx, column=31)
+        cell.value = ev_str
 
 kew_bp = Blueprint('kew_bp', __name__)
 

@@ -387,6 +387,17 @@ def _eval_thd(values_max: Iterable[float | None], values_avg: Iterable[float | N
     else:
         return "Đạt"
 
+def _eval_unbalance(unb_max: float | None, unb_avg: float | None, limit: float) -> str:
+    if unb_avg is not None and unb_max is not None:
+        if unb_avg >= limit:
+            return "Không đạt"
+        elif unb_max >= limit:
+            return "Chưa đạt"
+        return "Đạt"
+    elif unb_max is not None:
+        return "Đạt" if unb_max < limit else "Không đạt"
+    return "—"
+
 def _fmt_remark_pct(v: float | None, decimals: int = 2) -> str:
     if v is None or v != v:  # NaN
         return "—"
@@ -870,17 +881,7 @@ def mba_kwargs_from_inps(
     # ─── Độ lệch pha điện áp / dòng (%) ───────────────────────────
     uv_unb = _pick(stats, "AVG_UV[%]", "AVG_VUNB[%]")
     ua_unb = _pick(stats, "AVG_UA[%]", "AVG_AUNB[%]")
-    if uv_unb.get("avg") is not None and uv_unb.get("max") is not None:
-        if uv_unb["avg"] >= _V_DEV_LIMIT_PCT:
-            dueval = "Không đạt"
-        elif uv_unb["max"] >= _V_DEV_LIMIT_PCT:
-            dueval = "Chưa đạt"
-        else:
-            dueval = "Đạt"
-    elif uv_unb.get("max") is not None:
-        dueval = "Đạt" if uv_unb["max"] < _V_DEV_LIMIT_PCT else "Không đạt"
-    else:
-        dueval = "—"
+    dueval = _eval_unbalance(uv_unb.get("max"), uv_unb.get("avg"), _V_DEV_LIMIT_PCT)
 
     # ─── Hệ số công suất ─────────────────────────────────────────
     pf = _pick_total(stats, "PF", "[_]") or _pick(stats, "AVG_PF[_]")
