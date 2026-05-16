@@ -180,12 +180,6 @@ function showMessage(msg, isError = false) {
     msgDiv.className = isError ? 'error' : 'success';
 }
 
-// Lấy hoặc tạo session ID (để phân biệt các user/tab)
-let sessionId = localStorage.getItem('dien_excel_session');
-if (!sessionId) {
-    sessionId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-    localStorage.setItem('dien_excel_session', sessionId);
-}
 
 // CLIENT-SIDE Upload File
 async function uploadFile() {
