@@ -608,16 +608,9 @@ def _device_tdd_limit_from_name(name: str) -> float:
 # ──────────────────────────────────────────────────────────────────────────────
 
 _CURRENT_CHAR_MAP: dict[str, str] = {
-    "on dinh": "ổn định",
-    "on định": "ổn định",
     "ổn định": "ổn định",
-    "dao dong nhe": "có sự dao động nhẹ",
     "dao động nhẹ": "có sự dao động nhẹ",
-    "bien doi lien tuc": "biến đổi liên tục với biên độ nhỏ",
     "biến đổi liên tục": "biến đổi liên tục với biên độ nhỏ",
-    "chu ky load-unload": "biến đổi theo chu kỳ Load/Unload",
-    "chu kỳ load-unload": "biến đổi theo chu kỳ Load/Unload",
-    "load-unload": "biến đổi theo chu kỳ Load/Unload",
     "load/unload": "biến đổi theo chu kỳ Load/Unload",
 }
 

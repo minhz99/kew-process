@@ -3,12 +3,13 @@ Tổ chức hồ sơ đo KEW6315 từ ZIP: đọc Excel hiện trường (.xlsx)
 chuyển ảnh PS-SDxxx.BMP vào đúng thư mục thiết bị, nén lại Project_Output.zip.
 
 Excel hiện trường chỉ hỗ trợ một bộ cột cố định (tên cột không phân biệt hoa thường):
-``stt``, ``name``, ``file``, ``img``, ``imgend``, ``imgomit``, ``type``, ``pdm``,
+``stt``, ``name``, ``file``, ``img``, ``imgend``, ``imgomit``, ``imglu``, ``type``, ``pdm``,
 ``p``, ``pf``, ``i1``, ``i2``, ``i3``, ``di``, ``thd``, ``tdd``,
 ``current_char``, ``u_min``, ``u_max``, ``delta_u``.
 
-Bước tổ chức ZIP dùng ``name`` / ``file`` / ``img`` / ``imgend`` / ``imgomit``
-(tuỳ chọn điền: chỉ số ảnh trong dải bị loại, vd ``944, 945`` hoặc ``PS-SD944``);
+Bước tổ chức ZIP dùng ``name`` / ``file`` / ``img`` / ``imgend`` / ``imgomit`` /
+``imglu`` (tuỳ chọn: chỉ số ảnh PS-SDxxx dùng riêng cho máy nén khí load/unload —
+sẽ được copy vào thư mục thiết bị với tên ``load-unload-xxx.BMP``);
 ``stt`` và các cột còn lại dành cho bước Word (thứ tự thiết bị, metadata).
 
 Các cột đã có sẵn từ trước, được tái dùng để sinh nhận xét (không dùng INPS):
@@ -22,6 +23,8 @@ Các cột đánh giá tự động (sinh nhận xét):
   "Biến đổi liên tục" / "Chu kỳ Load-Unload".
 - ``u_min``, ``u_max``: Điện áp đo được thấp nhất / cao nhất (V); tool tự tính δU.
 - ``delta_u``: Độ lệch pha (mất cân bằng) điện áp lớn nhất (%).
+- ``imglu``: (Tuỳ chọn) Chỉ số ảnh PS-SDxxx dùng cho dạng sóng load/unload — được đổi
+  tên thành ``load-unload-xxx.BMP`` khi copy vào thư mục thiết bị.
 """
 from __future__ import annotations
 
@@ -47,6 +50,7 @@ FIELD_XLSX_HEADERS: tuple[str, ...] = (
     "img",           # Chỉ số ảnh đầu dải (PS-SDxxx)
     "imgend",        # Chỉ số ảnh cuối dải
     "imgomit",       # Chỉ số ảnh bỏ qua trong dải (tuỳ chọn)
+    "imglu",         # (Tuỳ chọn) Chỉ số ảnh PS-SDxxx dạng sóng load/unload → đổi tên load-unload-xxx.BMP
     # ── Phân loại & thông tin chung ────────────────────────────────────
     "type",          # Loại section: MBA / device (thiết bị)
     "pdm",           # Công suất định mức (kVA) — dùng tính % tải MBA
@@ -323,6 +327,7 @@ class RowPlan:
     img_start: int
     img_end: int
     img_omit: frozenset[int]
+    img_lu: Optional[int]  # Chỉ số ảnh load/unload (None nếu không có)
 
 
 def read_plans_from_excel(excel_path: str) -> tuple[list[RowPlan], list[str]]:
@@ -370,6 +375,8 @@ def read_plans_from_excel(excel_path: str) -> tuple[list[RowPlan], list[str]]:
                 f"Dòng {int(idx) + 2}: imgomit có chỉ số ngoài dải {i0}–{i1}: "
                 f"{', '.join(str(x) for x in outs)} (bỏ qua các mục ngoài dải)."
             )
+        # Cột imglu: tuỳ chọn — ảnh load/unload dạng sóng (ảnh thứ 7)
+        img_lu = _to_int_img(row[colmap["imglu"]])
         try:
             folder = sanitize_device_folder(dev_raw)
         except ValueError as e:
@@ -383,6 +390,7 @@ def read_plans_from_excel(excel_path: str) -> tuple[list[RowPlan], list[str]]:
                 img_start=i0,
                 img_end=i1,
                 img_omit=omit_eff,
+                img_lu=img_lu,
             )
         )
     if not plans:
@@ -433,10 +441,19 @@ def build_project_output(
     plans: list[RowPlan],
     s_map: dict[str, str],
     bmp_map: dict[int, str],
+    warnings: Optional[list[str]] = None,
 ) -> str:
     """
     Tạo thư mục Project_Output trong output_parent, trả về đường dẫn Project_Output.
+
+    Với mỗi thiết bị:
+    - Copy thư mục Sxxxx → tên thiết bị.
+    - Copy ảnh PS-SDxxx.BMP trong dải [img, imgend] (trừ imgomit).
+    - Nếu có ``img_lu``: copy ảnh đó vào thư mục thiết bị với tên
+      ``load-unload-xxx.BMP`` (xxx = chỉ số gốc 3 chữ số).
     """
+    if warnings is None:
+        warnings = []
     out_root = os.path.join(output_parent, "Project_Output")
     os.makedirs(out_root, exist_ok=True)
     for p in plans:
@@ -465,6 +482,34 @@ def build_project_output(
                 os.remove(src_bmp)
             except OSError:
                 pass
+
+        # ── Ảnh load/unload (imglu) — tuỳ chọn, ảnh thứ 7 ──────────────
+        if p.img_lu is not None:
+            if p.img_lu not in bmp_map:
+                warnings.append(
+                    f"Thiết bị «{p.device_raw}»: không tìm thấy ảnh "
+                    f"{bmp_basename_for_index(p.img_lu)} cho imglu — bỏ qua."
+                )
+            else:
+                lu_dest_name = f"load-unload-{p.img_lu:03d}.BMP"
+                lu_dest = os.path.join(dest_dir, lu_dest_name)
+                # Nếu img_lu nằm trong dải thường, file đã được copy vào dest_dir
+                # với tên PS-SDxxx.BMP (và nguồn gốc có thể đã bị xoá).
+                # Ưu tiên dùng bản đã copy; chỉ fallback sang bmp_map nếu chưa có.
+                already_copied = os.path.join(dest_dir, bmp_basename_for_index(p.img_lu))
+                if os.path.exists(already_copied):
+                    lu_src = already_copied
+                    shutil.copy2(lu_src, lu_dest)
+                    # Không xoá bản gốc vì nó đã nằm trong dest_dir
+                else:
+                    lu_src = bmp_map[p.img_lu]
+                    shutil.copy2(lu_src, lu_dest)
+                    # Xoá nguồn nếu nằm ngoài thư mục đích
+                    if os.path.dirname(os.path.normpath(lu_src)) != os.path.normpath(dest_dir):
+                        try:
+                            os.remove(lu_src)
+                        except OSError:
+                            pass
 
     return out_root
 
@@ -514,7 +559,7 @@ def process_field_zip_bytes(zip_bytes: bytes, work_dir: str) -> tuple[str, list[
 
     staging = os.path.join(work_dir, "staging")
     os.makedirs(staging, exist_ok=True)
-    build_project_output(extract, staging, plans, s_map, bmp_map)
+    build_project_output(extract, staging, plans, s_map, bmp_map, warnings)
 
     out_zip = os.path.join(work_dir, "KEW_HoSoDaXuLy.zip")
     proj = os.path.join(staging, "Project_Output")
