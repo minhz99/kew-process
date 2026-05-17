@@ -27,12 +27,12 @@ from modules.image.kew6315_layout import SCREENS
 
 # ── Đường dẫn mặc định đến thư mục ảnh mẫu chữ số ───────────────────────────
 _DEFAULT_DIGITS_DIR = os.path.normpath(
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "static", "digits_ocr")
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "static", "digits")
 )
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 # Chiều cao ROI (khớp với h_clear trong apply_text_to_image)
-_ROI_H = 16
+_ROI_H = 15
 # Ngưỡng tương đồng tối thiểu (0-1): giá trị thấp hơn = bỏ qua digit đó
 _MATCH_THRESHOLD = 0.70
 # Khoảng cách cộng thêm sau mỗi chữ số (theo logic trong apply_text_to_image)
