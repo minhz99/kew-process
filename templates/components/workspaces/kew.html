@@ -9,62 +9,10 @@
       <button type="button" class="btn" id="kew-subtab-word-btn"
         onclick="window.switchKewSubtab && window.switchKewSubtab('word')"
         style="font-size:0.85rem;border-color:var(--border)">Tạo báo cáo Word</button>
-      <button type="button" class="btn" id="kew-subtab-mba-btn"
-        onclick="window.switchKewSubtab && window.switchKewSubtab('mba')"
-        style="font-size:0.85rem;font-weight:600;border-color:var(--accent3);color:var(--accent3)">Xuất Excel
-        MBA</button>
+
     </div>
 
-    <div id="kew-panel-mba" class="kew-subpanel" style="display:block">
-      <div class="content active" id="tab-mba" style="padding-top: 1rem;">
-        <div class="chart-card" id="mba-manager-panel" style="border-color:var(--accent3)40">
-          <div
-            style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:10px">
-            <div>
-              <h3 style="margin:0;color:var(--accent3)">📊 Xuất Excel máy biến áp</h3>
-              <p style="font-size:0.76rem;color:var(--text-muted);margin:4px 0 0">Thêm từng file INPS và đặt tên sheet →
-                xuất 1 file Excel nhiều sheet.</p>
-            </div>
-            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-              <input type="text" id="mba-out-filename" class="btn" style="width:200px;padding:5px 10px;font-size:0.8rem"
-                placeholder="Tên file xuất (VD: MBA_NhaMay.xlsx)" value="NX-MBA.xlsm">
-              <button class="btn" id="btn-mba-export-all"
-                style="border-color:var(--accent3);color:var(--accent3);font-weight:600" onclick="exportMbaAll()">
-                <span id="mba-all-spinner"
-                  style="display:none;width:12px;height:12px;border:2px solid rgba(0,0,0,0.2);border-radius:50%;border-top-color:var(--accent3);animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:4px"></span>
-                📥 Xuất tất cả
-              </button>
-            </div>
-          </div>
-
-          <input type="file" id="mba-file-picker" multiple accept=".KEW,.kew,.ZIP,.zip" style="display:none">
-
-          <div id="mba-drop-area" onclick="document.getElementById('mba-file-picker').click()"
-            style="border: 2px dashed rgba(59, 130, 246, 0.4); border-radius: 12px; padding: 2rem 1rem; text-align: center; cursor: pointer; transition: all 0.2s; margin-bottom: 1.5rem; background: var(--surface2);">
-            <div style="font-size: 2.5rem; margin-bottom: 0.5rem; opacity: 0.8;">📥</div>
-            <div style="font-size: 1.05rem; font-weight: 500; color: var(--text);">Kéo thả file INPSxxxx.KEW vào khung
-              này
-            </div>
-            <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 5px;">hoặc click để duyệt file trên
-              máy
-            </div>
-          </div>
-
-          <div id="mba-entries-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:1rem">
-          </div>
-
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <button class="btn" style="border-color: var(--border); font-size: 0.82rem;" type="button"
-              onclick="window._mbaClearList && window._mbaClearList()">
-              🗑 Xóa danh sách
-            </button>
-            <span id="mba-status-msg" style="font-size:0.76rem;color:var(--text-muted);margin-left:auto;"></span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div id="kew-panel-field" class="kew-subpanel" style="display:none;padding:1rem;">
+    <div id="kew-panel-field" class="kew-subpanel" style="display:block;padding:1rem;">
       <div class="chart-card" style="border-color:rgba(16,185,129,0.35)">
         <div
           style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem;flex-wrap:wrap;gap:12px">
@@ -189,13 +137,12 @@
 <script>
   (function () {
     var TABS = {
-      mba: { panel: 'kew-panel-mba', btn: 'kew-subtab-mba-btn', color: 'var(--accent3)' },
       field: { panel: 'kew-panel-field', btn: 'kew-subtab-field-btn', color: 'var(--accent2, #10b981)' },
       word: { panel: 'kew-panel-word', btn: 'kew-subtab-word-btn', color: '#8b5cf6' }
     };
 
     window.switchKewSubtab = function (which) {
-      if (!TABS[which]) which = 'mba';
+      if (!TABS[which]) which = 'field';
       Object.keys(TABS).forEach(function (key) {
         var cfg = TABS[key];
         var panel = document.getElementById(cfg.panel);
@@ -220,154 +167,6 @@
   })();
 </script>
 
-<script>
-  (function () {
-    var _mbaEntries = [];
-    var _mbaNextId = 0;
-
-    setTimeout(function () {
-      var picker = document.getElementById('mba-file-picker');
-      var dropArea = document.getElementById('mba-drop-area');
-
-      if (picker) {
-        picker.addEventListener('change', function () {
-          if (!picker.files || !picker.files.length) return;
-          for (var i = 0; i < picker.files.length; i++) {
-            _mbaAddEntry(picker.files[i]);
-          }
-          picker.value = '';
-          _mbaRender();
-        });
-      }
-
-      if (dropArea) {
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-          dropArea.addEventListener(eventName, preventDefaults, false);
-        });
-        function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
-
-        ['dragenter', 'dragover'].forEach(eventName => {
-          dropArea.addEventListener(eventName, () => dropArea.style.borderColor = 'var(--accent)');
-        });
-
-        ['dragleave', 'drop'].forEach(eventName => {
-          dropArea.addEventListener(eventName, () => dropArea.style.borderColor = 'rgba(59, 130, 246, 0.4)');
-        });
-
-        dropArea.addEventListener('drop', function (e) {
-          var dt = e.dataTransfer;
-          var files = dt.files;
-          if (!files || !files.length) return;
-          for (var i = 0; i < files.length; i++) {
-            var name = files[i].name.toLowerCase();
-            if (name.endsWith('.kew') || name.endsWith('.zip')) {
-              _mbaAddEntry(files[i]);
-            }
-          }
-          _mbaRender();
-        });
-      }
-    }, 0);
-
-    function _mbaAddEntry(file) {
-      _mbaEntries.push({ id: _mbaNextId++, file: file });
-    }
-
-    window._mbaRemoveEntry = function (id) {
-      _mbaEntries = _mbaEntries.filter(function (e) { return e.id !== id; });
-      _mbaRender();
-    };
-
-    window._mbaClearList = function () {
-      _mbaEntries = [];
-      _mbaRender();
-    };
-
-    function _mbaRender() {
-      var list = document.getElementById('mba-entries-list');
-      var msg = document.getElementById('mba-status-msg');
-      if (!list) return;
-
-      if (_mbaEntries.length === 0) {
-        list.innerHTML = '<div style="color:var(--text-muted);font-size:0.78rem;padding:8px 0">Chưa có file nào. Kéo thả hoặc chọn file INPS (.KEW / .ZIP) để bắt đầu.</div>';
-        if (msg) msg.textContent = '';
-        return;
-      }
-
-      list.innerHTML = _mbaEntries.map(function (entry, idx) {
-        return '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">' +
-          '<span style="font-size:0.72rem;color:var(--text-muted);min-width:20px">#' + (idx + 1) + '</span>' +
-          '<span style="flex:1;font-size:0.8rem;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + _esc(entry.file.name) + '"><span style="margin-right:6px">📄</span>' + _esc(entry.file.name) + '</span>' +
-          '<span style="color:var(--text-muted)">→</span>' +
-          '<span style="background:var(--accent3);color:white;padding:2px 8px;border-radius:12px;font-size:0.75rem;font-weight:600">MBA' + (idx + 1) + '</span>' +
-          '<button onclick="window._mbaRemoveEntry(' + entry.id + ')" style="background:none;border:1px solid var(--danger);color:var(--danger);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:0.75rem;line-height:1">✕</button>' +
-          '</div>';
-      }).join('');
-
-      if (msg) msg.textContent = _mbaEntries.length + ' MBA đã thêm';
-    }
-
-    function _esc(s) {
-      return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    }
-
-    window.exportMbaAll = function () {
-      if (_mbaEntries.length === 0) {
-        alert('Chưa có file INPS nào. Vui lòng thêm file .KEW hoặc .ZIP.');
-        return;
-      }
-      var btn = document.getElementById('btn-mba-export-all');
-      var spinner = document.getElementById('mba-all-spinner');
-      var msg = document.getElementById('mba-status-msg');
-
-      if (btn) btn.disabled = true;
-      if (spinner) spinner.style.display = 'inline-block';
-      if (msg) msg.textContent = 'Đang xử lý...';
-
-      var outName = (document.getElementById('mba-out-filename').value || '').trim() || 'NX-MBA.xlsm';
-      if (!outName.toLowerCase().endsWith('.xlsx') && !outName.toLowerCase().endsWith('.xlsm')) {
-        outName += '.xlsm';
-      }
-
-      var fd = new FormData();
-
-      _mbaEntries.forEach(function (e) {
-        fd.append('files', e.file);
-      });
-
-      fd.append('filename', outName);
-
-      fetch('/api/kew/export-mba', { method: 'POST', body: fd })
-        .then(function (r) {
-          if (!r.ok) return r.json().then(function (j) { throw new Error(j.error || 'HTTP ' + r.status); });
-          var warn = r.headers.get('X-MBA-Warnings');
-          if (warn) {
-            try { warn = decodeURIComponent(warn); } catch (e) { }
-          }
-          return r.blob().then(function (blob) { return { blob: blob, warn: warn }; });
-        })
-        .then(function (res) {
-          var url = URL.createObjectURL(res.blob);
-          var a = document.createElement('a');
-          a.href = url; a.download = outName;
-          document.body.appendChild(a); a.click();
-          setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 500);
-          if (msg) msg.textContent = '✅ Đã xuất ' + _mbaEntries.length + ' sheet thành công!';
-          if (res.warn) setTimeout(function () { alert('Cảnh báo:\n' + res.warn); }, 300);
-        })
-        .catch(function (err) {
-          alert('Lỗi xuất Excel MBA: ' + err.message);
-          if (msg) msg.textContent = '❌ Xuất thất bại.';
-        })
-        .finally(function () {
-          if (btn) btn.disabled = false;
-          if (spinner) spinner.style.display = 'none';
-        });
-    };
-
-    _mbaRender();
-  })();
-</script>
 
 <script>
   (function () {

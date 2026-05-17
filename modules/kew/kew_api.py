@@ -1,7 +1,7 @@
 """
 Module: kew_api.py
 Description: Cung cấp các API RESTful để xử lý dữ liệu từ thiết bị KEW6315.
-Bao gồm các tính năng: xuất dữ liệu sang template MBA.xlsm và tổ chức hồ sơ hiện trường từ ZIP.
+Bao gồm các tính năng: tổ chức hồ sơ hiện trường từ ZIP và sinh các báo cáo (Word, Excel MBA).
 """
 
 import os
@@ -16,13 +16,7 @@ from pathlib import Path
 from flask import Blueprint, request, jsonify, send_file
 
 
-try:
-    import pandas as pd
-    from openpyxl import load_workbook
-    from typing import Mapping
-    _MBA_DEPS_OK = True
-except ImportError:
-    _MBA_DEPS_OK = False
+
 
 # ─── Cấu hình MBA export ─────────────────────────────────────────────────────
 from modules.report.gen_excel_mba import (
@@ -35,130 +29,11 @@ _MBA_TEMPLATE_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
     '..', '..', 'static', 'excel-template', 'MBA.xlsm'
 )
-_MBA_PREBUILT_COUNT = 10  # Số sheet có sẵn trong template (MBA1 … MBA10)
 
 kew_bp = Blueprint('kew_bp', __name__)
 
 
-@kew_bp.route('/export-mba', methods=['POST'])
-def export_mba():
-    """
-    API endpoint để xuất báo cáo MBA sang file Excel (.xlsm).
-    
-    Nhận các file KEW hoặc ZIP từ người dùng, trích xuất dữ liệu và điền vào 
-    template Excel có sẵn. Mỗi file KEW sẽ tương ứng với một sheet MBA trong file kết quả.
-    
-    Returns:
-        Response: File Excel kết quả hoặc lỗi JSON.
-    """
-    if not _MBA_DEPS_OK:
-        return jsonify({'error': 'Thiếu thư viện pandas hoặc openpyxl.'}), 500
 
-    out_filename = request.form.get('filename', '').strip() or 'NX-MBA.xlsm'
-    # Đảm bảo đuôi .xlsm để bảo toàn macro của template
-    if not out_filename.lower().endswith(('.xlsx', '.xlsm')):
-        out_filename += '.xlsm'
-
-    # ── Lấy tất cả file KEW bytes từ request ─────────────────────────────────
-    def _extract_kew_bytes(f) -> list:
-        """Từ 1 FileStorage trả về list [(name, bytes)]."""
-        raw = f.read()
-        if f.filename.upper().endswith('.ZIP'):
-            with zipfile.ZipFile(io.BytesIO(raw), 'r', metadata_encoding="utf-8") as zf:
-                entries = [n for n in zf.namelist() if n.upper().endswith('.KEW')]
-                return [(os.path.basename(n), zf.read(n)) for n in entries]
-        return [(os.path.basename(f.filename), raw)]
-
-    kew_list = []  # list of (name, bytes)
-    if 'files' in request.files:
-        for f in request.files.getlist('files'):
-            kew_list.extend(_extract_kew_bytes(f))
-    elif 'zip' in request.files:
-        kew_list.extend(_extract_kew_bytes(request.files['zip']))
-
-    if not kew_list:
-        return jsonify({'error': 'Cần upload ít nhất 1 file .KEW hoặc .ZIP.'}), 400
-
-
-    # ── Load template ─────────────────────────────────────────────────────────
-    template_path = os.path.normpath(_MBA_TEMPLATE_PATH)
-    if not os.path.isfile(template_path):
-        return jsonify({'error': f'Không tìm thấy template MBA.xlsm tại {template_path}'}), 500
-
-    try:
-        wb = load_workbook(template_path, keep_vba=True)
-    except Exception as e:
-        return jsonify({'error': f'Không mở được template: {e}'}), 500
-
-    # ── Danh sách sheet có sẵn trong template (MBA1 … MBA10) ─────────────────
-    # Template đã có sẵn _MBA_PREBUILT_COUNT sheet; chỉ cần trỏ vào và đổi tên.
-    # Nếu số lượng MBA vượt quá số sheet có sẵn → copy_worksheet từ sheet cuối.
-    prebuilt_sheets = wb.sheetnames[:_MBA_PREBUILT_COUNT]
-
-    errors_list = []
-    try:
-        for idx, (kew_name, kew_bytes) in enumerate(kew_list):
-            # ── Parse KEW ────────────────────────────────────────────────────────
-            try:
-                df_raw = pd.read_csv(
-                    io.BytesIO(kew_bytes),
-                    skiprows=_MBA_SKIP_ROWS,
-                    low_memory=False,
-                )
-                df_raw.columns = df_raw.columns.str.strip()
-            except Exception as e:
-                errors_list.append(f'{kew_name}: không đọc được ({e})')
-                continue
-
-            df, warnings = _mba_extract(df_raw)
-            if warnings:
-                errors_list.extend([f"{kew_name}: {w}" for w in warnings])
-
-            # ── Lấy sheet đích ───────────────────────────────────────────────────
-            try:
-                if idx < len(prebuilt_sheets):
-                    # Tái sử dụng sheet có sẵn, KHÔNG đổi tên
-                    ws = wb[prebuilt_sheets[idx]]
-                else:
-                    # Vượt quá số sheet template → copy từ sheet cuối cùng có sẵn
-                    ws_ref = wb[wb.sheetnames[len(prebuilt_sheets) - 1]]
-                    ws = wb.copy_worksheet(ws_ref)
-                    ws.title = f'MBA{idx + 1}'
-            except Exception as e:
-                errors_list.append(f'{kew_name}: không thể lấy sheet ({e})')
-                continue
-
-            try:
-                _mba_write(ws, df)
-            except Exception as e:
-                errors_list.append(f'{kew_name}: lỗi ghi dữ liệu ({e})')
-                continue
-
-        if errors_list and len(errors_list) == len(kew_list):
-            # Tất cả đều lỗi
-            return jsonify({'error': 'Tất cả file thất bại: ' + '; '.join(errors_list)}), 400
-
-        output = io.BytesIO()
-        wb.save(output)
-        output.seek(0)
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': f'Lỗi hệ thống khi xử lý: {str(e)}'}), 500
-
-    # Giữ đuôi .xlsm để bảo toàn macro
-    if not out_filename.lower().endswith('.xlsm'):
-        out_filename = os.path.splitext(out_filename)[0] + '.xlsm'
-
-    resp = send_file(
-        output,
-        as_attachment=True,
-        download_name=out_filename,
-        mimetype='application/vnd.ms-excel.sheet.macroEnabled.12',
-    )
-    if errors_list:
-        resp.headers['X-MBA-Warnings'] = urllib.parse.quote('; '.join(errors_list))
-    return resp
 
 
 @kew_bp.route("/organize-field-zip", methods=["POST"])

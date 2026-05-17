@@ -1,3 +1,8 @@
+"""
+Module: gen_excel_mba.py
+Description: Chứa các hàm hỗ trợ sinh báo cáo Excel cho Máy biến áp (MBA).
+Hỗ trợ đọc dữ liệu từ file INPSxxxx.KEW và điền vào template Excel MBA.
+"""
 import os
 import io
 import unicodedata
@@ -91,6 +96,16 @@ _MBA_FMT = {
 }
 
 def _mba_to_number(v):
+    """Chuyển đổi một giá trị từ file KEW sang số thực (float).
+    
+    Xử lý các đơn vị k (kilo), m (mega) và loại bỏ các ký hiệu đơn vị khác.
+    
+    Args:
+        v: Giá trị cần chuyển đổi.
+        
+    Returns:
+        float or pd.NA: Giá trị số sau khi chuyển đổi hoặc pd.NA nếu không hợp lệ.
+    """
     import pandas as pd
     if v is None or (isinstance(v, float) and pd.isna(v)):
         return pd.NA
@@ -110,6 +125,16 @@ def _mba_to_number(v):
     return pd.to_numeric(s, errors="coerce")
 
 def _mba_extract(df: "pd.DataFrame") -> "tuple[pd.DataFrame, list[str]]":
+    """Trích xuất và chuẩn hóa dữ liệu từ DataFrame gốc của file KEW.
+    
+    Áp dụng mapping cột, chuyển đổi đơn vị và làm tròn số.
+    
+    Args:
+        df (pd.DataFrame): DataFrame dữ liệu gốc.
+        
+    Returns:
+        tuple: (DataFrame đã chuẩn hóa, danh sách các cảnh báo warnings).
+    """
     import pandas as pd
     orig_cols = list(_MBA_COLUMN_MAPPING.keys())
     available_cols = [c for c in orig_cols if c in df.columns]
@@ -152,6 +177,16 @@ def _mba_extract(df: "pd.DataFrame") -> "tuple[pd.DataFrame, list[str]]":
     return out, warnings
 
 def _evaluate_for_excel(df: "pd.DataFrame") -> dict[int, str]:
+    """Đánh giá các chỉ số kỹ thuật (điện áp, PF, THD, unbalance) để ghi nhận xét vào file Excel.
+    
+    Sử dụng các hàm đánh giá dùng chung với module report.
+    
+    Args:
+        df (pd.DataFrame): DataFrame dữ liệu đã chuẩn hóa.
+        
+    Returns:
+        dict: Một dictionary mapping dòng (row index) với chuỗi nhận xét (ví dụ {8: "Đạt"}).
+    """
     from modules.report.gen_word import (
         _eval_voltage, _eval_pf, _eval_thd, _eval_unbalance,
         _V_DEV_LIMIT_PCT, _THDV_LIMIT_PCT, _TDD_LIMIT_PCT, _MBA_NOMINAL_VOLTAGE_V
@@ -197,6 +232,14 @@ def _evaluate_for_excel(df: "pd.DataFrame") -> dict[int, str]:
     return res
 
 def _mba_write(ws, df: "pd.DataFrame") -> None:
+    """Ghi dữ liệu từ DataFrame vào worksheet Excel và áp dụng định dạng.
+    
+    Cũng ghi các nhận xét đánh giá vào cột AE (cột 31).
+    
+    Args:
+        ws: Worksheet của openpyxl.
+        df (pd.DataFrame): DataFrame dữ liệu đã chuẩn hóa.
+    """
     import pandas as pd
     sr, sc = _MBA_START_ROW, _MBA_START_COL
     
