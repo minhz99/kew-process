@@ -720,8 +720,8 @@ def run_ocr_and_update_excel(
 
         # Lấy danh sách ảnh thực tế sau khi loại bỏ omit
         valid_indices = [
-            i for i in range(plan.img_start, plan.img_end + 1)
-            if i not in plan.img_omit
+            i if i not in plan.img_omit else None
+            for i in range(plan.img_start, plan.img_end + 1)
         ]
 
         # Chạy OCR cho thiết bị này

@@ -23,7 +23,7 @@ from typing import Optional
 import numpy as np
 from PIL import Image
 
-from modules.image.kew6315_layout import SCREENS, SCREEN_BY_ID
+from modules.image.kew6315_layout import SCREENS
 
 # ── Đường dẫn mặc định đến thư mục ảnh mẫu chữ số ───────────────────────────
 _DEFAULT_DIGITS_DIR = os.path.normpath(
@@ -300,10 +300,10 @@ def read_screen_values(
     Returns:
         Dict mapping overlay_id → float (hoặc None nếu không đọc được).
     """
-    if screen_id not in SCREEN_BY_ID:
+    if screen_id not in SCREENS:
         return {}
 
-    screen = SCREEN_BY_ID[screen_id]
+    screen = SCREENS[screen_id]
     overlays = screen.get("overlays", [])
 
     try:
@@ -348,7 +348,7 @@ def _aggregate(values: list[Optional[float]], mode: str) -> Optional[float]:
 
 
 def read_device_ocr(
-    bmp_indices: list[int],
+    bmp_indices: list[int | None],
     bmp_map: dict[int, str],
     digits_dir: str = _DEFAULT_DIGITS_DIR,
 ) -> tuple[dict[str, Optional[float]], list[str]]:
@@ -386,6 +386,10 @@ def read_device_ocr(
             continue
         
         bmp_idx = bmp_indices[pos]
+        if bmp_idx is None:
+            screen_cache[screen_id] = {}
+            continue
+        
         bmp_path = bmp_map.get(bmp_idx)
         if bmp_path is None:
             warnings.append(

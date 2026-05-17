@@ -9,7 +9,7 @@ API chính:
   và như luồng Excel MBA) rồi gọi ``mba_kwargs_from_inps``; thiếu INPSxxxx.KEW thì bảng dùng ``"—"``.
   **Nhận xét văn bản** (``remarks_mba`` / ``remarks_device``): tự sinh theo dữ liệu từ file INPSxxxx.KEW; có thể ghép thêm ghi chú
   cột Excel (P, PF, …); nếu ô Excel chứa đoạn bắt đầu bằng ``Nhận xét:`` thì dùng nguyên văn thủ công.
-* ``build_field_word_report`` — quét một thư mục ``Project_Output/`` rồi xuất
+* ``build_field_word_report`` — quét một thư mục dự án (đã tổ chức) rồi xuất
   1 file Word duy nhất gồm nhiều MBA / device.
 * ``build_word_report_from_zip`` — entry-point cho API: nhận ZIP đã tổ chức
   (output của "Xử lý file sơ bộ"), tự dò metadata trong Excel kèm (nếu có),
@@ -1466,7 +1466,7 @@ def build_field_word_report(
     5. Render từng section bằng template tương ứng và ghép thành file cuối cùng.
 
     Args:
-        project_root: Thư mục chứa các thư mục con của từng thiết bị (VD: Project_Output).
+        project_root: Thư mục chứa các thư mục con của từng thiết bị (VD: KEW_[Tên file upload]).
         output_path: Đường dẫn lưu file .docx kết quả.
         mba_template: Template cho MBA.
         device_template: Template cho thiết bị thường.
@@ -1481,7 +1481,7 @@ def build_field_word_report(
     """
     root = Path(project_root)
     if not root.is_dir():
-        raise FileNotFoundError(f"Không tìm thấy thư mục Project_Output: {root}")
+        raise FileNotFoundError(f"Không tìm thấy thư mục dự án: {root}")
 
     if devices is None:
         devices = [
@@ -1666,7 +1666,7 @@ def _metadata_keys_for_excel_name(name: str) -> list[str]:
     return keys
 
 def _lookup_device_metadata(metadata: dict[str, dict], folder_name: str) -> dict:
-    """Ghép dòng Excel với thư mục ``Project_Output/<tên>/`` (NFC/NFD, hậu tố ``_2``…)."""
+    """Ghép dòng Excel với thư mục thiết bị (NFC/NFD, hậu tố ``_2``…)."""
     if not metadata:
         return {}
     hit = _metadata_first_hit(metadata, folder_name)

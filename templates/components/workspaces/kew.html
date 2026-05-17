@@ -33,7 +33,7 @@
               <code>stt</code> và các cột còn lại phục vụ bước tạo Word (thứ tự thiết bị, loại MBA/device, …).
               Hệ thống đổi tên thư mục theo tên thiết bị, chuyển ảnh vào đúng thư mục, kiểm tra thiếu file / trùng dải
               ảnh, rồi trả về
-              <strong>KEW_HoSoDaXuLy.zip</strong> (cấu trúc <code>Project_Output/</code>…).
+                <strong>[Tên file upload]_processed.zip</strong> (cấu trúc <code>KEW_[Tên file upload]</code>…).
             </p>
           </div>
         </div>
@@ -69,7 +69,7 @@
           <div>
             <h3 style="margin:0;color:#8b5cf6">📝 Tạo báo cáo Word</h3>
             <p style="font-size:0.76rem;color:var(--text-muted);margin:6px 0 0;max-width:52rem">
-              Upload file <strong>KEW_HoSoDaXuLy.zip</strong> (output của bước "Xử lý file sơ bộ"), hoặc ZIP chứa các
+              Upload file <strong>[Tên file upload]_processed.zip</strong> (output của bước "Xử lý file sơ bộ"), hoặc ZIP chứa các
               thư mục thiết bị có
               <code>INPSxxxx.KEW</code> + ảnh <code>PS-SDxxx.BMP</code>. Hệ thống tổng hợp số liệu từ INPS, dựng báo cáo
               Word
@@ -89,7 +89,7 @@
         <div id="kew-word-drop" onclick="document.getElementById('kew-word-zip-input').click()"
           style="border:2px dashed rgba(139,92,246,0.45);border-radius:12px;padding:1.75rem 1rem;text-align:center;cursor:pointer;margin-bottom:1rem;background:var(--surface2)">
           <div style="font-size:2rem;margin-bottom:0.35rem">📄</div>
-          <div style="font-weight:500;color:var(--text)">Chọn hoặc kéo thả ZIP đã tổ chức (Project_Output/…)</div>
+          <div style="font-weight:500;color:var(--text)">Chọn hoặc kéo thả ZIP đã tổ chức (KEW_[Tên file upload]/…)</div>
           <div style="font-size:0.82rem;color:var(--text-muted);margin-top:6px">Mỗi thư mục con phải có INPSxxxx.KEW +
             ảnh BMP</div>
         </div>
@@ -251,11 +251,15 @@
           var url = URL.createObjectURL(res.blob);
           var a = document.createElement('a');
           a.href = url;
-          a.download = 'KEW_HoSoDaXuLy.zip';
+          var origName = _kewFieldFile ? _kewFieldFile.name : 'KEW';
+          if (origName.toLowerCase().endsWith('.zip')) {
+            origName = origName.slice(0, -4);
+          }
+          a.download = origName + '_processed.zip';
           document.body.appendChild(a);
           a.click();
           setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 400);
-          if (st) st.textContent = '✅ Đã tải KEW_HoSoDaXuLy.zip';
+          if (st) st.textContent = '✅ Đã tải ' + a.download;
         })
         .catch(function (err) {
           alert('Lỗi: ' + err.message);

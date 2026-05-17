@@ -75,7 +75,7 @@ def organize_field_zip():
     # Tham số OCR từ form
     run_ocr_raw = request.form.get("run_ocr", "true").strip().lower()
     run_ocr = run_ocr_raw not in ("0", "false", "no", "")
-    ocr_overwrite_raw = request.form.get("ocr_overwrite", "false").strip().lower()
+    ocr_overwrite_raw = request.form.get("ocr_overwrite", "true").strip().lower()
     ocr_overwrite = ocr_overwrite_raw in ("1", "true", "yes")
 
     work = tempfile.mkdtemp(prefix="kew_field_org_")
