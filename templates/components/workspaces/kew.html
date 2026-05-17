@@ -17,24 +17,65 @@
         <div
           style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem;flex-wrap:wrap;gap:12px">
           <div>
-            <h3 style="margin:0;color:var(--accent2, #10b981)">📦 Xử lý KEW (hồ sơ hiện trường)</h3>
-            <p style="font-size:0.76rem;color:var(--text-muted);margin:6px 0 0;max-width:52rem">
-              Upload một file <strong>.zip</strong> gồm: file Excel hiện trường <strong>.xlsx</strong> với đúng các cột
-              <code>stt</code>, <code>name</code>, <code>file</code>, <code>img</code>, <code>imgend</code>,
-              <code>imgomit</code>, <code>imglu</code>, <code>type</code>, <code>pdm</code>,
-              <code>p</code>, <code>pf</code>, <code>i1</code>, <code>i2</code>, <code>i3</code>, <code>di</code>,
-              <code>thd</code>, <code>tdd</code>
-              (tên cột không phân biệt hoa thường), các thư mục record <code>S0001</code>, <code>S0002</code>, … và ảnh
-              <code>PS-SDxxx.BMP</code>.
-              Bước này dùng <code>name</code> / <code>file</code> / <code>img</code> / <code>imgend</code> /
-              <code>imgomit</code> (tuỳ chọn: liệt kê chỉ số ảnh trong dải bị loại, vd <code>944,945</code>) /
-              <code>imglu</code> (tuỳ chọn: chỉ số ảnh PS-SDxxx riêng cho máy nén khí load/unload — được
-              đổi tên thành <code>load-unload-xxx.BMP</code> trong thư mục thiết bị);
-              <code>stt</code> và các cột còn lại phục vụ bước tạo Word (thứ tự thiết bị, loại MBA/device, …).
-              Hệ thống đổi tên thư mục theo tên thiết bị, chuyển ảnh vào đúng thư mục, kiểm tra thiếu file / trùng dải
-              ảnh, rồi trả về
-                <strong>[Tên file upload]_processed.zip</strong> (cấu trúc <code>KEW_[Tên file upload]</code>…).
+            <h3 style="margin:0;color:var(--accent2, #10b981)">📦 Xử lý KEW thô</h3>
+            <p style="font-size:0.76rem;color:var(--text-muted);margin:6px 0 8px;max-width:52rem;line-height:1.5">
+              Upload file <strong>.zip</strong> chứa file <strong>Excel hiện trường</strong> (.xlsx), các thư mục record
+              <code>Sxxxx</code> và ảnh gốc <code>PS-SDxxx.BMP</code>. Hệ thống sẽ tự động đồng bộ dải ảnh vào đúng
+              thiết bị, chạy OCR để trích xuất số liệu đo đạc.
             </p>
+            <div
+              style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:12px;max-width:52rem;font-size:0.73rem;line-height:1.55">
+              <div style="margin-bottom:6px;color:var(--text);font-weight:600;display:flex;align-items:center;gap:6px">
+                📋 Cấu trúc các cột Excel bắt buộc (không phân biệt hoa thường):
+              </div>
+              <div style="display:flex;flex-wrap:wrap;gap:6px">
+                <span
+                  style="background:rgba(16,185,129,0.1);color:#34d399;padding:2px 8px;border-radius:6px;border:1px solid rgba(16,185,129,0.2);font-family:monospace">stt</span>
+                <span
+                  style="background:rgba(16,185,129,0.1);color:#34d399;padding:2px 8px;border-radius:6px;border:1px solid rgba(16,185,129,0.2);font-family:monospace">name</span>
+                <span
+                  style="background:rgba(16,185,129,0.1);color:#34d399;padding:2px 8px;border-radius:6px;border:1px solid rgba(16,185,129,0.2);font-family:monospace">file</span>
+                <span
+                  style="background:rgba(16,185,129,0.1);color:#34d399;padding:2px 8px;border-radius:6px;border:1px solid rgba(16,185,129,0.2);font-family:monospace">img</span>
+                <span
+                  style="background:rgba(16,185,129,0.1);color:#34d399;padding:2px 8px;border-radius:6px;border:1px solid rgba(16,185,129,0.2);font-family:monospace">imgend</span>
+                <span
+                  style="background:rgba(16,185,129,0.1);color:#34d399;padding:2px 8px;border-radius:6px;border:1px solid rgba(16,185,129,0.2);font-family:monospace">type</span>
+                <span
+                  style="background:rgba(16,185,129,0.1);color:#34d399;padding:2px 8px;border-radius:6px;border:1px solid rgba(16,185,129,0.2);font-family:monospace">pdm</span>
+                <span
+                  style="background:rgba(16,185,129,0.1);color:#34d399;padding:2px 8px;border-radius:6px;border:1px solid rgba(16,185,129,0.2);font-family:monospace">current_char</span>
+              </div>
+              <div style="margin-top:8px;color:var(--text-muted);font-size:0.7rem">
+                * <strong>Tùy chọn khác:</strong> <code>imgomit</code> (danh sách ảnh bỏ qua), <code>imglu</code>
+                (ảnh load/unload cho máy nén khí).
+              </div>
+            </div>
+            <div class="zip-tree-container"
+              style="margin-top: 12px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 10px; padding: 12px 16px; font-family: Consolas, Monaco, 'Courier New', monospace; font-size: 0.78rem; line-height: 1.5; color: var(--text-muted); max-width: 52rem; box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.2);">
+              <div
+                style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px dashed rgba(16, 185, 129, 0.2); padding-bottom: 8px; margin-bottom: 8px;">
+                <span style="font-weight: 600; color: #10b981; display: flex; align-items: center; gap: 6px;">
+                  📂 Cấu trúc ZIP: File KEW gốc + Excel hiện trường
+                </span>
+              </div>
+              <div style="color: var(--text); overflow-x: auto; white-space: pre;">📁 KEW.zip
+                ├── <span style="color: var(--text); font-weight: 600;">📊 file-hien-truong.xlsx</span> <span
+                  style="color: var(--text-muted); font-size: 0.72rem;">(Excel chứa danh sách thiết bị và dải
+                  ảnh)</span>
+                ├── <span style="color: var(--text); font-weight: 600;">📁 S0001/</span> <span
+                  style="color: var(--text-muted); font-size: 0.72rem;"></span>
+                │ └── <span style="color: var(--text);">📄 INPS0001.KEW</span> <span
+                  style="color: var(--text-muted); font-size: 0.72rem;"></span>
+                ├── <span style="color: var(--text); font-weight: 600;">📁 S0002/</span>
+                │ └── <span style="color: var(--text);">📄 INPS0002.KEW</span>
+                ├── <span style="color: var(--text); font-weight: 600;">🖼️ PS-SD641.BMP</span> <span
+                  style="color: var(--text-muted); font-size: 0.72rem;"></span>
+                ├── <span style="color: var(--text); font-weight: 600;">🖼️ PS-SD642.BMP</span> <span
+                  style="color: var(--text-muted); font-size: 0.72rem;"></span>
+                └── <span style="color: var(--text-muted);">... </span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -69,18 +110,55 @@
           <div>
             <h3 style="margin:0;color:#8b5cf6">📝 Tạo báo cáo Word</h3>
             <p style="font-size:0.76rem;color:var(--text-muted);margin:6px 0 0;max-width:52rem">
-              Upload file <strong>[Tên file upload]_processed.zip</strong> (output của bước "Xử lý file sơ bộ"), hoặc ZIP chứa các
-              thư mục thiết bị có
-              <code>INPSxxxx.KEW</code> + ảnh <code>PS-SDxxx.BMP</code>. Hệ thống tổng hợp số liệu từ INPS, dựng báo cáo
-              Word
-              (<strong>BaoCao_KEW.docx</strong>).
-              Nếu ZIP có kèm Excel <strong>.xlsx</strong> đủ bộ cột hiện trường (cùng mẫu với bước «Xử lý file sơ bộ»),
-              hệ thống đọc
-              <code>stt</code> (thứ tự thiết bị trong báo cáo), <code>type</code>, <code>pdm</code> (điện áp định mức),
-              <code>p</code>, <code>pf</code>, <code>i1</code>–<code>i3</code>, <code>di</code>, <code>thd</code>,
-              <code>tdd</code>
-              làm metadata (loại section, điện áp định mức, chuỗi nhận xét ghép từ các chỉ số).
+              Upload ZIP chứa file Excel thông số và các thư mục thiết bị đã phân loại, có <code>INPSxxxx.KEW</code> +
+              ảnh <code>PS-SDxxx.BMP</code> tương ứng (Thường là file ZIP tải về từ bước <strong>Xử lý file sơ
+                bộ</strong>).
             </p>
+            <div
+              style="display:flex;align-items:center;gap:8px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.25);border-radius:8px;padding:10px 14px;margin:10px 0;max-width:52rem;font-size:0.75rem;line-height:1.45;color:var(--text)">
+              <span style="font-size:1.3rem;color:#f59e0b;align-self:flex-start;margin-top:2px">💡</span>
+              <div>
+                <strong style="color:#f59e0b">Quy trình bắt buộc để tạo Báo cáo Word / Excel MBA:</strong><br>
+                <span style="color:var(--text-muted)">[1] Chạy <strong>Xử lý file sơ bộ</strong> ở tab bên cạnh & tải
+                  file ZIP về → [2] Giải nén ZIP → <strong>Thêm thủ công <code>a.png</code> vào từng thư mục thiết
+                    bị</strong> → [3] Nén lại thành ZIP mới rồi tải lên tại đây.</span>
+              </div>
+            </div>
+            <div class="zip-tree-container"
+              style="margin-top: 12px; background: rgba(139, 92, 246, 0.08); border: 1px solid rgba(139, 92, 246, 0.25); border-radius: 10px; padding: 12px 16px; font-family: Consolas, Monaco, 'Courier New', monospace; font-size: 0.78rem; line-height: 1.5; color: var(--text-muted); max-width: 52rem; box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.2);">
+              <div
+                style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px dashed rgba(139, 92, 246, 0.2); padding-bottom: 8px; margin-bottom: 8px;">
+                <span style="font-weight: 600; color: #a78bfa; display: flex; align-items: center; gap: 6px;">
+                  📦 Cấu trúc ZIP đầu vào tiêu chuẩn (Đã bổ sung <code>a.png</code>):
+                </span>
+                <span
+                  style="font-size: 0.7rem; background: rgba(139, 92, 246, 0.15); color: #a78bfa; padding: 2px 8px; border-radius: 99px; border: 1px solid rgba(139, 92, 246, 0.25);">
+                  Đúng cấu trúc này mới tạo được Word/Excel MBA
+                </span>
+              </div>
+              <div style="color: var(--text); overflow-x: auto; white-space: pre;">📁 file_processed.zip
+                ├── <span style="color: var(--text); font-weight: 600;">📊 file-hien-truong.xlsx</span> <span
+                  style="color: var(--text); font-size: 0.72rem;">(Excel chứa thông số đã qua OCR)</span>
+                ├── <span style="color: var(--text); font-weight: 600;">📁 MBA T1/</span> <span
+                  style="color: var(--text); font-size: 0.72rem;">(Thư mục thiết bị 1 - trùng với cột
+                  <i>name</i>)</span>
+                │ ├── <span style="color: var(--text); ">📄 INPS0001.KEW</span> <span
+                  style="color: var(--text); font-size: 0.72rem;">(File đo đạc của thiết bị)</span>
+                │ ├── <span style="color: #fbbf24; font-weight: bold;">🖼️ a.png</span> <span
+                  style="color: #fbbf24; font-size: 0.72rem; font-weight: bold;">(THÊM THỦ CÔNG)</span>
+                │ ├── <span style="color: var(--text);">🖼️ PS-SD641.BMP</span> <span
+                  style="color: var(--text); font-size: 0.72rem;">(Ảnh biểu đồ đo đạc thứ 1)</span>
+                │ ├── <span style="color: var(--text);">🖼️ PS-SD642.BMP</span>
+                │ └── <span style="color: var(--text);">...</span>
+                └── <span style="color: var(--text); font-weight: 600;">📁 Máy nén khí 2/</span> <span
+                  style="color: var(--text); font-size: 0.72rem;">(Thư mục thiết bị 2)</span>
+                │ ├── <span style="color: var(--text); ">📄 INPS0002.KEW</span>
+                │ ├── <span style="color: #fbbf24; font-weight: bold;">🖼️ a.png</span> <span
+                  style="color: #fbbf24; font-size: 0.72rem; font-weight: bold;">(THÊM THỦ CÔNG)</span>
+                │ ├── <span style="color: var(--text); ">🖼️ PS-SD643.BMP</span>
+                │ └── <span style="color: var(--text);">...</span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -89,9 +167,10 @@
         <div id="kew-word-drop" onclick="document.getElementById('kew-word-zip-input').click()"
           style="border:2px dashed rgba(139,92,246,0.45);border-radius:12px;padding:1.75rem 1rem;text-align:center;cursor:pointer;margin-bottom:1rem;background:var(--surface2)">
           <div style="font-size:2rem;margin-bottom:0.35rem">📄</div>
-          <div style="font-weight:500;color:var(--text)">Chọn hoặc kéo thả ZIP đã tổ chức (KEW_[Tên file upload]/…)</div>
-          <div style="font-size:0.82rem;color:var(--text-muted);margin-top:6px">Mỗi thư mục con phải có INPSxxxx.KEW +
-            ảnh BMP</div>
+          <div style="font-weight:500;color:var(--text)">Chọn hoặc kéo thả file ZIP</div>
+          <div style="font-size:0.82rem;color:var(--text-muted);margin-top:6px">ZIP chứa file Excel thông số + các
+            thư mục thiết bị
+          </div>
         </div>
 
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:0.5rem">
@@ -116,7 +195,7 @@
             onclick="window.kewExcelMbaProcessZip && window.kewExcelMbaProcessZip()" disabled>
             <span id="kew-excelmba-spinner"
               style="display:none;width:12px;height:12px;border:2px solid rgba(0,0,0,0.15);border-radius:50%;border-top-color:#10b981;animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:6px"></span>
-            Excel MBA
+            Tạo Excel MBA
           </button>
           <button type="button" class="btn" id="btn-kew-table6-process"
             style="border-color:#1071e0;color:#1071e0;font-weight:600"
