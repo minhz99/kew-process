@@ -32,7 +32,7 @@ _DEFAULT_DIGITS_DIR = os.path.normpath(
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 # Chiều cao ROI (khớp với h_clear trong apply_text_to_image)
-_ROI_H = 15
+_ROI_H = 16
 # Ngưỡng tương đồng tối thiểu (0-1): giá trị thấp hơn = bỏ qua digit đó
 _MATCH_THRESHOLD = 0.70
 # Khoảng cách cộng thêm sau mỗi chữ số (theo logic trong apply_text_to_image)
