@@ -27,7 +27,7 @@ from modules.image.kew6315_layout import SCREENS
 
 # ── Đường dẫn mặc định đến thư mục ảnh mẫu chữ số ───────────────────────────
 _DEFAULT_DIGITS_DIR = os.path.normpath(
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "static", "digits")
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "static", "digits-ocr")
 )
 
 # ── Constants ─────────────────────────────────────────────────────────────────
@@ -192,8 +192,8 @@ def _scan_digits_rtl(
                 if ch == "-" and (not result_chars or current_x < (x_cursor - 3)):
                     continue
                 
-                # CẢI TIẾN: Không cho phép trùng dấu chấm thập phân
-                if ch == "." and "." in result_chars:
+                # CẢI TIẾN: Không cho phép trùng dấu chấm thập phân và không cho phép dấu chấm là ký tự cuối (đầu tiên từ phải sang)
+                if ch == "." and (not result_chars or "." in result_chars):
                     continue
                 
                 current_threshold = 0.92 if ch == "-" else _MATCH_THRESHOLD
