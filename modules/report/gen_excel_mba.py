@@ -200,17 +200,10 @@ def _evaluate_for_excel(df: "pd.DataFrame") -> dict[int, str]:
             eval_str, _, _, _ = _eval_voltage(u_vals.max(), u_vals.min(), u_vals.mean(), _MBA_NOMINAL_VOLTAGE_V)
             res[8] = eval_str
             
-    res[11] = "—"
-    
     if "AVG_Vunb[%]" in df.columns:
         vu_vals = df["AVG_Vunb[%]"].dropna()
         if not vu_vals.empty:
             res[14] = _eval_unbalance(vu_vals.max(), vu_vals.mean(), _V_DEV_LIMIT_PCT)
-            
-    if "AVG_Aunb[%]" in df.columns:
-        au_vals = df["AVG_Aunb[%]"].dropna()
-        if not au_vals.empty:
-            res[15] = _eval_unbalance(au_vals.max(), au_vals.mean(), 10.0)
             
     if "AVG_PF" in df.columns:
         pf_vals = df["AVG_PF"].dropna()
