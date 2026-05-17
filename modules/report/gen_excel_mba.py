@@ -333,21 +333,18 @@ def generate_mba_excel_from_devices(
         
         inps_found = False
         if folder:
-            from modules.kew.analyse_kew import find_file
+            from modules.kew.analyse_kew import find_file, parse_inps
             import pandas as pd
             try:
                 inps_path = find_file(str(folder), "INPS")
                 if inps_path and os.path.isfile(inps_path):
-                    # Đọc và ghi dữ liệu INPS
-                    df_raw = pd.read_csv(
-                        inps_path,
-                        skiprows=_MBA_SKIP_ROWS,
-                        low_memory=False,
-                    )
-                    df_raw.columns = df_raw.columns.str.strip()
-                    df, warnings = _mba_extract(df_raw)
-                    _mba_write(ws, df)
-                    inps_found = True
+                    # Đọc và ghi dữ liệu INPS bằng bộ parse chuẩn của hệ thống
+                    magic, df_raw = parse_inps(inps_path)
+                    if df_raw is not None and not df_raw.empty:
+                        df_raw.columns = df_raw.columns.str.strip()
+                        df, warnings = _mba_extract(df_raw)
+                        _mba_write(ws, df)
+                        inps_found = True
             except Exception as e:
                 print(f"Lỗi đọc file INPS cho {name}: {e}")
                 

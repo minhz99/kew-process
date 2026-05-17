@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import os
 import re
-from typing import Optional
+from typing import Any, Optional
 
 import numpy as np
 from PIL import Image
@@ -226,9 +226,9 @@ def _scan_digits_rtl(
     if re.match(r"^-?\d+(?:\.\d+)?$", text):
         return text
 
-    # Thử xóa các ký tự rác ở hai đầu nếu chuỗi gần đúng
-    cleaned = text.strip("-").strip(".")
-    if re.match(r"^\d+(?:\.\d+)?$", cleaned) and cleaned:
+    # Thử xóa các ký tự rác ở hai đầu nếu chuỗi gần đúng (giữ lại dấu trừ cho số âm)
+    cleaned = text.strip(".")
+    if re.match(r"^-?\d+(?:\.\d+)?$", cleaned) and cleaned:
         return cleaned
 
     return None
