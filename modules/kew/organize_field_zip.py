@@ -1,19 +1,11 @@
-"""
-Tổ chức hồ sơ đo KEW6315 từ ZIP: đọc Excel hiện trường (.xlsx), đổi tên thư mục Sxxxx,
-chuyển ảnh PS-SDxxx.BMP vào đúng thư mục thiết bị, chạy OCR tự động điền thông số,
-nén lại Project_Output.zip.
+"""Mô-đun hỗ trợ tổ chức hồ sơ đo KEW6315 từ file ZIP.
 
-File Excel hiện trường chỉ cần có **10 cột bắt buộc** (xem :data:`FIELD_XLSX_REQUIRED`).
-Các cột thông số đo lường (:data:`FIELD_XLSX_OCR`) sẽ được **OCR tự động điền** sau khi sắp xếp
-ảnh, hoặc nếu đã có sẵn trong Excel thì được giữ nguyên (không ghi đè).
-
-Các cột bắt buộc (``FIELD_XLSX_REQUIRED``):
-``stt``, ``name``, ``file``, ``img``, ``imgend``, ``imgomit``, ``imglu``,
-``type``, ``pdm``, ``current_char``.
-
-Các cột do OCR tự điền (``FIELD_XLSX_OCR``):
-``p``, ``cos_phi``, ``i_max``, ``u_min``, ``u_max``,
-``delta_u``, ``delta_i``, ``thd``, ``tdd``.
+Mô-đun này thực hiện các công việc:
+1. Đọc file Excel hiện trường (.xlsx) để lấy kế hoạch.
+2. Đổi tên các thư mục Sxxxx thành tên thiết bị tương ứng.
+3. Di chuyển các file ảnh PS-SDxxx.BMP vào đúng thư mục thiết bị.
+4. Chạy OCR tự động đọc các thông số đo từ ảnh và ghi vào Excel.
+5. Nén lại thư mục kết quả thành Project_Output.zip.
 """
 from __future__ import annotations
 
@@ -37,11 +29,15 @@ FIELD_XLSX_REQUIRED: tuple[str, ...] = (
     "file",          # Mã thư mục KEW (Sxxxx)
     "img",           # Chỉ số ảnh đầu dải (PS-SDxxx)
     "imgend",        # Chỉ số ảnh cuối dải
-    "imgomit",       # Chỉ số ảnh bỏ qua trong dải (tuỳ chọn)
-    "imglu",         # (Tuỳ chọn) Chỉ số ảnh load/unload → đổi tên load-unload-xxx.BMP
     "type",          # Loại section: MBA / device (thiết bị)
     "pdm",           # Công suất định mức (kVA) — dùng tính % tải MBA
     "current_char",  # Đặc tính dòng điện: Ổn định / Dao động nhẹ / ...
+)
+
+# ── Cột tự chọn (không bắt buộc có trong Excel) ──────────────────────────────
+FIELD_XLSX_OPTIONAL: tuple[str, ...] = (
+    "imgomit",       # Chỉ số ảnh bỏ qua trong dải (tuỳ chọn)
+    "imglu",         # Chỉ số ảnh load/unload → đổi tên load-unload-xxx.BMP
 )
 
 # ── Cột do OCR tự động điền sau khi nhận dạng ảnh BMP ────────────────────────
@@ -57,8 +53,8 @@ FIELD_XLSX_OCR: tuple[str, ...] = (
     "tdd",           # TDD dòng điện lớn nhất (%)
 )
 
-# ── Toàn bộ schema đầy đủ (required + OCR) — dùng cho Word report ────────────
-FIELD_XLSX_HEADERS: tuple[str, ...] = FIELD_XLSX_REQUIRED + FIELD_XLSX_OCR
+# ── Toàn bộ schema đầy đủ — dùng cho Word report ─────────────────────────────
+FIELD_XLSX_HEADERS: tuple[str, ...] = FIELD_XLSX_REQUIRED + FIELD_XLSX_OPTIONAL + FIELD_XLSX_OCR
 
 _BMP_RE = re.compile(r"^PS-SD(\d{1,4})\.BMP$", re.IGNORECASE)
 _S_DIR_RE = re.compile(r"^S(\d{4})$", re.IGNORECASE)
@@ -71,8 +67,15 @@ _WIN_RESERVED = {
 
 
 def _norm_key(s: str) -> str:
-    """
-    Chuẩn hóa chuỗi để so khớp tên cột (NFKC, viết thường, xóa khoảng trắng thừa).
+    """Chuẩn hóa chuỗi để so khớp tên cột.
+
+    Chuyển đổi chuỗi sang dạng NFKC, viết thường và loại bỏ khoảng trắng thừa.
+
+    Args:
+        s (str): Chuỗi cần chuẩn hóa.
+
+    Returns:
+        str: Chuỗi đã được chuẩn hóa.
     """
     if s is None or (isinstance(s, float) and pd.isna(s)):
         return ""
@@ -82,22 +85,30 @@ def _norm_key(s: str) -> str:
 
 
 def _is_skipped_path(path: str) -> bool:
-    """
-    Kiểm tra xem đường dẫn có nên bị bỏ qua (thư mục hệ thống macOS, file ẩn).
+    """Kiểm tra xem đường dẫn có nên bị bỏ qua hay không.
+
+    Bỏ qua các thư mục hệ thống như __MACOSX và các file ẩn bắt đầu bằng ._.
+
+    Args:
+        path (str): Đường dẫn cần kiểm tra.
+
+    Returns:
+        bool: True nếu nên bỏ qua, ngược lại False.
     """
     parts = path.split(os.sep)
     return any(p in _SKIP_DIR_NAMES or p.startswith("._") for p in parts)
 
 
 def find_first_excel(root: str) -> Optional[str]:
-    """
-    Tìm file Excel đầu tiên trong thư mục gốc.
-    
+    """Tìm file Excel đầu tiên trong thư mục gốc.
+
+    Quét đệ quy thư mục gốc để tìm file có đuôi .xlsx hoặc .xlsm.
+
     Args:
         root (str): Thư mục để tìm kiếm.
-        
+
     Returns:
-        Optional[str]: Đường dẫn đến file Excel tìm được hoặc None.
+        Optional[str]: Đường dẫn đến file Excel tìm được hoặc None nếu không thấy.
     """
     candidates: list[str] = []
     for dirpath, _, filenames in os.walk(root):
@@ -114,11 +125,17 @@ def find_first_excel(root: str) -> Optional[str]:
 
 
 def scan_s_folders(root: str) -> tuple[dict[str, str], list[str]]:
-    """
-    Quét tất cả các thư mục có định dạng Sxxxx (ví dụ S0001).
-    
+    """Quét tất cả các thư mục có định dạng Sxxxx.
+
+    Tìm kiếm các thư mục có tên khớp với định dạng Sxxxx (ví dụ: S0001) trong thư mục gốc.
+
+    Args:
+        root (str): Thư mục gốc cần quét.
+
     Returns:
-        tuple: (Map Sxxxx -> đường dẫn tuyệt đối, danh sách lỗi trùng lặp).
+        tuple[dict[str, str], list[str]]: Một tuple gồm:
+            - Dict mapping mã thư mục (Sxxxx) sang đường dẫn tuyệt đối.
+            - Danh sách các thông báo lỗi nếu phát hiện trùng lặp.
     """
     mapping: dict[str, str] = {}
     errors: list[str] = []
@@ -139,7 +156,18 @@ def scan_s_folders(root: str) -> tuple[dict[str, str], list[str]]:
 
 
 def scan_bmp_files(root: str) -> tuple[dict[int, str], list[str]]:
-    """Số thứ tự ảnh (1-based như trong tên 001) -> một đường dẫn file."""
+    """Quét tất cả các file ảnh BMP có định dạng PS-SDxxxx.BMP.
+
+    Trích xuất số thứ tự ảnh từ tên file và lưu vào map.
+
+    Args:
+        root (str): Thư mục gốc cần quét.
+
+    Returns:
+        tuple[dict[int, str], list[str]]: Một tuple gồm:
+            - Dict mapping số thứ tự ảnh (int) sang đường dẫn tuyệt đối.
+            - Danh sách các thông báo lỗi nếu phát hiện trùng lặp số ảnh.
+    """
     by_num: dict[int, str] = {}
     dup: list[str] = []
     for dirpath, _, filenames in os.walk(root):
@@ -159,14 +187,15 @@ def scan_bmp_files(root: str) -> tuple[dict[int, str], list[str]]:
 
 
 def file_code_to_s_name(raw: Any) -> Optional[str]:
-    """
-    Chuyển đổi một giá trị (số hoặc chuỗi) sang định dạng thư mục Sxxxx.
-    
+    """Chuẩn hóa mã file từ Excel thành chuỗi chuẩn 'Sxxxx'.
+
+    Ví dụ: '447' hoặc 'S0447' hoặc 447 đều chuyển thành 'S0447'.
+
     Args:
-        raw: Giá trị thô từ Excel.
-        
+        raw (Any): Giá trị thô từ ô Excel.
+
     Returns:
-        Optional[str]: Chuỗi định dạng Sxxxx hoặc None.
+        Optional[str]: Chuỗi 'Sxxxx' hoặc None nếu không hợp lệ.
     """
     if raw is None or (isinstance(raw, float) and pd.isna(raw)):
         return None
@@ -183,8 +212,15 @@ def file_code_to_s_name(raw: Any) -> Optional[str]:
 
 
 def _to_int_img(v: Any) -> Optional[int]:
-    """
-    Chuyển đổi chỉ số ảnh sang kiểu integer.
+    """Chuyển đổi chỉ số ảnh sang kiểu số nguyên.
+
+    Hỗ trợ chuyển đổi từ chuỗi, số thực có giá trị nguyên.
+
+    Args:
+        v (Any): Giá trị cần chuyển đổi.
+
+    Returns:
+        Optional[int]: Giá trị số nguyên hoặc None nếu không hợp lệ.
     """
     if v is None or (isinstance(v, float) and pd.isna(v)):
         return None
@@ -203,9 +239,17 @@ def _to_int_img(v: Any) -> Optional[int]:
 
 
 def _parse_img_omit(raw: Any) -> tuple[frozenset[int], list[str]]:
-    """Đọc cột ``imgomit``: danh sách chỉ số ``PS-SDxxx`` cần bỏ qua trong dải ``img``–``imgend``.
+    """Phân tích danh sách chỉ số ảnh cần bỏ qua từ cột imgomit.
 
-    Hỗ trợ: ``944``, ``944,945``, ``944+945``, ``PS-SD944``, ``PS-SD944.BMP``, số nguyên trong ô Excel.
+    Hỗ trợ các định dạng: "944", "944,945", "944+945", "PS-SD944", "PS-SD944.BMP".
+
+    Args:
+        raw (Any): Giá trị thô từ ô Excel.
+
+    Returns:
+        tuple[frozenset[int], list[str]]: Một tuple gồm:
+            - Set chứa các chỉ số ảnh cần bỏ qua (frozenset).
+            - Danh sách các cảnh báo nếu có phần tử không hợp lệ.
     """
     warnings: list[str] = []
     if raw is None or (isinstance(raw, float) and pd.isna(raw)):
@@ -238,13 +282,32 @@ def _parse_img_omit(raw: Any) -> tuple[frozenset[int], list[str]]:
 
 
 def bmp_basename_for_index(n: int) -> str:
-    """Trả về tên file BMP cho chỉ số n (ví dụ PS-SD001.BMP)."""
+    """Tạo tên file BMP từ chỉ số ảnh.
+
+    Ví dụ: 1 -> "PS-SD001.BMP".
+
+    Args:
+        n (int): Chỉ số ảnh.
+
+    Returns:
+        str: Tên file BMP tương ứng.
+    """
     return f"PS-SD{n:03d}.BMP"
 
 
 def sanitize_device_folder(name: Any) -> str:
-    """
-    Làm sạch tên thiết bị để dùng làm tên thư mục (xóa ký tự cấm, chuẩn hóa NFC).
+    """Làm sạch tên thiết bị để dùng làm tên thư mục.
+
+    Xóa các ký tự cấm trong tên file của Windows/Linux, chuẩn hóa về dạng NFC.
+
+    Args:
+        name (Any): Tên thiết bị thô.
+
+    Returns:
+        str: Tên thư mục đã được làm sạch.
+
+    Raises:
+        ValueError: Nếu tên thiết bị trống hoặc không hợp lệ sau chuẩn hóa.
     """
     if name is None or (isinstance(name, float) and pd.isna(name)):
         raise ValueError("Tên thiết bị trống.")
@@ -264,7 +327,17 @@ def sanitize_device_folder(name: Any) -> str:
 
 
 def _unique_name(base: str, used: set[str]) -> str:
-    """Đảm bảo tên thư mục là duy nhất bằng cách thêm hậu tố _2, _3..."""
+    """Đảm bảo tên thư mục là duy nhất trong tập hợp đã dùng.
+
+    Nếu tên đã tồn tại, tự động thêm hậu tố _2, _3...
+
+    Args:
+        base (str): Tên thư mục cơ sở.
+        used (set[str]): Tập hợp các tên đã sử dụng.
+
+    Returns:
+        str: Tên thư mục duy nhất.
+    """
     if base not in used:
         used.add(base)
         return base
@@ -278,18 +351,18 @@ def _unique_name(base: str, used: set[str]) -> str:
 
 
 def resolve_field_excel_column_map(df: pd.DataFrame) -> dict[str, Any]:
-    """Map tên cột logic (chữ thường) → tên cột gốc trong DataFrame.
+    """Map tên cột logic sang tên cột gốc trong DataFrame.
 
-    Chỉ bắt buộc các cột trong :data:`FIELD_XLSX_REQUIRED`; các cột OCR
-    trong :data:`FIELD_XLSX_OCR` có thể vắng mặt (sẽ được tạo mới sau OCR).
-    Cột trùng tên sau chuẩn hóa → ``ValueError``.
+    Kiểm tra các cột bắt buộc. Các cột tùy chọn hoặc OCR nếu thiếu sẽ được map với None.
 
     Args:
-        df: DataFrame đọc từ file Excel hiện trường.
+        df (pd.DataFrame): DataFrame đọc từ file Excel.
 
     Returns:
-        Dict mapping tên cột logic → tên cột gốc. Các cột OCR vắng mặt
-        được map → ``None`` (không có trong DataFrame).
+        dict[str, Any]: Dict mapping tên cột logic sang tên cột gốc trong file Excel.
+
+    Raises:
+        ValueError: Nếu thiếu cột bắt buộc hoặc có 2 cột trùng tên sau chuẩn hóa.
     """
     seen: dict[str, Any] = {}
     for c in df.columns:
@@ -338,11 +411,20 @@ class RowPlan:
 
 
 def read_plans_from_excel(excel_path: str) -> tuple[list[RowPlan], list[str]]:
-    """
-    Đọc kế hoạch tổ chức hồ sơ từ file Excel hiện trường.
-    
+    """Đọc kế hoạch tổ chức hồ sơ từ file Excel hiện trường.
+
+    Phân tích các dòng trong file Excel để tạo danh sách kế hoạch xử lý.
+
+    Args:
+        excel_path (str): Đường dẫn đến file Excel.
+
     Returns:
-        tuple: (Danh sách các RowPlan, danh sách cảnh báo warnings).
+        tuple[list[RowPlan], list[str]]: Một tuple gồm:
+            - Danh sách các đối tượng RowPlan chứa thông tin kế hoạch.
+            - Danh sách các cảnh báo phát sinh trong quá trình đọc.
+
+    Raises:
+        ValueError: Nếu file Excel rỗng hoặc không có dòng hợp lệ nào.
     """
     warnings: list[str] = []
     try:
@@ -373,7 +455,8 @@ def read_plans_from_excel(excel_path: str) -> tuple[list[RowPlan], list[str]]:
         if s_name in used_s:
             raise ValueError(f"Dòng {int(idx) + 2}: mã thư mục {s_name} bị lặp trong Excel.")
         used_s.add(s_name)
-        omit_all, w_omit = _parse_img_omit(row[colmap["imgomit"]])
+        omit_col = colmap.get("imgomit")
+        omit_all, w_omit = _parse_img_omit(row[omit_col]) if omit_col else (frozenset(), [])
         warnings.extend(w_omit)
         omit_eff = frozenset(n for n in omit_all if i0 <= n <= i1)
         outs = sorted(n for n in omit_all if n < i0 or n > i1)
@@ -383,7 +466,8 @@ def read_plans_from_excel(excel_path: str) -> tuple[list[RowPlan], list[str]]:
                 f"{', '.join(str(x) for x in outs)} (bỏ qua các mục ngoài dải)."
             )
         # Cột imglu: tuỳ chọn — ảnh load/unload dạng sóng (ảnh thứ 7)
-        img_lu = _to_int_img(row[colmap["imglu"]])
+        lu_col = colmap.get("imglu")
+        img_lu = _to_int_img(row[lu_col]) if lu_col else None
         try:
             folder = sanitize_device_folder(dev_raw)
         except ValueError as e:
@@ -406,6 +490,17 @@ def read_plans_from_excel(excel_path: str) -> tuple[list[RowPlan], list[str]]:
     return plans, warnings
 
 def _ranges_overlap(a0: int, a1: int, b0: int, b1: int) -> bool:
+    """Kiểm tra xem hai dải ảnh có bị chồng lấn hay không.
+
+    Args:
+        a0 (int): Điểm bắt đầu dải A.
+        a1 (int): Điểm kết thúc dải A.
+        b0 (int): Điểm bắt đầu dải B.
+        b1 (int): Điểm kết thúc dải B.
+
+    Returns:
+        bool: True nếu có chồng lấn, ngược lại False.
+    """
     return not (a1 < b0 or b1 < a0)
 
 
@@ -414,9 +509,18 @@ def validate_plans_against_fs(
     s_map: dict[str, str],
     bmp_map: dict[int, str],
 ) -> list[str]:
-    """
-    Kiểm tra xem các thư mục và ảnh trong kế hoạch có thực sự tồn tại trong file hệ thống/ZIP không.
-    Kiểm tra trùng lặp dải ảnh giữa các thiết bị.
+    """Kiểm tra tính hợp lệ của kế hoạch so với file hệ thống.
+
+    Kiểm tra xem các thư mục Sxxxx và file ảnh BMP có tồn tại hay không,
+    và kiểm tra trùng lặp dải ảnh giữa các thiết bị.
+
+    Args:
+        plans (list[RowPlan]): Danh sách kế hoạch.
+        s_map (dict[str, str]): Map thư mục Sxxxx hiện có.
+        bmp_map (dict[int, str]): Map file ảnh BMP hiện có.
+
+    Returns:
+        list[str]: Danh sách các thông báo lỗi (nếu có).
     """
     errors: list[str] = []
     for p in plans:
@@ -450,14 +554,18 @@ def build_project_output(
     bmp_map: dict[int, str],
     warnings: Optional[list[str]] = None,
 ) -> str:
-    """
-    Tạo thư mục Project_Output trong output_parent, trả về đường dẫn Project_Output.
+    """Tạo thư mục Project_Output và copy file theo kế hoạch.
 
-    Với mỗi thiết bị:
-    - Copy thư mục Sxxxx → tên thiết bị.
-    - Copy ảnh PS-SDxxx.BMP trong dải [img, imgend] (trừ imgomit).
-    - Nếu có ``img_lu``: copy ảnh đó vào thư mục thiết bị với tên
-      ``load-unload-xxx.BMP`` (xxx = chỉ số gốc 3 chữ số).
+    Args:
+        extract_root (str): Thư mục giải nén ZIP gốc.
+        output_parent (str): Thư mục chứa thư mục Project_Output kết quả.
+        plans (list[RowPlan]): Danh sách kế hoạch.
+        s_map (dict[str, str]): Map thư mục Sxxxx.
+        bmp_map (dict[int, str]): Map file ảnh BMP.
+        warnings (Optional[list[str]]): Danh sách để lưu cảnh báo.
+
+    Returns:
+        str: Đường dẫn đến thư mục Project_Output đã tạo.
     """
     if warnings is None:
         warnings = []
@@ -522,7 +630,12 @@ def build_project_output(
 
 
 def zip_directory(folder: str, zip_path: str) -> None:
-    """Nén `folder` (ví dụ .../Project_Output) sao cho gốc ZIP là tên thư mục đó."""
+    """Nén một thư mục thành file ZIP.
+
+    Args:
+        folder (str): Thư mục cần nén.
+        zip_path (str): Đường dẫn file ZIP đầu ra.
+    """
     parent = os.path.dirname(folder)
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         for root, _, files in os.walk(folder):
@@ -538,20 +651,16 @@ def run_ocr_and_update_excel(
     bmp_map: dict[int, str],
     overwrite_existing: bool = False,
 ) -> list[str]:
-    """
-    Chạy OCR nhận dạng cho từng thiết bị và cập nhật trực tiếp vào file Excel.
-
-    Hệ thống sẽ kiểm tra xem cột đã có giá trị chưa, nếu chưa có sẽ thực hiện OCR.
-    Hỗ trợ MBA (Transformer) nếu người dùng cung cấp chỉ số ảnh.
+    """Chạy OCR nhận dạng thông số từ ảnh và cập nhật vào file Excel.
 
     Args:
-        excel_path: Đường dẫn tới file Excel cần cập nhật.
-        plans: Danh sách kế hoạch đọc từ Excel.
-        bmp_map: Mapping chỉ số ảnh -> đường dẫn file nguồn.
-        overwrite_existing: Nếu True, sẽ ghi đè cả các ô đã có dữ liệu.
+        excel_path (str): Đường dẫn đến file Excel cần cập nhật.
+        plans (list[RowPlan]): Danh sách kế hoạch.
+        bmp_map (dict[int, str]): Map file ảnh BMP.
+        overwrite_existing (bool): Có ghi đè các ô đã có dữ liệu hay không.
 
     Returns:
-        list: Danh sách các cảnh báo (warnings) nhận dạng được.
+        list[str]: Danh sách các cảnh báo nhận dạng được.
     """
     try:
         from openpyxl import load_workbook
@@ -649,9 +758,21 @@ def process_field_zip_bytes(
     run_ocr: bool = True,
     ocr_overwrite: bool = False,
 ) -> tuple[str, list[str], list[str]]:
-    """
-    Giải nén zip_bytes vào work_dir, xử lý, tạo file ZIP kết quả trong work_dir.
-    Trả về (đường_dẫn_zip_kết_quả, warnings, errors_fatal).
+    """Xử lý toàn bộ quy trình tổ chức hồ sơ từ dữ liệu ZIP.
+
+    Giải nén, đọc kế hoạch, sắp xếp thư mục, chạy OCR và nén lại kết quả.
+
+    Args:
+        zip_bytes (bytes): Dữ liệu nhị phân của file ZIP đầu vào.
+        work_dir (str): Thư mục làm việc tạm thời.
+        run_ocr (bool): Có chạy OCR hay không.
+        ocr_overwrite (bool): Có ghi đè dữ liệu OCR hay không.
+
+    Returns:
+        tuple[str, list[str], list[str]]: Một tuple gồm:
+            - Đường dẫn file ZIP kết quả.
+            - Danh sách các cảnh báo.
+            - Danh sách các lỗi nghiêm trọng (khiến quy trình dừng lại).
     """
     warnings: list[str] = []
     extract = os.path.join(work_dir, "in")

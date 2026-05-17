@@ -289,7 +289,7 @@ def export_mba():
         """Từ 1 FileStorage trả về list [(name, bytes)]."""
         raw = f.read()
         if f.filename.upper().endswith('.ZIP'):
-            with zipfile.ZipFile(io.BytesIO(raw), 'r') as zf:
+            with zipfile.ZipFile(io.BytesIO(raw), 'r', metadata_encoding="utf-8") as zf:
                 entries = [n for n in zf.namelist() if n.upper().endswith('.KEW')]
                 return [(os.path.basename(n), zf.read(n)) for n in entries]
         return [(os.path.basename(f.filename), raw)]
@@ -706,7 +706,7 @@ def generate_excel_mba():
         extract = os.path.join(work, "in")
         os.makedirs(extract, exist_ok=True)
         bio = io.BytesIO(zip_bytes)
-        with zipfile.ZipFile(bio, "r") as zf_in:
+        with zipfile.ZipFile(bio, "r", metadata_encoding="utf-8") as zf_in:
             zf_in.extractall(extract)
 
         project_root = _find_project_root(Path(extract))

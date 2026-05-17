@@ -1413,7 +1413,7 @@ _MBA_NAME_RE = re.compile(r"^(MBA|TR|TBA|T\d|MBT)\b|MÁY BIẾN ÁP|BIẾN ÁP",
 
 def _guess_kind(name: str) -> SectionKind:
     """Đoán loại template từ tên thiết bị (chỉ khi không có cột ``type`` từ Excel)."""
-    return "mba" if _MBA_NAME_RE.search(name or "") else "device"
+    return "mba" if _MBA_NAME_RE.search(unicodedata.normalize("NFC", name or "")) else "device"
 
 def _resolve_word_section_kind(
     spec: Mapping,
