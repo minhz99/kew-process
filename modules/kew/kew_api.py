@@ -72,11 +72,9 @@ def organize_field_zip():
     if not zip_bytes:
         return jsonify({"error": "File ZIP rỗng."}), 400
 
-    # Tham số OCR từ form
-    run_ocr_raw = request.form.get("run_ocr", "true").strip().lower()
-    run_ocr = run_ocr_raw not in ("0", "false", "no", "")
-    ocr_overwrite_raw = request.form.get("ocr_overwrite", "true").strip().lower()
-    ocr_overwrite = ocr_overwrite_raw in ("1", "true", "yes")
+    # Tham số OCR từ form (CẢI TIẾN: Luôn luôn OCR và ghi đè theo yêu cầu của USER)
+    run_ocr = True
+    ocr_overwrite = True
 
     work = tempfile.mkdtemp(prefix="kew_field_org_")
     try:

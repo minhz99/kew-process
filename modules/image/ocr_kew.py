@@ -192,6 +192,10 @@ def _scan_digits_rtl(
                 if ch == "-" and (not result_chars or current_x < (x_cursor - 3)):
                     continue
                 
+                # CẢI TIẾN: Không cho phép trùng dấu chấm thập phân
+                if ch == "." and "." in result_chars:
+                    continue
+                
                 current_threshold = 0.92 if ch == "-" else _MATCH_THRESHOLD
 
                 strip = roi[:, x_start:current_x]
@@ -207,8 +211,8 @@ def _scan_digits_rtl(
         if best_char is None:
             # Không tìm thấy ký tự nào đạt ngưỡng -> dịch cursor sang trái 1px và thử lại
             x_cursor -= 1
-            # Nếu đã lùi quá nhiều mà không thấy gì thì dừng
-            if len(result_chars) > 0 and x_cursor < (roi_w // 4):
+            # CẢI TIẾN: Thay vì roi_w // 4, cho phép lùi đến sát mép trái (4px) để tránh bỏ sót số đầu
+            if len(result_chars) > 0 and x_cursor < 4:
                 break
             continue
 

@@ -810,12 +810,15 @@ def process_field_zip_bytes(
         return "", warnings, fatal
 
     # ── Chạy OCR tự động điền Excel ──────────────────────────────────────────
-    if run_ocr:
+    # CẢI TIẾN: Luôn luôn OCR và ghi đè theo yêu cầu của USER
+    run_ocr_forced = True
+    ocr_overwrite_forced = True
+    if run_ocr_forced:
         ocr_warns = run_ocr_and_update_excel(
             excel_path=excel_path,
             plans=plans,
             bmp_map=bmp_map,
-            overwrite_existing=ocr_overwrite,
+            overwrite_existing=ocr_overwrite_forced,
         )
         warnings.extend(ocr_warns)
 
