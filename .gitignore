@@ -43,3 +43,4 @@ config_prime_dai_viet.json
 test_mba.py
 test_vba.py
 test.zip
+/test-bmp
