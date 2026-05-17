@@ -27,7 +27,7 @@ from modules.image.kew6315_layout import SCREENS, SCREEN_BY_ID
 
 # ── Đường dẫn mặc định đến thư mục ảnh mẫu chữ số ───────────────────────────
 _DEFAULT_DIGITS_DIR = os.path.normpath(
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "static", "digits")
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "static", "digits_ocr")
 )
 
 # ── Constants ─────────────────────────────────────────────────────────────────
