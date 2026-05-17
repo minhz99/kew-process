@@ -1850,15 +1850,24 @@ def _find_first_excel(root: Path) -> Path | None:
 def _find_project_root(extract_root: Path) -> Path:
     """Tìm thư mục chứa các thư mục thiết bị.
 
-    Ưu tiên một thư mục có tên ``Project_Output``; nếu không, dùng chính
-    ``extract_root``.
+    Tìm thư mục chứa ít nhất 1 file Excel và các thư mục con (thiết bị).
+    Nếu không thấy, mặc định dùng extract_root.
     """
-    direct = extract_root / "Project_Output"
-    if direct.is_dir():
-        return direct
-    for p in extract_root.rglob("Project_Output"):
-        if p.is_dir():
-            return p
+    # Kiểm tra ngay tại extract_root
+    excels = list(extract_root.glob("*.xlsx")) + list(extract_root.glob("*.xlsm"))
+    subdirs = [d for d in extract_root.iterdir() if d.is_dir() and not d.name.startswith(".") and d.name != "__MACOSX"]
+    
+    if excels and subdirs:
+        return extract_root
+        
+    # Nếu không có ở gốc, tìm sâu hơn
+    for p in extract_root.rglob("*"):
+        if p.is_dir() and not p.name.startswith(".") and p.name != "__MACOSX":
+            sub_excels = list(p.glob("*.xlsx")) + list(p.glob("*.xlsm"))
+            sub_dirs = [d for d in p.iterdir() if d.is_dir() and not d.name.startswith(".") and d.name != "__MACOSX"]
+            if sub_excels and sub_dirs:
+                return p
+                
     return extract_root
 
 def build_word_report_from_zip(

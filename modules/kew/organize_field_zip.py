@@ -553,23 +553,25 @@ def build_project_output(
     s_map: dict[str, str],
     bmp_map: dict[int, str],
     warnings: Optional[list[str]] = None,
+    output_folder_name: str = "Project_Output",
 ) -> str:
-    """Tạo thư mục Project_Output và copy file theo kế hoạch.
+    """Tạo thư mục đầu ra và copy file theo kế hoạch.
 
     Args:
         extract_root (str): Thư mục giải nén ZIP gốc.
-        output_parent (str): Thư mục chứa thư mục Project_Output kết quả.
+        output_parent (str): Thư mục chứa thư mục kết quả.
         plans (list[RowPlan]): Danh sách kế hoạch.
         s_map (dict[str, str]): Map thư mục Sxxxx.
         bmp_map (dict[int, str]): Map file ảnh BMP.
         warnings (Optional[list[str]]): Danh sách để lưu cảnh báo.
+        output_folder_name (str): Tên thư mục đầu ra.
 
     Returns:
-        str: Đường dẫn đến thư mục Project_Output đã tạo.
+        str: Đường dẫn đến thư mục đã tạo.
     """
     if warnings is None:
         warnings = []
-    out_root = os.path.join(output_parent, "Project_Output")
+    out_root = os.path.join(output_parent, output_folder_name)
     os.makedirs(out_root, exist_ok=True)
     for p in plans:
         src_dir = s_map[p.s_key]
@@ -757,6 +759,7 @@ def process_field_zip_bytes(
     work_dir: str,
     run_ocr: bool = True,
     ocr_overwrite: bool = False,
+    original_filename: str = "KEW",
 ) -> tuple[str, list[str], list[str]]:
     """Xử lý toàn bộ quy trình tổ chức hồ sơ từ dữ liệu ZIP.
 
@@ -767,6 +770,7 @@ def process_field_zip_bytes(
         work_dir (str): Thư mục làm việc tạm thời.
         run_ocr (bool): Có chạy OCR hay không.
         ocr_overwrite (bool): Có ghi đè dữ liệu OCR hay không.
+        original_filename (str): Tên file ZIP gốc (không có đuôi).
 
     Returns:
         tuple[str, list[str], list[str]]: Một tuple gồm:
@@ -778,8 +782,13 @@ def process_field_zip_bytes(
     extract = os.path.join(work_dir, "in")
     os.makedirs(extract, exist_ok=True)
     bio = io.BytesIO(zip_bytes)
-    with zipfile.ZipFile(bio, "r") as zf:
-        zf.extractall(extract)
+    try:
+        with zipfile.ZipFile(bio, "r", metadata_encoding="utf-8") as zf:
+            zf.extractall(extract)
+    except TypeError:
+        bio.seek(0)
+        with zipfile.ZipFile(bio, "r") as zf:
+            zf.extractall(extract)
 
     excel_path = find_first_excel(extract)
     if not excel_path:
@@ -812,14 +821,16 @@ def process_field_zip_bytes(
 
     staging = os.path.join(work_dir, "staging")
     os.makedirs(staging, exist_ok=True)
-    build_project_output(extract, staging, plans, s_map, bmp_map, warnings)
+    
+    out_folder_name = f"KEW_{original_filename}"
+    build_project_output(extract, staging, plans, s_map, bmp_map, warnings, output_folder_name=out_folder_name)
 
-    # Copy Excel (đã cập nhật nếu run_ocr=True) vào Project_Output để có trong ZIP kết quả
-    excel_dst = os.path.join(staging, "Project_Output", os.path.basename(excel_path))
+    # Copy Excel (đã cập nhật nếu run_ocr=True) vào thư mục kết quả
+    excel_dst = os.path.join(staging, out_folder_name, os.path.basename(excel_path))
     if not os.path.exists(excel_dst):
         shutil.copy2(excel_path, excel_dst)
 
-    out_zip = os.path.join(work_dir, "KEW_HoSoDaXuLy.zip")
-    proj = os.path.join(staging, "Project_Output")
+    out_zip = os.path.join(work_dir, f"{original_filename}_processed.zip")
+    proj = os.path.join(staging, out_folder_name)
     zip_directory(proj, out_zip)
     return out_zip, warnings, []

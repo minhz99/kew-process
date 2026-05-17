@@ -64,6 +64,10 @@ def organize_field_zip():
     if not str(zf.filename).lower().endswith(".zip"):
         return jsonify({"error": "Chỉ chấp nhận file .zip."}), 400
 
+    original_filename = str(zf.filename)
+    if original_filename.lower().endswith(".zip"):
+        original_filename = original_filename[:-4]
+
     zip_bytes = zf.read()
     if not zip_bytes:
         return jsonify({"error": "File ZIP rỗng."}), 400
@@ -77,7 +81,7 @@ def organize_field_zip():
     work = tempfile.mkdtemp(prefix="kew_field_org_")
     try:
         out_path, warnings, fatal = organize_mod.process_field_zip_bytes(
-            zip_bytes, work, run_ocr=run_ocr, ocr_overwrite=ocr_overwrite
+            zip_bytes, work, run_ocr=run_ocr, ocr_overwrite=ocr_overwrite, original_filename=original_filename
         )
         if fatal:
             return jsonify({"errors": fatal, "warnings": warnings}), 400
@@ -89,7 +93,7 @@ def organize_field_zip():
         resp = send_file(
             buf,
             as_attachment=True,
-            download_name="KEW_HoSoDaXuLy.zip",
+            download_name=f"{original_filename}_processed.zip",
             mimetype="application/zip",
         )
         if warnings:
