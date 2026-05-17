@@ -119,10 +119,10 @@
             Excel MBA
           </button>
           <button type="button" class="btn" id="btn-kew-table6-process"
-            style="border-color:#f59e0b;color:#f59e0b;font-weight:600"
+            style="border-color:#1071e0;color:#1071e0;font-weight:600"
             onclick="window.kewTable6ProcessZip && window.kewTable6ProcessZip()" disabled>
             <span id="kew-table6-spinner"
-              style="display:none;width:12px;height:12px;border:2px solid rgba(0,0,0,0.15);border-radius:50%;border-top-color:#f59e0b;animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:6px"></span>
+              style="display:none;width:12px;height:12px;border:2px solid rgba(0,0,0,0.15);border-radius:50%;border-top-color:#1071e0;animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:6px"></span>
             Tạo Bảng 6.3
           </button>
           <span id="kew-word-file-label" style="font-size:0.8rem;color:var(--text-muted)">Chưa chọn file</span>
@@ -470,7 +470,7 @@
       if (st) st.textContent = 'Đang tạo Excel MBA…';
 
       var baseName = (document.getElementById('kew-word-out-filename').value || '').trim() || 'Nhà Máy A';
-      var outName = 'Excel MBA ' + baseName + '.xlsm';
+      var outName = 'NX MBA ' + baseName + '.xlsm';
 
       var fd = new FormData();
       fd.append('zip', _kewWordFile, _kewWordFile.name);
