@@ -56,7 +56,11 @@ FIELD_XLSX_OCR: tuple[str, ...] = (
 # ── Toàn bộ schema đầy đủ — dùng cho Word report ─────────────────────────────
 FIELD_XLSX_HEADERS: tuple[str, ...] = FIELD_XLSX_REQUIRED + FIELD_XLSX_OPTIONAL + FIELD_XLSX_OCR
 
-_BMP_RE = re.compile(r"^PS-SD(\d{1,4})\.BMP$", re.IGNORECASE)
+_IMG_MIN = 0
+_IMG_MAX = 999
+_IMG_MOD = 1000
+
+_BMP_RE = re.compile(r"^PS-SD(\d{3})\.BMP$", re.IGNORECASE)
 _S_DIR_RE = re.compile(r"^S(\d{4})$", re.IGNORECASE)
 
 _WIN_RESERVED = {
@@ -156,7 +160,7 @@ def scan_s_folders(root: str) -> tuple[dict[str, str], list[str]]:
 
 
 def scan_bmp_files(root: str) -> tuple[dict[int, str], list[str]]:
-    """Quét tất cả các file ảnh BMP có định dạng PS-SDxxxx.BMP.
+    """Quét tất cả các file ảnh BMP có định dạng PS-SDxxx.BMP.
 
     Trích xuất số thứ tự ảnh từ tên file và lưu vào map.
 
@@ -184,6 +188,36 @@ def scan_bmp_files(root: str) -> tuple[dict[int, str], list[str]]:
             else:
                 by_num[n] = full
     return by_num, dup
+
+
+def _valid_img_index(n: int) -> bool:
+    return _IMG_MIN <= n <= _IMG_MAX
+
+
+def _format_img_index(n: int) -> str:
+    return f"{n:03d}"
+
+
+def _format_img_range(start: int, end: int) -> str:
+    return f"{_format_img_index(start)}–{_format_img_index(end)}"
+
+
+def _iter_img_range(start: int, end: int):
+    """Duyệt dải ảnh PS-SDxxx theo vòng 000-999."""
+    if not _valid_img_index(start) or not _valid_img_index(end):
+        raise ValueError(f"Dải ảnh ngoài giới hạn 000–999: {start}–{end}.")
+    cur = start
+    while True:
+        yield cur
+        if cur == end:
+            break
+        cur = (cur + 1) % _IMG_MOD
+
+
+def _img_in_range(n: int, start: int, end: int) -> bool:
+    if start <= end:
+        return start <= n <= end
+    return n >= start or n <= end
 
 
 def file_code_to_s_name(raw: Any) -> Optional[str]:
@@ -259,8 +293,13 @@ def _parse_img_omit(raw: Any) -> tuple[frozenset[int], list[str]]:
             if not raw.is_integer():
                 warnings.append("imgomit: ô chứa số thập phân — chỉ dùng chỉ số ảnh nguyên, bỏ qua giá trị này.")
                 return frozenset(), warnings
-            return frozenset({int(raw)}), warnings
-        return frozenset({raw}), warnings
+            n = int(raw)
+        else:
+            n = int(raw)
+        if not _valid_img_index(n):
+            warnings.append(f"imgomit: chỉ hỗ trợ chỉ số ảnh 000–999, bỏ qua {n}.")
+            return frozenset(), warnings
+        return frozenset({n}), warnings
     s = str(raw).strip()
     if not s:
         return frozenset(), warnings
@@ -269,13 +308,21 @@ def _parse_img_omit(raw: Any) -> tuple[frozenset[int], list[str]]:
         tok = tok.strip()
         if not tok:
             continue
-        tm = re.search(r"PS-SD(\d{1,4})(?:\.BMP)?", tok, re.IGNORECASE)
+        tm = re.search(r"PS-SD(\d+)(?:\.BMP)?", tok, re.IGNORECASE)
         if tm:
-            out.add(int(tm.group(1)))
+            n = int(tm.group(1))
+            if _valid_img_index(n):
+                out.add(n)
+            else:
+                warnings.append(f"imgomit: chỉ hỗ trợ chỉ số ảnh 000–999, bỏ qua {tok}.")
             continue
-        dm = re.fullmatch(r"(\d{1,4})", re.sub(r"\s+", "", tok))
+        dm = re.fullmatch(r"(\d+)", re.sub(r"\s+", "", tok))
         if dm:
-            out.add(int(dm.group(1)))
+            n = int(dm.group(1))
+            if _valid_img_index(n):
+                out.add(n)
+            else:
+                warnings.append(f"imgomit: chỉ hỗ trợ chỉ số ảnh 000–999, bỏ qua {tok}.")
             continue
         warnings.append(f"imgomit: không hiểu mục «{tok}» — bỏ qua token.")
     return frozenset(out), warnings
@@ -292,6 +339,8 @@ def bmp_basename_for_index(n: int) -> str:
     Returns:
         str: Tên file BMP tương ứng.
     """
+    if not _valid_img_index(n):
+        raise ValueError(f"Chỉ số ảnh ngoài giới hạn 000–999: {n}.")
     return f"PS-SD{n:03d}.BMP"
 
 
@@ -450,24 +499,35 @@ def read_plans_from_excel(excel_path: str) -> tuple[list[RowPlan], list[str]]:
         if s_name is None or i0 is None or i1 is None:
             warnings.append(f"Dòng {int(idx) + 2}: thiếu file/img/imgend — bỏ qua.")
             continue
-        if i1 < i0:
-            raise ValueError(f"Dòng {int(idx) + 2}: IMG end ({i1}) nhỏ hơn IMG ({i0}).")
+        if not _valid_img_index(i0):
+            raise ValueError(
+                f"Dòng {int(idx) + 2}: IMG ({i0}) ngoài giới hạn 000–999."
+            )
+        if not _valid_img_index(i1):
+            raise ValueError(
+                f"Dòng {int(idx) + 2}: IMG end ({i1}) ngoài giới hạn 000–999."
+            )
         if s_name in used_s:
             raise ValueError(f"Dòng {int(idx) + 2}: mã thư mục {s_name} bị lặp trong Excel.")
         used_s.add(s_name)
         omit_col = colmap.get("imgomit")
         omit_all, w_omit = _parse_img_omit(row[omit_col]) if omit_col else (frozenset(), [])
         warnings.extend(w_omit)
-        omit_eff = frozenset(n for n in omit_all if i0 <= n <= i1)
-        outs = sorted(n for n in omit_all if n < i0 or n > i1)
+        omit_eff = frozenset(n for n in omit_all if _img_in_range(n, i0, i1))
+        outs = sorted(n for n in omit_all if not _img_in_range(n, i0, i1))
         if outs:
             warnings.append(
-                f"Dòng {int(idx) + 2}: imgomit có chỉ số ngoài dải {i0}–{i1}: "
-                f"{', '.join(str(x) for x in outs)} (bỏ qua các mục ngoài dải)."
+                f"Dòng {int(idx) + 2}: imgomit có chỉ số ngoài dải {_format_img_range(i0, i1)}: "
+                f"{', '.join(_format_img_index(x) for x in outs)} (bỏ qua các mục ngoài dải)."
             )
         # Cột imglu: tuỳ chọn — ảnh load/unload dạng sóng (ảnh thứ 7)
         lu_col = colmap.get("imglu")
         img_lu = _to_int_img(row[lu_col]) if lu_col else None
+        if img_lu is not None and not _valid_img_index(img_lu):
+            warnings.append(
+                f"Dòng {int(idx) + 2}: imglu ({img_lu}) ngoài giới hạn 000–999 — bỏ qua."
+            )
+            img_lu = None
         try:
             folder = sanitize_device_folder(dev_raw)
         except ValueError as e:
@@ -501,7 +561,7 @@ def _ranges_overlap(a0: int, a1: int, b0: int, b1: int) -> bool:
     Returns:
         bool: True nếu có chồng lấn, ngược lại False.
     """
-    return not (a1 < b0 or b1 < a0)
+    return bool(set(_iter_img_range(a0, a1)).intersection(_iter_img_range(b0, b1)))
 
 
 def validate_plans_against_fs(
@@ -526,10 +586,11 @@ def validate_plans_against_fs(
     for p in plans:
         if p.s_key not in s_map:
             errors.append(f"Thiết bị «{p.device_raw}»: không có thư mục {p.s_key} trong ZIP.")
-        kept = [n for n in range(p.img_start, p.img_end + 1) if n not in p.img_omit]
+        kept = [n for n in _iter_img_range(p.img_start, p.img_end) if n not in p.img_omit]
         if not kept:
             errors.append(
-                f"Thiết bị «{p.device_raw}»: imgomit loại hết dải ảnh {p.img_start}–{p.img_end}."
+                f"Thiết bị «{p.device_raw}»: imgomit loại hết dải ảnh "
+                f"{_format_img_range(p.img_start, p.img_end)}."
             )
         for n in kept:
             if n not in bmp_map:
@@ -540,8 +601,9 @@ def validate_plans_against_fs(
         for pb in plans[i + 1 :]:
             if _ranges_overlap(pa.img_start, pa.img_end, pb.img_start, pb.img_end):
                 errors.append(
-                    f"Trùng dải ảnh: «{pa.device_raw}» ({pa.img_start}–{pa.img_end}) "
-                    f"và «{pb.device_raw}» ({pb.img_start}–{pb.img_end})."
+                    f"Trùng dải ảnh: «{pa.device_raw}» "
+                    f"({_format_img_range(pa.img_start, pa.img_end)}) "
+                    f"và «{pb.device_raw}» ({_format_img_range(pb.img_start, pb.img_end)})."
                 )
     return errors
 
@@ -580,7 +642,7 @@ def build_project_output(
             shutil.rmtree(dest_dir)
         shutil.copytree(src_dir, dest_dir)
 
-        for n in range(p.img_start, p.img_end + 1):
+        for n in _iter_img_range(p.img_start, p.img_end):
             if n in p.img_omit:
                 continue
             src_bmp = bmp_map[n]
@@ -706,22 +768,11 @@ def run_ocr_and_update_excel(
             col_indices[field] = max_col
             warnings_out.append(f"OCR: tạo mới cột «{field}» tại cột số {max_col}.")
 
-    # Tìm cột 'type' để lọc MBA (dựa trên header thực tế)
-    type_col_idx = existing_col_map.get("type")
-
     for plan in plans:
-        # Bỏ qua MBA nếu không có thông tin ảnh (trước đây bỏ qua cứng, nay cho phép nếu có img_start)
-        if type_col_idx:
-            row_type_val = ws.cell(row=plan.excel_row, column=type_col_idx).value
-            row_type = str(row_type_val).strip().lower() if row_type_val else ""
-            # Vẫn cho phép OCR MBA nếu user có điền chỉ số ảnh
-            if not plan.img_start:
-                continue
-
         # Lấy danh sách ảnh thực tế sau khi loại bỏ omit
         valid_indices = [
             i if i not in plan.img_omit else None
-            for i in range(plan.img_start, plan.img_end + 1)
+            for i in _iter_img_range(plan.img_start, plan.img_end)
         ]
 
         # Chạy OCR cho thiết bị này

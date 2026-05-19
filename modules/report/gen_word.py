@@ -4,7 +4,7 @@ API chính:
 * ``mba(doc, ...)``, ``device(doc, ...)`` — dựng context cho từng template.
 * ``merge_rendered_docx`` / ``merge_mba_device_docx`` — ghép nhiều file đã render.
 * ``mba_kwargs_from_inps`` / ``mba_kwargs_from_folder`` / ``device_kwargs_from_folder`` —
-  tự chọn ảnh từ thư mục thiết bị (**bắt buộc** ``a.png`` + PS-SDxxxx.BMP). Với MBA,
+  tự chọn ảnh từ thư mục thiết bị (**bắt buộc** ``a.png`` + PS-SDxxx.BMP). Với MBA,
   ``mba_kwargs_from_folder`` tự tìm ``INPSxxxx.KEW`` (cùng quy ước ``find_file`` như phân tích KEW
   và như luồng Excel MBA) rồi gọi ``mba_kwargs_from_inps``; thiếu INPSxxxx.KEW thì bảng dùng ``"—"``.
   **Nhận xét văn bản** (``remarks_mba`` / ``remarks_device``): tự sinh theo dữ liệu từ file INPSxxxx.KEW; có thể ghép thêm ghi chú
@@ -105,7 +105,8 @@ _MBA_NOMINAL_VOLTAGE_V = 400.0
 _I_SPREAD_STABLE_PCT = 15.0
 _I_SPREAD_MODERATE_PCT = 50.0
 # Ảnh theo dải Excel / organize_field_zip: PS-SD641.BMP …
-_BMP_RE = re.compile(r"^PS-SD(\d+)\.BMP$", re.IGNORECASE)
+_IMG_MOD = 1000
+_BMP_RE = re.compile(r"^PS-SD(\d{3})\.BMP$", re.IGNORECASE)
 
 # ════════════════════════════════════════════════════════════════════
 #                     Context builders (template)
@@ -983,14 +984,35 @@ def _resolve_remarks_field(
 #                       Image discovery helpers
 # ════════════════════════════════════════════════════════════════════
 
+def _sort_bmp_entries(entries: list[tuple[int, Path]]) -> list[tuple[int, Path]]:
+    """Sắp xếp ảnh theo dải vòng 000-999 nếu thư mục chứa đoạn qua mốc 999."""
+    if len(entries) <= 1:
+        return sorted(entries, key=lambda x: x[0])
+
+    sorted_entries = sorted(entries, key=lambda x: x[0])
+    if len({n for n, _ in sorted_entries}) >= _IMG_MOD:
+        return sorted_entries
+
+    max_gap = -1
+    start_idx = 0
+    count = len(sorted_entries)
+    for i, (cur, _) in enumerate(sorted_entries):
+        nxt = sorted_entries[(i + 1) % count][0]
+        gap = (nxt - cur) % _IMG_MOD
+        if gap > max_gap:
+            max_gap = gap
+            start_idx = (i + 1) % count
+    return sorted_entries[start_idx:] + sorted_entries[:start_idx]
+
+
 def list_bmp_in_folder(folder: str | Path) -> list[Path]:
-    """Tìm kiếm và sắp xếp các file ảnh PS-SDxxxx.BMP trong thư mục.
+    """Tìm kiếm và sắp xếp các file ảnh PS-SDxxx.BMP trong thư mục.
 
     Args:
         folder: Thư mục cần quét ảnh.
 
     Returns:
-        list[Path]: Danh sách các đường dẫn file BMP, sắp xếp theo số hiệu ảnh.
+        list[Path]: Danh sách file BMP theo thứ tự dải ảnh, có hỗ trợ vòng 999→000.
     """
     p = Path(folder)
     if not p.is_dir():
@@ -1002,7 +1024,7 @@ def list_bmp_in_folder(folder: str | Path) -> list[Path]:
         m = _BMP_RE.match(f.name)
         if m:
             bmps.append((int(m.group(1)), f))
-    bmps.sort(key=lambda x: x[0])
+    bmps = _sort_bmp_entries(bmps)
     # Fallback: mọi file .bmp nếu không theo định dạng đặt tên chuẩn
     if not bmps:
         extra: list[tuple[int, Path]] = []
@@ -1043,7 +1065,7 @@ def _require_overview_png_and_bmps(folder: str | Path) -> tuple[Path, list[Path]
         )
     bmps = list_bmp_in_folder(p)
     if not bmps:
-        raise FileNotFoundError(f"Không tìm thấy PS-SDxxxx.BMP trong {p!s}.")
+        raise FileNotFoundError(f"Không tìm thấy PS-SDxxx.BMP trong {p!s}.")
     return overview, bmps
 
 def _take(lst: list[Path], idx: int, fallback: Path | None) -> Path | None:
@@ -1054,7 +1076,7 @@ def auto_pick_mba_images(folder: str | Path) -> dict[str, str]:
 
     Yêu cầu:
     - 1 file 'a.png' cho ảnh tổng quan (imga).
-    - Các file 'PS-SDxxxx.BMP' cho ảnh thông số (img1, img2, img4, img6).
+    - Các file 'PS-SDxxx.BMP' cho ảnh thông số (img1, img2, img4, img6).
 
     Args:
         folder: Thư mục chứa ảnh của máy biến áp.
@@ -1077,7 +1099,7 @@ def auto_pick_device_images(folder: str | Path) -> dict[str, str]:
     """Chọn ảnh cho template device (``imga`` + ``img1``…``img6``).
 
     * ``imga``: **bắt buộc** file ``a.png`` trong thư mục.
-    * ``img1``…``img6``: ``PS-SDxxxx.BMP`` theo thứ tự số (vd 641–646 → ``img1``–``img6``).
+    * ``img1``…``img6``: ``PS-SDxxx.BMP`` theo thứ tự dải ảnh, hỗ trợ vòng 999→000.
     """
     overview, bmps = _require_overview_png_and_bmps(folder)
     fb = bmps[0]
@@ -1933,7 +1955,7 @@ def build_word_report_from_zip(
         if not raw_dirs:
             raise ValueError(
                 "ZIP không chứa thư mục thiết bị nào. Cấu trúc mong đợi: "
-                "Project_Output/<Tên thiết bị>/ (a.png, PS-SDxxxx.BMP)."
+                "Project_Output/<Tên thiết bị>/ (a.png, PS-SDxxx.BMP)."
             )
 
         excel_path = _find_first_excel(extract)
@@ -2041,7 +2063,7 @@ def _build_chapter_from_zip(
         if not raw_dirs:
             raise ValueError(
                 "ZIP không chứa thư mục thiết bị nào. Cấu trúc mong đợi: "
-                "Project_Output/<Tên thiết bị>/ (a.png, PS-SDxxxx.BMP)."
+                "Project_Output/<Tên thiết bị>/ (a.png, PS-SDxxx.BMP)."
             )
 
         excel_path = _find_first_excel(extract)
