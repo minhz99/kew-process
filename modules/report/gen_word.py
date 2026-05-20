@@ -1059,10 +1059,14 @@ def _require_overview_png_and_bmps(folder: str | Path) -> tuple[Path, list[Path]
     p = Path(folder)
     overview = find_overview_png(p)
     if overview is None:
-        raise FileNotFoundError(
-            f"Thiếu file a.png (ảnh tổng quan) trong {p!s}. "
-            "Vui lòng đặt a.png trong thư mục thiết bị."
-        )
+        fallback = _REPO_ROOT / "static" / "word-template" / "a.png"
+        if fallback.is_file():
+            overview = fallback
+        else:
+            raise FileNotFoundError(
+                f"Thiếu file a.png (ảnh tổng quan) trong {p!s}. "
+                "Vui lòng đặt a.png trong thư mục thiết bị."
+            )
     bmps = list_bmp_in_folder(p)
     if not bmps:
         raise FileNotFoundError(f"Không tìm thấy PS-SDxxx.BMP trong {p!s}.")

@@ -158,7 +158,7 @@ Input nên là `KEW_HoSoDaXuLy.zip` từ bước sơ bộ. Hệ thống tìm `Pr
 
 Chỉ các dòng Excel có `type = 4` hoặc `type = device4` mới được đưa vào Chương 4. Mỗi thư mục thiết bị cần có:
 
-- `a.png`
+- `a.png` (nếu thiếu, hệ thống sẽ tự động dùng ảnh mặc định tại `static/word-template/a.png`)
 - Các file `PS-SDxxx.BMP` theo thứ tự số. Template device cần 6 ảnh; nếu ít hơn, code sẽ lặp lại ảnh đầu tiên cho slot thiếu, nhưng nên chuẩn bị đủ 6 ảnh để báo cáo đúng.
 
 Template sử dụng: `static/word-template/device4.docx`.
@@ -183,7 +183,7 @@ Quy tắc phân loại:
 
 Mỗi thư mục MBA/thiết bị cần có:
 
-- `a.png`
+- `a.png` (nếu thiếu, tự động dùng ảnh mặc định từ `static/word-template/a.png`)
 - `PS-SDxxx.BMP`
 - Với MBA, nên có `INPSxxxx.KEW` để bảng thông số trong template lấy dữ liệu thật. Nếu thiếu, một số bảng sẽ hiện dấu `—`.
 
@@ -254,7 +254,7 @@ Template sử dụng: `static/word-template/table6.docx`.
 - **Không có thư mục Sxxxx**: cột `file` trỏ tới record không có trong ZIP.
 - **Thiếu ảnh BMP**: dải `img` - `imgend` có ảnh không tồn tại.
 - **Trùng dải ảnh**: hai thiết bị có dải ảnh giao nhau.
-- **Thiếu `a.png`**: bước sơ bộ có thể chạy, nhưng bước Word sẽ lỗi khi render section.
+- **Thiếu `a.png`**: bước sơ bộ có thể chạy; ở bước tạo Word, nếu thiếu `a.png`, hệ thống sẽ tự động sử dụng ảnh mặc định `static/word-template/a.png` làm fallback.
 - **Chương 4 rỗng**: không có dòng Excel nào có `type = 4`/`device4`.
 - **Excel MBA báo không tìm thấy MBA**: cột `type` chưa điền `MBA`, hoặc tên thư mục không được đoán là MBA.
 

@@ -52,4 +52,4 @@ Các cột này có thể để trống. Khi chạy **Xử lý file sơ bộ**, 
 - `img` đến `imgend` là dải ảnh bao gồm cả hai đầu.
 - Dải ảnh giữa các thiết bị không được chồng lấn.
 - `imgomit` chỉ nên chứa số ảnh nằm trong dải của chính thiết bị đó.
-- Mỗi thư mục thiết bị cần có `a.png` để tạo báo cáo Word.
+- Mỗi thư mục thiết bị cần có `a.png` để tạo báo cáo Word (nếu không có, hệ thống sẽ tự động dùng ảnh mặc định tại `static/word-template/a.png`).
