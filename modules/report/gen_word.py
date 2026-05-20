@@ -575,6 +575,51 @@ def _fmt_remark_voltage(v: float | None, decimals: int = 1) -> str:
     return f"{v:.{decimals}f}".replace(".", ",")
 
 
+def _lcfirst(s: str) -> str:
+    """Chuyển chữ cái đầu tiên của chuỗi sang chữ thường.
+
+    Quy tắc "không viết hoa giữa câu":
+    - Nếu từ đầu tiên viết hoa toàn bộ (VD: MBA, MSB, T1, THD, TDD…), giữ nguyên
+      vì đây là tên viết tắt / tên riêng thiết bị.
+    - Ngược lại, chuyển ký tự đầu sang chữ thường để tránh viết hoa giữa câu.
+
+    Args:
+        s: Chuỗi cần xử lý.
+
+    Returns:
+        str: Chuỗi đã chuyển chữ cái đầu sang thường (nếu cần).
+    """
+    if not s:
+        return s
+    # Kiểm tra từ đầu tiên: nếu là từ viết tắt hoàn toàn bằng chữ hoa (và chữ số)
+    # thì giữ nguyên (VD: MBA, MSB, T1, THD, TDD, ΔU…).
+    first_word = s.split()[0] if s.split() else ""
+    # Từ viết tắt: chỉ gồm ký tự ASCII hoa, chữ số, hoặc ký hiệu đặc biệt (Δ, φ, ≈…)
+    if first_word and first_word == first_word.upper() and any(c.isalpha() for c in first_word):
+        return s
+    # Chuyển ký tự đầu tiên sang chữ thường (hỗ trợ Unicode / tiếng Việt)
+    return s[0].lower() + s[1:]
+
+
+def _join_mid_sentence(phrases: list[str], sep: str = ", ") -> str:
+    """Ghép nhiều cụm từ thành một câu, áp dụng quy tắc không viết hoa giữa câu.
+
+    Phần tử đầu tiên giữ nguyên (đầu câu), các phần tử tiếp theo được chuyển ký
+    tự đầu sang chữ thường qua ``_lcfirst`` (trừ tên viết tắt thiết bị).
+
+    Args:
+        phrases: Danh sách các cụm từ cần ghép.
+        sep: Ký tự phân cách (mặc định ", ").
+
+    Returns:
+        str: Chuỗi đã ghép theo quy tắc không viết hoa giữa câu.
+    """
+    if not phrases:
+        return ""
+    result = [phrases[0]] + [_lcfirst(p) for p in phrases[1:]]
+    return sep.join(result)
+
+
 def _merge_auto_and_excel_notes(auto: str, excel_bits: str) -> str:
     """Ghép đoạn nhận xét sinh tự động với ghi chú bổ sung từ Excel hiện trường.
 
@@ -2224,7 +2269,9 @@ def _t6_auto_nhan_xet(delta_I: object, cos_phi: object, tdd: object) -> str:
 
     if not vi_pham:
         return "Thiết bị vận hành ổn định"
-    return ", ".join(vi_pham)
+    # Áp dụng quy tắc không viết hoa giữa câu: chỉ phần tử đầu giữ hoa,
+    # các phần tử tiếp theo chuyển chữ đầu sang thường (trừ tên viết tắt thiết bị).
+    return _join_mid_sentence(vi_pham)
 
 
 def _t6_fmt(v: object, decimals: int = 2) -> str:
