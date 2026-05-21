@@ -654,10 +654,14 @@ def _device_tdd_limit_from_name(name: str) -> float:
 # ──────────────────────────────────────────────────────────────────────────────
 
 _CURRENT_CHAR_MAP: dict[str, str] = {
-    "ổn định": "ổn định",
-    "dao động nhẹ": "có sự dao động nhẹ",
-    "biến đổi liên tục": "biến đổi liên tục với biên độ nhỏ",
+    "biến đổi liên tục theo tải": "biến đổi liên tục theo tải",
+    "biên độ nhỏ": "biến đổi liên tục với biên độ nhỏ",
+    "biến đổi liên tục": "biến đổi liên tục",
     "load/unload": "biến đổi theo chu kỳ Load/Unload",
+    "dao động nhẹ": "có sự dao động nhẹ",
+    "biến đổi nhẹ": "biến đổi nhẹ",
+    "tương đối ổn định": "tương đối ổn định",
+    "ổn định": "ổn định",
 }
 
 def _parse_float_field(v: object) -> float | None:
