@@ -20,7 +20,7 @@ Tài liệu này mô tả riêng file Excel hiện trường đang được code
 | `imgend` | Số ảnh BMP kết thúc | `646` |
 | `type` | Loại section: `MBA`, `4`/`device4`, hoặc `device` | `MBA` |
 | `pdm` | Công suất định mức kVA | `1600` |
-| `current_char` | Đặc tính dòng điện | `ổn định`, `dao động nhẹ`, `biến đổi liên tục`, `load/unload` |
+| `current_char` | Đặc tính dòng điện | `ổn định`, `tương đối ổn định`, `dao động nhẹ`, `biến đổi nhẹ`, `biến đổi liên tục`, `biên độ nhỏ` (biến đổi liên tục với biên độ nhỏ), `biến đổi liên tục theo tải`, `load/unload` |
 
 ## Cột Tùy Chọn
 

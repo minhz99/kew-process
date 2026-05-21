@@ -58,7 +58,7 @@ Tên cột được so khớp không phân biệt hoa thường và bỏ khoản
 | `imgend` | Số ảnh BMP cuối cùng trong dải ảnh của thiết bị | `646` |
 | `type` | Loại section: `MBA`, `4`/`device4`, hoặc `device` | `MBA` |
 | `pdm` | Công suất định mức kVA, dùng cho MBA và bảng tổng hợp MBA | `1600` |
-| `current_char` | Đặc tính dòng điện để sinh nhận xét | `ổn định`, `dao động nhẹ`, `biến đổi liên tục`, `load/unload` |
+| `current_char` | Đặc tính dòng điện để sinh nhận xét | `ổn định`, `tương đối ổn định`, `dao động nhẹ`, `biến đổi nhẹ`, `biến đổi liên tục`, `biên độ nhỏ` (biến đổi liên tục với biên độ nhỏ), `biến đổi liên tục theo tải`, `load/unload` |
 
 ### Cột tùy chọn
 
